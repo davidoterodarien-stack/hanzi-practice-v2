@@ -13,6 +13,17 @@
 <meta name="author" content="大卫 · dawei.com.ar" />
 <meta name="copyright" content="© 2026 大卫 · dawei.com.ar" />
 <meta name="generator" content="Hanzi Practice App · 大卫 · dawei.com.ar" />
+<meta name="description" content="Repaso interactivo de chino mandarín · 汉语课 CUI Nivel 2 · Ariel 老师" />
+<!-- Open Graph (WhatsApp, Facebook, LinkedIn) -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="汉字 Practice · Repaso de chino" />
+<meta property="og:description" content="Lecciones, tarjetas, quiz y juegos de gramática para repasar chino mandarín. 汉语课 CUI · Nivel 2 · Ariel 老师" />
+<meta property="og:image" content="https://davidoterodarien-stack.github.io/hanzi-practice-v2/preview.png" />
+<meta property="og:url" content="https://davidoterodarien-stack.github.io/hanzi-practice-v2" />
+<!-- Twitter/X -->
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="汉字 Practice · Repaso de chino" />
+<meta name="twitter:description" content="Lecciones, tarjetas, quiz y juegos de gramática · CUI Nivel 2" />
 <title>汉字 Practice - Repaso de chino mandarín</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -543,6 +554,39 @@
   .prueba-icon.clas { background: #EDE9FE; color: #5B21B6; }
   .prueba-icon.dial { background: #DBEAFE; color: #1E40AF; }
   .prueba-icon.orden { background: #D1FAE5; color: #065F46; }
+  .prueba-icon.audio { background: #FEF3C7; color: #92400E; }
+
+  /* audio game */
+  .audio-game-cols { display: flex; gap: 16px; margin-top: 8px; }
+  .audio-col { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .audio-sound-btn {
+    background: #fff; border: 2px solid var(--paper-deep);
+    border-radius: 14px; padding: 14px 10px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; font-size: 22px; cursor: pointer; font-weight: 800;
+    font-family: 'Nunito', sans-serif; transition: all .15s;
+    box-shadow: var(--shadow-paper);
+  }
+  .audio-sound-btn.playing { border-color: var(--gold); background: #FEF3C7; transform: scale(1.04); }
+  .audio-sound-btn.selected { border-color: var(--jade); background: var(--jade-light); }
+  .audio-sound-btn.matched { border-color: var(--jade); background: var(--jade-light); opacity: 0.5; pointer-events: none; }
+  .audio-sound-btn.wrong { border-color: var(--error); background: #FDE4DD; animation: shake .3s; }
+  .audio-hanzi-btn {
+    background: #fff; border: 2px solid var(--paper-deep);
+    border-radius: 14px; padding: 16px 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-family: 'Noto Serif SC', serif;
+    font-weight: 700; cursor: pointer; transition: all .15s;
+    box-shadow: var(--shadow-paper);
+  }
+  .audio-hanzi-btn.selected { border-color: var(--lacquer); background: #FDE4DD; transform: scale(1.04); }
+  .audio-hanzi-btn.matched { border-color: var(--jade); background: var(--jade-light); opacity: 0.5; pointer-events: none; }
+  .audio-hanzi-btn.wrong { border-color: var(--error); background: #FDE4DD; animation: shake .3s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
 
   /* name modal */
   .name-modal-overlay {
@@ -642,7 +686,7 @@
   .orden-hint { font-size: 12px; color: var(--ink-soft); font-weight: 700; text-align: center; margin-bottom: 12px; }
   .word-chip {
     background: #fff; border: 2px solid var(--paper-deep); border-radius: 10px;
-    padding: 10px 16px; font-size: 18px; font-weight: 700; cursor: pointer;
+    padding: 12px 20px; font-size: 26px; font-weight: 700; cursor: pointer;
     font-family: 'Noto Serif SC', serif; transition: transform 0.1s; display: inline-block;
   }
   .word-chip:active { transform: scale(0.94); }
@@ -667,6 +711,12 @@
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://pwqwlfrlaxnybnkdauvk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__0T0_tkgiEdgUGtwMoSHjA_xRd8btWE';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
 <script>
 const { useState, useEffect, useMemo } = React;
 const { createRoot } = ReactDOM;
@@ -792,6 +842,102 @@ const DEFAULT_VOCAB = {
     {"hanzi": "百", "pinyin": "bǎi", "es": "cien"},
     {"hanzi": "哥哥", "pinyin": "gēge", "es": "hermano mayor"},
     {"hanzi": "妈妈", "pinyin": "māma", "es": "mamá"}
+  ],
+  "9": [
+    {"hanzi": "今年", "pinyin": "jīnnián", "es": "este año"},
+    {"hanzi": "年", "pinyin": "nián", "es": "año"},
+    {"hanzi": "岁", "pinyin": "suì", "es": "años (edad)"},
+    {"hanzi": "怎么样", "pinyin": "zěnmeyàng", "es": "¿qué tal?, ¿cómo está?"},
+    {"hanzi": "今天", "pinyin": "jīntiān", "es": "hoy"},
+    {"hanzi": "课", "pinyin": "kè", "es": "clase"},
+    {"hanzi": "星期", "pinyin": "xīngqī", "es": "semana"},
+    {"hanzi": "上午", "pinyin": "shàngwǔ", "es": "por la mañana"},
+    {"hanzi": "下午", "pinyin": "xiàwǔ", "es": "por la tarde"},
+    {"hanzi": "晚上", "pinyin": "wǎnshang", "es": "noche"},
+    {"hanzi": "星期日", "pinyin": "xīngqīrì", "es": "domingo"},
+    {"hanzi": "生日", "pinyin": "shēngrì", "es": "cumpleaños"},
+    {"hanzi": "多大", "pinyin": "duō dà", "es": "¿cuántos años?"},
+    {"hanzi": "多", "pinyin": "duō", "es": "mucho; ¿cuánto?"},
+    {"hanzi": "大", "pinyin": "dà", "es": "grande"},
+    {"hanzi": "出生", "pinyin": "chūshēng", "es": "nacer"},
+    {"hanzi": "属", "pinyin": "shǔ", "es": "nacer en el año de..."},
+    {"hanzi": "聚会", "pinyin": "jùhuì", "es": "fiesta; reunión"},
+    {"hanzi": "祝贺", "pinyin": "zhùhè", "es": "felicitar"},
+    {"hanzi": "参加", "pinyin": "cānjiā", "es": "participar; asistir"},
+    {"hanzi": "了", "pinyin": "le", "es": "partícula de aspecto"},
+    {"hanzi": "吃", "pinyin": "chī", "es": "comer"},
+    {"hanzi": "蛋糕", "pinyin": "dàngāo", "es": "pastel; torta"},
+    {"hanzi": "买", "pinyin": "mǎi", "es": "comprar"},
+    {"hanzi": "瓶", "pinyin": "píng", "es": "botella (clasificador)"},
+    {"hanzi": "红葡萄酒", "pinyin": "hóng pútaojiǔ", "es": "vino tinto"},
+    {"hanzi": "酒", "pinyin": "jiǔ", "es": "vino; licor"},
+    {"hanzi": "北京", "pinyin": "Běijīng", "es": "Pekín"},
+    {"hanzi": "中餐", "pinyin": "zhōngcān", "es": "comida china"},
+    {"hanzi": "西餐", "pinyin": "xīcān", "es": "comida occidental"},
+    {"hanzi": "茶", "pinyin": "chá", "es": "té"},
+    {"hanzi": "可乐", "pinyin": "kělè", "es": "Coca-Cola"},
+    {"hanzi": "汉堡", "pinyin": "hànbǎo", "es": "hamburguesa"},
+    {"hanzi": "热狗", "pinyin": "règǒu", "es": "pancho / hot dog"},
+    {"hanzi": "面包", "pinyin": "miànbāo", "es": "pan"},
+    {"hanzi": "牛奶", "pinyin": "niúnǎi", "es": "leche"},
+    {"hanzi": "米饭", "pinyin": "mǐfàn", "es": "arroz cocido"},
+    {"hanzi": "啤酒", "pinyin": "píjiǔ", "es": "cerveza"}
+  ],
+  "mod-paises": [
+    {"hanzi": "中国", "pinyin": "Zhōngguó", "es": "🇨🇳 China"},
+    {"hanzi": "阿根廷", "pinyin": "Āgēntíng", "es": "🇦🇷 Argentina"},
+    {"hanzi": "墨西哥", "pinyin": "Mòxīgē", "es": "🇲🇽 México"},
+    {"hanzi": "巴西", "pinyin": "Bāxī", "es": "🇧🇷 Brasil"},
+    {"hanzi": "哥伦比亚", "pinyin": "Gēlúnbǐyà", "es": "🇨🇴 Colombia"},
+    {"hanzi": "智利", "pinyin": "Zhìlì", "es": "🇨🇱 Chile"},
+    {"hanzi": "委内瑞拉", "pinyin": "Wěinèiruìlā", "es": "🇻🇪 Venezuela"},
+    {"hanzi": "玻利维亚", "pinyin": "Bōlìwéiyà", "es": "🇧🇴 Bolivia"},
+    {"hanzi": "秘鲁", "pinyin": "Bìlǔ", "es": "🇵🇪 Perú"},
+    {"hanzi": "乌拉圭", "pinyin": "Wūlāguī", "es": "🇺🇾 Uruguay"},
+    {"hanzi": "巴拉圭", "pinyin": "Bālāguī", "es": "🇵🇾 Paraguay"},
+    {"hanzi": "厄瓜多尔", "pinyin": "Èkuǎduōěr", "es": "🇪🇨 Ecuador"},
+    {"hanzi": "古巴", "pinyin": "Gǔbā", "es": "🇨🇺 Cuba"},
+    {"hanzi": "巴拿马", "pinyin": "Pānámǎ", "es": "🇵🇦 Panamá"},
+    {"hanzi": "哥斯达黎加", "pinyin": "Gēsīdálígā", "es": "🇨🇷 Costa Rica"},
+    {"hanzi": "洪都拉斯", "pinyin": "Hóngdūlāsī", "es": "🇭🇳 Honduras"},
+    {"hanzi": "危地马拉", "pinyin": "Wēidìmǎlā", "es": "🇬🇹 Guatemala"},
+    {"hanzi": "波多黎各", "pinyin": "Bōduōlígē", "es": "🇵🇷 Puerto Rico"},
+    {"hanzi": "美国", "pinyin": "Měiguó", "es": "🇺🇸 Estados Unidos"},
+    {"hanzi": "加拿大", "pinyin": "Jiānádà", "es": "🇨🇦 Canadá"},
+    {"hanzi": "日本", "pinyin": "Rìběn", "es": "🇯🇵 Japón"},
+    {"hanzi": "英国", "pinyin": "Yīngguó", "es": "🇬🇧 Reino Unido"},
+    {"hanzi": "西班牙", "pinyin": "Xībānyá", "es": "🇪🇸 España"},
+    {"hanzi": "法国", "pinyin": "Fǎguó", "es": "🇫🇷 Francia"},
+    {"hanzi": "德国", "pinyin": "Déguó", "es": "🇩🇪 Alemania"},
+    {"hanzi": "意大利", "pinyin": "Yīdàlì", "es": "🇮🇹 Italia"},
+    {"hanzi": "葡萄牙", "pinyin": "Pútáoyá", "es": "🇵🇹 Portugal"},
+    {"hanzi": "俄罗斯", "pinyin": "Éluósī", "es": "🇷🇺 Rusia"},
+    {"hanzi": "荷兰", "pinyin": "Hélán", "es": "🇳🇱 Países Bajos"},
+    {"hanzi": "瑞士", "pinyin": "Ruìshì", "es": "🇨🇭 Suiza"},
+    {"hanzi": "瑞典", "pinyin": "Ruìdiǎn", "es": "🇸🇪 Suecia"},
+    {"hanzi": "波兰", "pinyin": "Bōlán", "es": "🇵🇱 Polonia"}
+  ],
+  "mod-numeros": [
+    {"hanzi": "零", "pinyin": "líng", "es": "0 · cero"},
+    {"hanzi": "一", "pinyin": "yī", "es": "1 · uno"},
+    {"hanzi": "二", "pinyin": "èr", "es": "2 · dos"},
+    {"hanzi": "三", "pinyin": "sān", "es": "3 · tres"},
+    {"hanzi": "四", "pinyin": "sì", "es": "4 · cuatro"},
+    {"hanzi": "五", "pinyin": "wǔ", "es": "5 · cinco"},
+    {"hanzi": "六", "pinyin": "liù", "es": "6 · seis"},
+    {"hanzi": "七", "pinyin": "qī", "es": "7 · siete"},
+    {"hanzi": "八", "pinyin": "bā", "es": "8 · ocho"},
+    {"hanzi": "九", "pinyin": "jiǔ", "es": "9 · nueve"},
+    {"hanzi": "十", "pinyin": "shí", "es": "10 · diez"},
+    {"hanzi": "二十", "pinyin": "èrshí", "es": "20 · veinte"},
+    {"hanzi": "三十", "pinyin": "sānshí", "es": "30 · treinta"},
+    {"hanzi": "四十", "pinyin": "sìshí", "es": "40 · cuarenta"},
+    {"hanzi": "五十", "pinyin": "wǔshí", "es": "50 · cincuenta"},
+    {"hanzi": "六十", "pinyin": "liùshí", "es": "60 · sesenta"},
+    {"hanzi": "七十", "pinyin": "qīshí", "es": "70 · setenta"},
+    {"hanzi": "八十", "pinyin": "bāshí", "es": "80 · ochenta"},
+    {"hanzi": "九十", "pinyin": "jiǔshí", "es": "90 · noventa"},
+    {"hanzi": "一百", "pinyin": "yībǎi", "es": "100 · cien"}
   ]
 };
 
@@ -829,12 +975,15 @@ function shuffle(arr) {
   return a;
 }
 
-const LESSON_THEMES = {
+const LESSON_THEMES = Object.assign({
   "5": { name: "En el campus", icon: "宿" },
   "6": { name: "El clima y el tiempo", icon: "天" },
   "7": { name: "Presentaciones", icon: "介" },
   "8": { name: "La familia", icon: "家" },
-};
+  "9": { name: "Fechas y celebraciones", icon: "🎂" },
+  "mod-paises": { name: "Países del mundo", icon: "国" },
+  "mod-numeros": { name: "Los números", icon: "数" },
+}, JSON.parse(localStorage.getItem('hanzi-lesson-themes') || '{}'));
 
 // ----------------- Prueba data -----------------
 const CLASIFICADOR_QUESTIONS = [
@@ -889,8 +1038,11 @@ function downloadResumen(vocab, progress, lessons, playerName) {
     </tr>`
   ).join('');
 
-  // ── Lecciones: tabla de puntajes ──────────────────────────────────────────
-  const lessonRows = lessons.map(id => {
+  // ── Lecciones regulares (1-8): tabla de puntajes ─────────────────────────
+  const regularLessons = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros');
+  const specialLessons = lessons.filter(id => id === 'mod-paises' || id === 'mod-numeros');
+
+  const lessonRows = regularLessons.map(id => {
     const lp = progress.lessons[id] || {};
     const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
     const m = lp.match || 0, c = lp.cards || 0, q = lp.quiz || 0;
@@ -902,22 +1054,50 @@ function downloadResumen(vocab, progress, lessons, playerName) {
     </tr>`;
   }).join('');
 
+  // ── Módulos especiales (países y números) ─────────────────────────────────
+  const specialRows = specialLessons.map(id => {
+    const lp = progress.lessons[id] || {};
+    const theme = LESSON_THEMES[id] || { name: id === 'mod-paises' ? 'Países del mundo' : 'Los números' };
+    const m = lp.match || 0, c = lp.cards || 0, q = lp.quiz || 0;
+    return `<tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #F3E6CC"><strong>${theme.name}</strong></td>
+      <td style="color:${scoreColor(m)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(m)} ${m}%</td>
+      <td style="color:${scoreColor(c)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(c)} ${c}%</td>
+      <td style="color:${scoreColor(q)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(q)} ${q}%</td>
+    </tr>`;
+  }).join('');
+
   // ── Para repasar: errores reales por módulo ───────────────────────────────
   let repasarHTML = '';
 
-  // Lecciones
-  lessons.forEach(id => {
+  // Lecciones regulares
+  regularLessons.forEach(id => {
     const lp = progress.lessons[id] || {};
     const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
-
     ['match', 'cards', 'quiz'].forEach(mode => {
       const modeLabel = { match: 'Emparejar', cards: 'Tarjetas', quiz: 'Quiz' }[mode];
       const missed = lp[mode + '_missed'] || [];
       if (missed.length === 0) return;
-      // Deduplicate by hanzi
       const unique = missed.filter((w, i, arr) => arr.findIndex(x => x.hanzi === w.hanzi) === i);
       repasarHTML += `<h3 style="margin:24px 0 6px;color:#2E2A26;font-size:15px">
         Lección ${id} · ${theme.name} — <em>${modeLabel}</em>
+        <span style="font-size:12px;color:#C1432B;font-weight:700">(${unique.length} ${unique.length === 1 ? 'error' : 'errores'})</span>
+      </h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px">${wordRows(unique)}</table>`;
+    });
+  });
+
+  // Módulos especiales
+  specialLessons.forEach(id => {
+    const lp = progress.lessons[id] || {};
+    const theme = LESSON_THEMES[id] || { name: id === 'mod-paises' ? 'Países del mundo' : 'Los números' };
+    ['match', 'cards', 'quiz'].forEach(mode => {
+      const modeLabel = { match: 'Emparejar', cards: 'Tarjetas', quiz: 'Quiz' }[mode];
+      const missed = lp[mode + '_missed'] || [];
+      if (missed.length === 0) return;
+      const unique = missed.filter((w, i, arr) => arr.findIndex(x => x.hanzi === w.hanzi) === i);
+      repasarHTML += `<h3 style="margin:24px 0 6px;color:#2E2A26;font-size:15px">
+        ${theme.name} — <em>${modeLabel}</em>
         <span style="font-size:12px;color:#C1432B;font-weight:700">(${unique.length} ${unique.length === 1 ? 'error' : 'errores'})</span>
       </h3>
       <table style="width:100%;border-collapse:collapse;margin-bottom:4px">${wordRows(unique)}</table>`;
@@ -958,6 +1138,11 @@ function downloadResumen(vocab, progress, lessons, playerName) {
     <th>Lección</th><th>Emparejar</th><th>Tarjetas</th><th>Quiz</th>
   </tr></thead><tbody>${lessonRows}</tbody></table>
 
+  ${specialRows ? `<h2>🌍 Módulos especiales</h2>
+  <table><thead><tr>
+    <th>Módulo</th><th>Emparejar</th><th>Tarjetas</th><th>Quiz</th>
+  </tr></thead><tbody>${specialRows}</tbody></table>` : ''}
+
   <h2>🧠 ¿Cuánto aprendiste?</h2>
   <table><tbody>
     <tr><td style="padding:10px 12px;border-bottom:1px solid #F3E6CC">Clasificadores</td><td style="color:${scoreColor(pp.clas||0)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(pp.clas||0)} ${pp.clas||0}%</td></tr>
@@ -982,6 +1167,161 @@ function downloadResumen(vocab, progress, lessons, playerName) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ----------------- Prueba: Audio -----------------
+let _zhVoice = null;
+function getZhVoice() {
+  if (_zhVoice) return _zhVoice;
+  const voices = window.speechSynthesis.getVoices();
+  _zhVoice = voices.find(v => v.lang === 'zh-CN') ||
+             voices.find(v => v.lang.startsWith('zh')) ||
+             null;
+  return _zhVoice;
+}
+window.speechSynthesis.onvoiceschanged = () => { _zhVoice = null; };
+
+function speak(text) {
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = 0.85;
+  const voice = getZhVoice();
+  if (voice) u.voice = voice;
+  window.speechSynthesis.speak(u);
+}
+
+function buildAudioRound(allWords) {
+  const picked = shuffle([...allWords]).slice(0, 6);
+  const soundCol = shuffle(picked.map((w, i) => ({ ...w, sid: 's' + i })));
+  const hanziCol = shuffle(picked.map((w, i) => ({ ...w, hid: 'h' + i })));
+  return { picked, soundCol, hanziCol };
+}
+
+function AudioGame({ allWords, onBack, onFinish, playerName }) {
+  const [round, setRound] = useState(() => buildAudioRound(allWords));
+  const [selectedSound, setSelectedSound] = useState(null);
+  const [selectedHanzi, setSelectedHanzi] = useState(null);
+  const [matched, setMatched] = useState(new Set());
+  const [wrong, setWrong] = useState([]);
+  const [errors, setErrors] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [playing, setPlaying] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const { soundCol, hanziCol, picked } = round;
+
+  const playSound = (item) => {
+    setPlaying(item.sid);
+    speak(item.hanzi);
+    setTimeout(() => setPlaying(null), 1200);
+    if (!matched.has(item.hanzi)) setSelectedSound(item);
+  };
+
+  const pickHanzi = (item) => {
+    if (matched.has(item.hanzi) || !selectedSound) return;
+    setSelectedHanzi(item);
+
+    if (selectedSound.hanzi === item.hanzi) {
+      // Correcto
+      const newMatched = new Set(matched);
+      newMatched.add(item.hanzi);
+      setMatched(newMatched);
+      setSelectedSound(null);
+      setSelectedHanzi(null);
+
+      if (newMatched.size === picked.length) {
+        const pct = Math.round((picked.length / (picked.length + errors)) * 100);
+        if (onFinish) onFinish(pct, missed);
+        setDone(true);
+      }
+    } else {
+      // Incorrecto
+      const newErrors = errors + 1;
+      setErrors(newErrors);
+      if (!missed.find(m => m.hanzi === selectedSound.hanzi)) {
+        setMissed(prev => [...prev, { hanzi: selectedSound.hanzi, pinyin: selectedSound.pinyin, es: selectedSound.es }]);
+      }
+      setWrong([selectedSound.sid, item.hid]);
+      setTimeout(() => {
+        setWrong([]);
+        setSelectedSound(null);
+        setSelectedHanzi(null);
+      }, 600);
+    }
+  };
+
+  const retry = () => {
+    setRound(buildAudioRound(allWords));
+    setSelectedSound(null);
+    setSelectedHanzi(null);
+    setMatched(new Set());
+    setWrong([]);
+    setErrors(0);
+    setMissed([]);
+    setPlaying(null);
+    setDone(false);
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((picked.length / (picked.length + errors)) * 100),
+    total: picked.length, correct: picked.length, missed,
+    onRetry: retry, onBack, playerName,
+  });
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px', paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Reconocer por audio'),
+        html('div', { className: 'flash-counter' }, matched.size + '/' + picked.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' }, html('i', null, '✕'), 'Errores: ' + errors),
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), 'Aciertos: ' + matched.size),
+      ),
+      html('p', { style: { textAlign: 'center', fontSize: 13, color: 'var(--ink-soft)', fontWeight: 700, margin: '4px 0 12px' } },
+        selectedSound
+          ? '👆 Ahora tocá el hanzi que corresponde'
+          : '👆 Tocá un 🔊 para escuchar la palabra'
+      ),
+      html('div', { className: 'audio-game-cols' },
+        // Columna izquierda: botones de audio
+        html('div', { className: 'audio-col' },
+          soundCol.map(item => {
+            const isMatched = matched.has(item.hanzi);
+            const isPlaying = playing === item.sid;
+            const isSelected = selectedSound && selectedSound.sid === item.sid;
+            const isWrong = wrong.includes(item.sid);
+            let cls = 'audio-sound-btn';
+            if (isMatched) cls += ' matched';
+            else if (isWrong) cls += ' wrong';
+            else if (isPlaying) cls += ' playing';
+            else if (isSelected) cls += ' selected';
+            return html('button', { key: item.sid, className: cls, onClick: () => !isMatched && playSound(item) },
+              html('span', null, isMatched ? '✓' : '🔊'),
+              html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)' } }, isMatched ? item.hanzi : '#' + (soundCol.indexOf(item) + 1)),
+            );
+          })
+        ),
+        // Columna derecha: hanzi
+        html('div', { className: 'audio-col' },
+          hanziCol.map(item => {
+            const isMatched = matched.has(item.hanzi);
+            const isSelected = selectedHanzi && selectedHanzi.hid === item.hid;
+            const isWrong = wrong.includes(item.hid);
+            let cls = 'audio-hanzi-btn';
+            if (isMatched) cls += ' matched';
+            else if (isWrong) cls += ' wrong';
+            else if (isSelected) cls += ' selected';
+            return html('button', { key: item.hid, className: cls, onClick: () => pickHanzi(item) },
+              item.hanzi,
+            );
+          })
+        ),
+      ),
+    ),
+  );
 }
 
 // ----------------- Name Modal -----------------
@@ -1024,6 +1364,24 @@ function App() {
   const [progress, setProgress] = useState(loadProgress);
   const [screen, setScreen] = useState({ name: 'home' });
   const [lastResults, setLastResults] = useState({});
+
+  // Cargar vocab y temas desde Supabase al iniciar (sin bloquear la UI)
+  useEffect(() => {
+    db.from('vocabulary').select('lesson,hanzi,pinyin,es').then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        const remote = supabaseRowsToVocab(data);
+        // Merge: DEFAULT_VOCAB base + Supabase encima (Supabase gana si hay conflicto)
+        const merged = { ...DEFAULT_VOCAB, ...remote };
+        setVocab(merged);
+        localStorage.setItem(VOCAB_KEY, JSON.stringify(merged));
+      }
+    });
+    db.from('lesson_themes').select('lesson,name,icon,hidden').then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        data.forEach(r => { LESSON_THEMES[r.lesson] = { name: r.name, icon: r.icon || r.lesson, hidden: !!r.hidden }; });
+      }
+    });
+  }, []);
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(NAME_KEY) || '');
 
   useEffect(() => { saveProgress(progress); }, [progress]);
@@ -1075,6 +1433,7 @@ function App() {
       onAdmin: () => setScreen({ name: 'admin' }),
       onPrueba: (game) => setScreen({ name: 'prueba', game }),
       pruebaProgress: progress.prueba || {},
+      onRefuerzo: () => setScreen({ name: 'refuerzo' }),
       onDownload: () => downloadResumen(vocab, progress, lessons, playerName),
       playerName,
       onChangeName: () => { localStorage.removeItem(NAME_KEY); setPlayerName(''); },
@@ -1109,6 +1468,14 @@ function App() {
       onSaveResult: (result) => setLastResult(screen.lessonId, screen.mode, result),
       onClearResult: () => clearLastResult(screen.lessonId, screen.mode),
     });
+  } else if (screen.name === 'refuerzo') {
+    const missedWords = getMissedWords(progress);
+    const allWords = lessons.flatMap(id => vocab[id]);
+    content = html(RefuerzoSession, {
+      words: missedWords, allWords,
+      onBack: () => setScreen({ name: 'home' }),
+      playerName,
+    });
   } else if (screen.name === 'admin') {
     content = html(AdminPanel, {
       vocab,
@@ -1134,6 +1501,10 @@ function App() {
     if (screen.game === 'clas') content = html(ClasificadorGame, gameProps);
     else if (screen.game === 'dialogo') content = html(DialogoGame, gameProps);
     else if (screen.game === 'orden') content = html(OrdenGame, gameProps);
+    else if (screen.game === 'audio') {
+      const allWords = lessons.flatMap(id => vocab[id]);
+      content = html(AudioGame, { ...gameProps, allWords });
+    }
   }
 
   const handleSaveName = (name) => {
@@ -1148,7 +1519,7 @@ function App() {
 }
 
 // ----------------- Home -----------------
-function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, playerName, onChangeName }) {
+function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName }) {
   return html(React.Fragment, null,
     html('div', { className: 'topbar' },
       html('div', { className: 'brand' },
@@ -1181,7 +1552,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
       ),
       html('h2', { className: 'section-title' }, 'Elegí una lección'),
       html('div', { className: 'lesson-grid' },
-        lessons.map(id => {
+        lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros' && !LESSON_THEMES[id]?.hidden).map(id => {
           const words = vocab[id];
           const theme = LESSON_THEMES[id] || { name: 'Lección ' + id, icon: words[0]?.hanzi?.[0] || '汉' };
           const lp = progress.lessons[id] || {};
@@ -1202,13 +1573,55 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
           );
         })
       ),
+
+      // ── Módulos especiales ──
+      vocab['mod-paises'] && !LESSON_THEMES['mod-paises']?.hidden && html(React.Fragment, null,
+        html('h2', { className: 'section-title' }, 'Aprende los países'),
+        html('button', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14,
+            background: '#fff', border: '2px solid var(--paper-deep)', borderRadius: 'var(--radius)',
+            padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
+            boxShadow: 'var(--shadow-paper)',
+          },
+          onClick: () => onSelectLesson('mod-paises'),
+        },
+          html('div', { className: 'hanzi-font', style: { fontSize: 36, color: 'var(--lacquer)', minWidth: 44 } }, '国'),
+          html('div', null,
+            html('div', { style: { fontWeight: 800, fontSize: 15, color: 'var(--ink)' } }, 'Nombres de países en chino'),
+            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 } },
+              (vocab['mod-paises'] ? vocab['mod-paises'].length : 0) + ' países · Latinoamérica, Europa, Asia'
+            ),
+          ),
+        ),
+      ),
+
+      vocab['mod-numeros'] && !LESSON_THEMES['mod-numeros']?.hidden && html(React.Fragment, null,
+        html('h2', { className: 'section-title' }, 'Aprende los números'),
+        html('button', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14,
+            background: '#fff', border: '2px solid var(--paper-deep)', borderRadius: 'var(--radius)',
+            padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
+            boxShadow: 'var(--shadow-paper)',
+          },
+          onClick: () => onSelectLesson('mod-numeros'),
+        },
+          html('div', { className: 'hanzi-font', style: { fontSize: 36, color: 'var(--lacquer)', minWidth: 44 } }, '数'),
+          html('div', null,
+            html('div', { style: { fontWeight: 800, fontSize: 15, color: 'var(--ink)' } }, 'Del 0 al 100 en chino'),
+            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 } }, '0 al 10 · decenas del 20 al 100'),
+          ),
+        ),
+      ),
       html('h2', { className: 'section-title' }, '¿Cuánto aprendiste?'),
       html('div', { className: 'prueba-grid' },
         [
           { id: 'clas', icon: '🔢', cls: 'clas', title: 'Clasificadores', sub: 'Elige 个, 口, 张, 层 o 号 correctamente' },
           { id: 'dialogo', icon: '💬', cls: 'dial', title: 'Completa el diálogo', sub: 'Rellena el hueco de la conversación' },
           { id: 'orden', icon: '🔀', cls: 'orden', title: 'Ordena la oración', sub: 'Coloca las palabras en el orden correcto' },
-        ].map(g => {
+          { id: 'audio', icon: '🔊', cls: 'audio', title: 'Reconocer por audio', sub: 'Escuchá y uní el sonido con el hanzi' },
+        ].filter(g => !LESSON_THEMES['mod-' + g.id]?.hidden).map(g => {
           const best = pruebaProgress[g.id] || 0;
           const hasStar = best >= 80;
           return html('button', { key: g.id, className: 'prueba-card', onClick: () => onPrueba(g.id) },
@@ -1231,6 +1644,87 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
           html('div', { style: { fontSize: 12, opacity: 0.75, fontWeight: 600 } }, 'Aciertos, errores y palabras para repasar'),
         ),
       ),
+      !LESSON_THEMES['mod-refuerzo']?.hidden && html('h2', { className: 'section-title' }, 'Reforcemos'),
+      !LESSON_THEMES['mod-refuerzo']?.hidden && html('button', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: 14,
+          width: '100%', marginTop: 0, marginBottom: 12,
+          background: 'linear-gradient(135deg, var(--lacquer) 0%, var(--lacquer-dark) 100%)',
+          color: '#fff', border: 'none', borderRadius: 'var(--radius)',
+          padding: '16px 20px', cursor: 'pointer', textAlign: 'left',
+          boxShadow: '0 4px 16px rgba(193,67,43,0.28)',
+        },
+        onClick: onRefuerzo,
+      },
+        html('span', { style: { fontSize: 22 } }, '💪'),
+        html('span', null,
+          html('div', { style: { fontWeight: 800, fontSize: 15 } }, 'Práctica personalizada'),
+          html('div', { style: { fontSize: 12, opacity: 0.8, fontWeight: 600, marginTop: 2 } }, 'Ejercicios con tus palabras para reforzar'),
+        ),
+      ),
+    )
+  );
+}
+
+// ----------------- Números: tabla interactiva -----------------
+function NumbersIntro({ words, onBack, onPlay }) {
+  const [active, setActive] = useState(null);
+
+  const playNum = (w) => {
+    setActive(w.hanzi);
+    speak(w.hanzi);
+    setTimeout(() => setActive(null), 1200);
+  };
+
+  const singles = words.filter(w => ['零','一','二','三','四','五','六','七','八','九','十'].includes(w.hanzi));
+  const tens    = words.filter(w => w.hanzi.length > 1 && w.es.includes('·'));
+
+  const NumCard = ({ w }) => html('button', {
+    key: w.hanzi,
+    onClick: () => playNum(w),
+    style: {
+      background: active === w.hanzi ? 'var(--lacquer)' : '#fff',
+      border: '2px solid ' + (active === w.hanzi ? 'var(--lacquer)' : 'var(--paper-deep)'),
+      borderRadius: 14, padding: '10px 6px', cursor: 'pointer',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+      transition: 'all 0.15s',
+    }
+  },
+    html('div', { className: 'hanzi-font', style: { fontSize: 32, color: active === w.hanzi ? '#fff' : 'var(--lacquer)', lineHeight: 1 } }, w.hanzi),
+    html('div', { style: { fontSize: 11, fontWeight: 800, color: active === w.hanzi ? 'rgba(255,255,255,0.85)' : 'var(--lacquer-dark)', letterSpacing: 0.5 } }, w.pinyin),
+    html('div', { style: { fontSize: 10, color: active === w.hanzi ? 'rgba(255,255,255,0.75)' : 'var(--ink-soft)', fontWeight: 600 } }, w.es.split('·')[0].trim()),
+  );
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Los números'),
+        html('div', { style: { fontSize: 11, color: 'var(--ink-soft)', fontWeight: 700 } }, 'Tocá para escuchar'),
+      ),
+      html('div', { style: { padding: '0 16px' } },
+
+        html('p', { className: 'admin-note', style: { marginBottom: 12, textAlign: 'center' } }, '🔊 Tocá cada número para escuchar cómo suena'),
+
+        html('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 } },
+          singles.map(w => html(NumCard, { key: w.hanzi, w }))
+        ),
+
+        html('div', { style: { background: 'var(--jade-light)', borderRadius: 14, padding: '14px 16px', marginBottom: 20 } },
+          html('div', { style: { fontWeight: 800, fontSize: 13, color: 'var(--jade-dark)', marginBottom: 8 } }, '💡 ¿Cómo se forman las decenas?'),
+          html('div', { style: { fontSize: 13, color: 'var(--jade-dark)', lineHeight: 1.7 } },
+            '二 + 十 = 二十 (20) · tres dieces = tres dieces', html('br', null),
+            'El patrón es: ', html('strong', null, '[número] + 十'), ' para las decenas.',  html('br', null),
+            'Ejemplo: 七十 = qīshí = 70 (siete + diez)',
+          ),
+        ),
+
+        html('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 24 } },
+          tens.map(w => html(NumCard, { key: w.hanzi, w }))
+        ),
+
+        html('button', { className: 'primary-btn', onClick: onPlay }, '¡Listo! Ir a practicar →'),
+      ),
     )
   );
 }
@@ -1250,9 +1744,16 @@ function LessonMenu({ vocab, lessonId, progress, onBack, onSelectMode }) {
     html('main', { style: { paddingTop: '18px' } },
       html('div', { className: 'header-row' },
         html('button', { className: 'back-btn', onClick: onBack }, '←'),
-        html('h1', null, 'Lección ' + lessonId + ' · ' + theme.name),
+        html('h1', null, (lessonId === 'mod-paises' || lessonId === 'mod-numeros') ? theme.name : 'Lección ' + lessonId + ' · ' + theme.name),
       ),
       html('div', { className: 'mode-list' },
+        lessonId === 'mod-numeros' && html('button', { className: 'mode-card', onClick: () => onSelectMode('intro') },
+          html('div', { className: 'mode-emoji', style: { background: '#FFF3C4', fontSize: 22 } }, '📊'),
+          html('div', null,
+            html('div', { className: 'mode-title' }, 'Explorar los números'),
+            html('div', { className: 'mode-sub' }, 'Tabla interactiva con audio · toca para escuchar'),
+          )
+        ),
         modes.map(m => html('button', { key: m.id, className: 'mode-card', onClick: () => onSelectMode(m.id) },
           html('div', { className: 'mode-emoji ' + m.cls }, m.emoji),
           html('div', null,
@@ -1269,6 +1770,7 @@ function LessonMenu({ vocab, lessonId, progress, onBack, onSelectMode }) {
 function PlayScreen({ vocab, lessonId, mode, onBack, onHome, onFinish, nextAction, savedResult, onSaveResult, onClearResult }) {
   const words = vocab[lessonId];
   const extra = { savedResult, onSaveResult, onClearResult };
+  if (mode === 'intro') return html(NumbersIntro, { words, onBack, onPlay: onBack });
   if (mode === 'match') return html(MatchGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
   if (mode === 'cards') return html(FlashcardGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
   if (mode === 'quiz') return html(QuizGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
@@ -1280,7 +1782,7 @@ const ROUND_SIZE = 6;
 
 function buildMatchRound(words) {
   const picked = shuffle(words).slice(0, Math.min(ROUND_SIZE, words.length));
-  const left = picked.map((w, i) => ({ id: i + '-h', pairId: i, kind: 'hanzi', text: w.hanzi }));
+  const left = picked.map((w, i) => ({ id: i + '-h', pairId: i, kind: 'hanzi', text: w.hanzi, es: w.es }));
   const right = picked.map((w, i) => ({ id: i + '-p', pairId: i, kind: 'pinyin', text: w.pinyin, es: w.es }));
   return { left: shuffle(left), right: shuffle(right) };
 }
@@ -1490,10 +1992,36 @@ function FlashcardGame({ words, lessonId, onBack, onHome, onFinish, nextAction, 
 }
 
 // ----------------- Quiz -----------------
+const FLAG_RE = /^\p{Emoji_Presentation}/u;
+const FLAG_CODE_RE = /^([\u{1F1E0}-\u{1F1FF}]{2})/u;
+function getFlagCode(es) {
+  if (!es) return null;
+  const m = es.match(FLAG_CODE_RE);
+  if (!m) return null;
+  return [...m[1]].map(c => String.fromCharCode(c.codePointAt(0) - 0x1F1A5)).join('').toLowerCase();
+}
+function stripFlag(es) {
+  return es ? es.replace(/^[\u{1F1E0}-\u{1F1FF}]{2}\s*/u, '') : es;
+}
+function FlagImg({ es, size }) {
+  const code = getFlagCode(es);
+  if (!code) return null;
+  const h = size || 18;
+  const w = Math.round(h * 1.33);
+  return html('img', { src: 'https://flagcdn.com/' + w + 'x' + h + '/' + code + '.png', style: { borderRadius: 2, verticalAlign: 'middle', marginRight: 6 }, alt: code.toUpperCase() });
+}
+function sameCategory(a, b) {
+  // Si ambas tienen bandera (países) o ambas no tienen, son misma categoría
+  return FLAG_RE.test(a.es) === FLAG_RE.test(b.es);
+}
 function buildQuizQuestions(words) {
   const picked = shuffle(words).slice(0, Math.min(8, words.length));
   return picked.map(w => {
-    const distractors = shuffle(words.filter(x => x.es !== w.es)).slice(0, 3).map(x => x.es);
+    // Preferir distractores de la misma categoría (países con países, palabras con palabras)
+    const samePool = shuffle(words.filter(x => x.es !== w.es && sameCategory(w, x)));
+    const diffPool = shuffle(words.filter(x => x.es !== w.es && !sameCategory(w, x)));
+    const pool = [...samePool, ...diffPool];
+    const distractors = pool.slice(0, 3).map(x => x.es);
     const options = shuffle([w.es, ...distractors]);
     return { hanzi: w.hanzi, pinyin: w.pinyin, correct: w.es, options };
   });
@@ -1587,7 +2115,7 @@ function QuizGame({ words, lessonId, onBack, onHome, onFinish, nextAction, saved
             if (opt === q.correct) cls += ' correct';
             else if (opt === selectedOpt) cls += ' wrong';
           }
-          return html('button', { key: opt, className: cls, onClick: () => handlePick(opt) }, opt);
+          return html('button', { key: opt, className: cls, onClick: () => handlePick(opt) }, stripFlag(opt));
         })
       )
     )
@@ -1644,10 +2172,265 @@ function ResultScreen({ percent, mode, completed, reviewWords, onRetry, onHome, 
       html('div', { className: 'result-title' }, title),
       html('div', { className: 'result-sub' }, sub),
       html('div', { className: 'result-actions' },
-        html('button', { className: 'primary-btn', onClick: onRetry }, 'Volver a intentar'),
+        nextAction && html('button', { className: 'primary-btn', onClick: nextAction.go }, nextAction.label),
+        html('button', { className: nextAction ? 'secondary-btn' : 'primary-btn', onClick: onRetry }, 'Volver a intentar'),
         html('button', { className: 'secondary-btn', onClick: onHome }, 'Volver al inicio'),
       ),
       html(ReviewList, { reviewWords })
+    )
+  );
+}
+
+// ----------------- Refuerzo: helpers -----------------
+function getMissedWords(progress) {
+  const all = [];
+  const lp = progress.lessons || {};
+  Object.keys(lp).forEach(lid => {
+    ['match', 'cards', 'quiz'].forEach(mode => {
+      (lp[lid][mode + '_missed'] || []).forEach(w => { if (w && w.hanzi) all.push(w); });
+    });
+  });
+  const pp = progress.prueba || {};
+  ['clas', 'dialogo', 'orden', 'audio'].forEach(game => {
+    (pp[game + '_missed'] || []).forEach(w => { if (w && w.hanzi) all.push(w); });
+  });
+  const seen = new Set();
+  return all.filter(w => {
+    if (seen.has(w.hanzi)) return false;
+    seen.add(w.hanzi);
+    return true;
+  });
+}
+
+// ----------------- Refuerzo: Tarjetas de estudio -----------------
+function StudyCardsPhase({ words, onDone, onBack }) {
+  const [deck] = useState(() => shuffle([...words]));
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const w = deck[index];
+  const isLast = index === deck.length - 1;
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Tarjetas de estudio'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + deck.length),
+      ),
+      html('div', { style: { padding: '16px 16px 0' } },
+        html('div', {
+          onClick: () => setFlipped(f => !f),
+          style: {
+            minHeight: 220, borderRadius: 20, background: '#fff',
+            boxShadow: 'var(--shadow-paper)', cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '32px 24px', gap: 14, marginBottom: 24, transition: 'background 0.2s',
+          }
+        },
+          !flipped
+            ? html(React.Fragment, null,
+                html('div', { className: 'hanzi-font', style: { fontSize: 72, color: 'var(--lacquer)', lineHeight: 1.1 } }, w.hanzi),
+                html('div', { style: { fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 8 } }, '👆 Tocá para ver'),
+              )
+            : html(React.Fragment, null,
+                html('div', { className: 'hanzi-font', style: { fontSize: 52, color: 'var(--lacquer)', lineHeight: 1.1, marginBottom: 4 } }, w.hanzi),
+                html('div', { style: { fontSize: 20, fontWeight: 800, color: 'var(--lacquer-dark)', letterSpacing: 1 } }, w.pinyin),
+                html('div', { style: { fontSize: 16, color: 'var(--ink-mid)', fontWeight: 600, textAlign: 'center', marginTop: 6 } }, w.es),
+              ),
+        ),
+        html('div', { style: { display: 'flex', gap: 12 } },
+          html('button', {
+            className: 'secondary-btn', style: { margin: 0, flex: 1 },
+            disabled: index === 0,
+            onClick: () => { setFlipped(false); setIndex(i => i - 1); },
+          }, '← Anterior'),
+          isLast
+            ? html('button', { className: 'primary-btn', style: { flex: 1 }, onClick: onDone }, '¡Listo! →')
+            : html('button', { className: 'primary-btn', style: { flex: 1 }, onClick: () => { setFlipped(false); setIndex(i => i + 1); } }, 'Siguiente →'),
+        ),
+      ),
+    )
+  );
+}
+
+// ----------------- Refuerzo: Quiz genérico -----------------
+function buildRefuerzoMC(words, allWords, mode) {
+  return shuffle([...words]).map(w => {
+    let show, hint, correct, distractor;
+    if (mode === 'pinyin') { show = w.hanzi; hint = w.es; correct = w.pinyin; distractor = x => x.pinyin; }
+    else if (mode === 'hanzi') { show = w.es; hint = w.pinyin; correct = w.hanzi; distractor = x => x.hanzi; }
+    else { show = w.hanzi; hint = w.pinyin; correct = w.es; distractor = x => x.es; }
+    const pool = shuffle([...allWords].filter(x => x.hanzi !== w.hanzi && distractor(x) !== correct));
+    const options = shuffle([correct, ...pool.slice(0, 2).map(distractor)]);
+    return { show, hint, correct, options };
+  });
+}
+
+function RefuerzoMC({ words, allWords, mode, title, onDone, onBack, playerName }) {
+  const [questions] = useState(() => buildRefuerzoMC(words, allWords, mode));
+  const [index, setIndex] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [correctRef, setCorrectRef] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [done, setDone] = useState(false);
+
+  const q = questions[index];
+  const isHanzi = mode === 'hanzi';
+  const isCorrect = selected !== null && selected === q.correct;
+
+  const handlePick = (opt) => {
+    if (selected !== null) return;
+    setSelected(opt);
+    const ok = opt === q.correct;
+    const nc = correct + (ok ? 1 : 0);
+    setCorrectRef(nc);
+    if (ok) setCorrect(nc);
+    else {
+      const orig = words.find(w => (mode === 'pinyin' || mode === 'es' ? w.hanzi : w.es) === q.show) || {};
+      setMissed(m => [...m, orig]);
+    }
+  };
+
+  const handleNext = () => {
+    const next = index + 1;
+    if (next >= questions.length) {
+      setDone(true);
+      if (onDone) onDone();
+    } else { setIndex(next); setSelected(null); }
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((correctRef / questions.length) * 100),
+    total: questions.length, correct: correctRef, missed,
+    onRetry: () => { setIndex(0); setSelected(null); setCorrect(0); setCorrectRef(0); setMissed([]); setDone(false); },
+    onBack, playerName,
+  });
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, title),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + questions.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), correct + ' correctas'),
+      ),
+      html('div', { style: { padding: '16px 16px 0' } },
+        html('div', { style: { background: '#fff', borderRadius: 20, boxShadow: 'var(--shadow-paper)', padding: '28px 24px', textAlign: 'center', marginBottom: 20 } },
+          isHanzi
+            ? html(React.Fragment, null,
+                html('div', { style: { fontSize: 16, color: 'var(--ink-mid)', fontWeight: 600, marginBottom: 10 } }, q.show),
+                html('div', { style: { fontSize: 15, color: 'var(--lacquer-dark)', fontWeight: 700, letterSpacing: 0.5 } }, q.hint),
+              )
+            : html(React.Fragment, null,
+                html('div', { className: 'hanzi-font', style: { fontSize: 60, color: 'var(--lacquer)', lineHeight: 1.1, marginBottom: 8 } }, q.show),
+                html('div', { style: { fontSize: 14, color: 'var(--ink-soft)', fontWeight: 600 } }, q.hint),
+              ),
+        ),
+        selected !== null
+          ? html(React.Fragment, null,
+              html('div', { style: {
+                borderRadius: 16, padding: '18px 20px', textAlign: 'center', fontWeight: 800, marginBottom: 16,
+                background: isCorrect ? 'var(--jade-light)' : '#FDE4DD',
+                color: isCorrect ? 'var(--jade-dark)' : 'var(--lacquer-dark)',
+              }},
+                html('div', { style: { fontSize: 36 } }, isCorrect ? '✓' : '✗'),
+                html('div', { style: { fontSize: 18, marginTop: 4 } }, isCorrect ? '¡Correcto!' : 'Correcto: ' + q.correct),
+              ),
+              html('button', { className: 'primary-btn', onClick: handleNext },
+                index < questions.length - 1 ? 'Siguiente →' : 'Ver resultado'
+              ),
+            )
+          : html('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+              q.options.map((opt, i) => html('button', {
+                key: i, className: 'quiz-option',
+                style: {
+                  textAlign: 'center',
+                  fontFamily: isHanzi ? 'Noto Serif SC, serif' : 'Nunito, sans-serif',
+                  fontSize: isHanzi ? 24 : 15,
+                },
+                onClick: () => handlePick(opt),
+              }, String.fromCharCode(65 + i) + '.  ' + opt)),
+            ),
+      ),
+    )
+  );
+}
+
+// ----------------- Refuerzo: Session hub -----------------
+const REFUERZO_EXERCISES = [
+  { id: 'cards',  icon: '📖', label: 'Tarjetas de estudio',    sub: 'Repasá hanzi, pinyin y significado' },
+  { id: 'es',     icon: '🇪🇸', label: '¿Qué significa?',        sub: 'Ves el hanzi, elegís el significado' },
+  { id: 'pinyin', icon: '🔤', label: '¿Cuál es el pinyin?',      sub: 'Ves el hanzi, elegís el pinyin' },
+  { id: 'hanzi',  icon: '汉', label: '¿Cómo se escribe?',       sub: 'Ves el significado, elegís el hanzi' },
+  { id: 'match',  icon: '🔗', label: 'Emparejamiento',          sub: 'Une hanzi con su pinyin y significado' },
+];
+
+function RefuerzoSession({ words, allWords, onBack, playerName }) {
+  const [current, setCurrent] = useState(null);
+  const [done, setDone] = useState(new Set());
+
+  const markDone = (id) => { setDone(prev => new Set([...prev, id])); setCurrent(null); };
+  const goBack = () => setCurrent(null);
+  const noop = () => {};
+
+  if (current === 'cards') return html(StudyCardsPhase, { words, onDone: () => markDone('cards'), onBack: goBack });
+  if (current === 'es')    return html(RefuerzoMC, { words, allWords, mode: 'es',    title: '¿Qué significa?',   onDone: () => markDone('es'),    onBack: goBack, playerName });
+  if (current === 'pinyin') return html(RefuerzoMC, { words, allWords, mode: 'pinyin', title: '¿Cuál es el pinyin?',     onDone: () => markDone('pinyin'), onBack: goBack, playerName });
+  if (current === 'hanzi')  return html(RefuerzoMC, { words, allWords, mode: 'hanzi',  title: '¿Cómo se escribe?', onDone: () => markDone('hanzi'),  onBack: goBack, playerName });
+  if (current === 'match')  return html(MatchGame, {
+    words, lessonId: null,
+    onBack: goBack, onHome: goBack,
+    onFinish: () => markDone('match'),
+    nextAction: null, savedResult: null, onSaveResult: noop, onClearResult: noop,
+  });
+
+  // Hub
+  const allDone = done.size === REFUERZO_EXERCISES.length;
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('div', null,
+          html('h1', null, 'Reforcemos'),
+          html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 } }, 'Práctica personalizada · ' + words.length + ' palabras'),
+        ),
+        html('div', { style: { fontSize: 13, fontWeight: 800, color: done.size === REFUERZO_EXERCISES.length ? 'var(--jade)' : 'var(--ink-soft)' } },
+          done.size + '/' + REFUERZO_EXERCISES.length + ' ✓'
+        ),
+      ),
+      html('div', { style: { padding: '0 16px' } },
+        html('div', { style: { display: 'flex', gap: 6, marginBottom: 20 } },
+          REFUERZO_EXERCISES.map((e, i) => html('div', {
+            key: e.id,
+            style: {
+              flex: 1, height: 5, borderRadius: 4,
+              background: done.has(e.id) ? 'var(--jade)' : 'var(--paper-deep)',
+            }
+          }))
+        ),
+        allDone && html('div', { style: {
+          background: 'var(--jade-light)', borderRadius: 16, padding: '16px 20px',
+          textAlign: 'center', marginBottom: 20, fontWeight: 800, color: 'var(--jade-dark)',
+        }},
+          html('div', { style: { fontSize: 32 } }, '🎉'),
+          html('div', { style: { fontSize: 17, marginTop: 6 } }, '¡Completaste todos los ejercicios!'),
+        ),
+        REFUERZO_EXERCISES.map(e => html('button', {
+          key: e.id,
+          className: 'prueba-card',
+          style: { marginBottom: 10, opacity: 1 },
+          onClick: () => setCurrent(e.id),
+        },
+          html('div', { className: 'prueba-icon', style: { fontFamily: 'Noto Serif SC, serif', fontSize: e.id === 'hanzi' ? 22 : 20, background: done.has(e.id) ? 'var(--jade-light)' : 'var(--paper)' } }, e.icon),
+          html('div', { style: { flex: 1 } },
+            html('div', { className: 'mode-title' }, e.label),
+            html('div', { className: 'mode-sub' }, e.sub),
+          ),
+          done.has(e.id) && html('div', { style: { fontSize: 20, color: 'var(--jade)' } }, '✓'),
+        )),
+      ),
     )
   );
 }
@@ -1686,37 +2469,291 @@ function parseVocabText(text) {
   return result;
 }
 
+// Helper: convierte filas de Supabase al formato { "5": [{hanzi,pinyin,es},...], ... }
+function supabaseRowsToVocab(rows) {
+  const vocab = {};
+  rows.forEach(r => {
+    if (!vocab[r.lesson]) vocab[r.lesson] = [];
+    vocab[r.lesson].push({ hanzi: r.hanzi, pinyin: r.pinyin, es: r.es });
+  });
+  return vocab;
+}
+
 function AdminPanel({ vocab, onBack, onVocabUpdate }) {
+  const [session, setSession] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginStatus, setLoginStatus] = useState(null);
+
+  // texto manual (modo legacy)
   const [text, setText] = useState('');
+  // archivo CSV
+  const [csvFile, setCsvFile] = useState(null);
   const [status, setStatus] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  // gestión de lecciones
+  const [renamingLesson, setRenamingLesson] = useState(null);
+  const [visibilityTick, setVisibilityTick] = useState(0);
+  const [renameValue, setRenameValue] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  // editor de contenido de lección
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [editWords, setEditWords] = useState([]);
+
+  const handleRenameLesson = (id) => {
+    const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+    setRenamingLesson(id);
+    setRenameValue(theme.name);
+  };
+
+  const handleRenameSave = async (id) => {
+    if (renameValue.trim()) {
+      const theme = { ...(LESSON_THEMES[id] || {}), name: renameValue.trim() };
+      LESSON_THEMES[id] = theme;
+      // Guardar en Supabase (para todos)
+      await db.from('lesson_themes').upsert({ lesson: id, name: theme.name, icon: theme.icon || id });
+      // Guardar en localStorage (fallback offline)
+      const saved = JSON.parse(localStorage.getItem('hanzi-lesson-themes') || '{}');
+      saved[id] = theme;
+      localStorage.setItem('hanzi-lesson-themes', JSON.stringify(saved));
+      setStatus({ type: 'ok', msg: '✅ Nombre de Lección ' + id + ' actualizado para todos.' });
+    }
+    setRenamingLesson(null);
+  };
+
+
+  useEffect(() => {
+    db.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoadingSession(false);
+    });
+    const { data: listener } = db.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginStatus(null);
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) setLoginStatus({ type: 'err', msg: error.message });
+  };
+
+  const handleLogout = async () => {
+    await db.auth.signOut();
+    setStatus(null);
+  };
+
+  // nueva lección
+
+  // Parsea CSV con formato: Lección, 汉字, Pīnyīn, Significado en español
+  // Agrupa automáticamente por número de lección
+  const parseCsvMultiLesson = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const sep = lines[0].includes(';') ? ';' : ',';
+    // Saltar encabezado si la primera celda empieza con "Lecci"
+    const startIdx = /^lecci/i.test(lines[0].split(sep)[0]) ? 1 : 0;
+    const lessons = {}; // { id: { name, icon, words: [] } }
+    lines.slice(startIdx).forEach(line => {
+      // Parsear respetando comillas
+      const parts = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') { inQ = !inQ; }
+        else if (c === sep && !inQ) { parts.push(cur.trim()); cur = ''; }
+        else { cur += c; }
+      }
+      parts.push(cur.trim());
+      if (parts.length < 4) return;
+      const [lecCol, hanzi, pinyin, es] = parts;
+      if (!hanzi || !pinyin || !es) return;
+      // Extraer número de lección: "Lección 3 — ..." → "3"
+      const numMatch = lecCol.match(/lecci[oó]n\s+(\d+)/i);
+      if (!numMatch) return;
+      const lid = numMatch[1];
+      if (!lessons[lid]) {
+        // Nombre: lo que viene después de "—" en la primera aparición
+        const nameMatch = lecCol.match(/[—-]\s*(.+)/);
+        const rawName = nameMatch ? nameMatch[1].trim() : ('Lección ' + lid);
+        // Ícono: primer carácter chino del nombre
+        const iconMatch = rawName.match(/[一-鿿]/);
+        lessons[lid] = { name: rawName, icon: iconMatch ? iconMatch[0] : lid, words: [] };
+      }
+      lessons[lid].words.push({ lesson: lid, hanzi, pinyin, es });
+    });
+    return lessons;
+  };
+
+  // Subir CSV multi-lección al Supabase
+  const handleCsvUpload = async () => {
+    if (!csvFile) { setStatus({ type: 'err', msg: 'Seleccioná un archivo CSV primero.' }); return; }
+    setUploading(true);
+    setStatus(null);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const lessons = parseCsvMultiLesson(e.target.result);
+        const lessonIds = Object.keys(lessons);
+        if (lessonIds.length === 0) { setStatus({ type: 'err', msg: 'No se encontraron lecciones. Verificá el formato del CSV.' }); setUploading(false); return; }
+
+        let totalWords = 0;
+        const newVocab = { ...vocab };
+
+        for (const lid of lessonIds) {
+          const { name, icon, words } = lessons[lid];
+          // Borrar palabras existentes de esa lección en Supabase antes de insertar
+          await db.from('vocabulary').delete().eq('lesson', lid);
+          const { error: insErr } = await db.from('vocabulary').insert(words);
+          if (insErr) throw insErr;
+          await db.from('lesson_themes').upsert({ lesson: lid, name, icon });
+          LESSON_THEMES[lid] = { name, icon };
+          newVocab[lid] = words.map(w => ({ hanzi: w.hanzi, pinyin: w.pinyin, es: w.es }));
+          totalWords += words.length;
+        }
+
+        onVocabUpdate(newVocab);
+        setStatus({ type: 'ok', msg: '✅ ' + lessonIds.length + ' lección(es) cargadas con ' + totalWords + ' palabras en total para todos los usuarios.' });
+        setCsvFile(null);
+      } catch (err) {
+        setStatus({ type: 'err', msg: 'Error: ' + err.message });
+      }
+      setUploading(false);
+    };
+    reader.readAsText(csvFile, 'UTF-8');
+  };
+
+  // Eliminar lección (local + Supabase)
+  const handleToggleVisibility = async (id) => {
+    const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+    const newHidden = !theme.hidden;
+    const updated = { ...theme, hidden: newHidden };
+    LESSON_THEMES[id] = updated;
+    await db.from('lesson_themes').upsert({ lesson: id, name: updated.name, icon: updated.icon || id, hidden: newHidden });
+    setStatus({ type: 'ok', msg: newHidden ? '🚫 Módulo ocultado para los alumnos.' : '👁️ Módulo visible para los alumnos.' });
+    setVisibilityTick(t => t + 1);
+  };
+
+  const handleDeleteLesson = async (id) => {
+    try {
+      await db.from('vocabulary').delete().eq('lesson', id);
+      await db.from('lesson_themes').delete().eq('lesson', id);
+    } catch (e) { /* silencioso si no estaba en Supabase */ }
+    const newVocab = { ...vocab };
+    delete newVocab[id];
+    onVocabUpdate(newVocab);
+    setConfirmDelete(null);
+    setStatus({ type: 'ok', msg: '✅ Lección ' + id + ' eliminada para todos.' });
+  };
 
   const handleApply = () => {
-    if (!text.trim()) {
-      setStatus({ type: 'err', msg: 'Pegá el contenido del vocabulario antes de aplicar.' });
-      return;
-    }
+    if (!text.trim()) { setStatus({ type: 'err', msg: 'Pegá el contenido del vocabulario antes de aplicar.' }); return; }
     try {
       const parsed = parseVocabText(text);
-      const lessonCount = Object.keys(parsed).length;
       const wordCount = Object.values(parsed).reduce((acc, arr) => acc + arr.length, 0);
-      if (wordCount === 0) {
-        setStatus({ type: 'err', msg: 'No se encontraron palabras. Revisá el formato (carácter | pinyin | significado).' });
-        return;
-      }
+      if (wordCount === 0) { setStatus({ type: 'err', msg: 'No se encontraron palabras.' }); return; }
       onVocabUpdate(parsed);
-      setStatus({ type: 'ok', msg: 'Listo: se cargaron ' + wordCount + ' palabras en ' + lessonCount + ' lecciones.' });
-    } catch (e) {
-      setStatus({ type: 'err', msg: 'Error al procesar el texto: ' + e.message });
+      setStatus({ type: 'ok', msg: 'Listo: ' + wordCount + ' palabras cargadas localmente.' });
+    } catch (err) {
+      setStatus({ type: 'err', msg: 'Error: ' + err.message });
     }
   };
 
   const handleReset = () => {
     localStorage.removeItem(VOCAB_KEY);
-    setStatus({ type: 'ok', msg: 'Se restauró el vocabulario original.' });
+    setStatus({ type: 'ok', msg: 'Vocabulario original restaurado.' });
     setTimeout(() => window.location.reload(), 600);
   };
 
+  // Sincronizar DEFAULT_VOCAB a Supabase
+  const handleSeedDefaults = async () => {
+    setUploading(true);
+    setStatus(null);
+    try {
+      let total = 0;
+      for (const [lid, words] of Object.entries(DEFAULT_VOCAB)) {
+        await db.from('vocabulary').delete().eq('lesson', lid);
+        await db.from('vocabulary').insert(words.map(w => ({ lesson: lid, hanzi: w.hanzi, pinyin: w.pinyin, es: w.es })));
+        const theme = LESSON_THEMES[lid] || { name: 'Lección ' + lid, icon: lid };
+        await db.from('lesson_themes').upsert({ lesson: lid, name: theme.name, icon: theme.icon });
+        total += words.length;
+      }
+      setStatus({ type: 'ok', msg: '✅ ' + Object.keys(DEFAULT_VOCAB).length + ' lecciones sincronizadas (' + total + ' palabras) a Supabase.' });
+    } catch (err) {
+      setStatus({ type: 'err', msg: 'Error: ' + err.message });
+    }
+    setUploading(false);
+  };
+
+  // Abrir editor de palabras de una lección
+  const handleEditLesson = (id) => {
+    setEditingLesson(id);
+    setEditWords((vocab[id] || []).map((w, i) => ({ ...w, _key: Date.now() + i })));
+  };
+
+  // Guardar palabras editadas a Supabase
+  const handleSaveEditLesson = async () => {
+    setUploading(true);
+    try {
+      const rows = editWords
+        .filter(w => w.hanzi && w.pinyin && w.es)
+        .map(w => ({ lesson: editingLesson, hanzi: w.hanzi.trim(), pinyin: w.pinyin.trim(), es: w.es.trim() }));
+      if (rows.length === 0) { setStatus({ type: 'err', msg: 'No hay palabras válidas para guardar.' }); setUploading(false); return; }
+      await db.from('vocabulary').delete().eq('lesson', editingLesson);
+      const { error } = await db.from('vocabulary').insert(rows);
+      if (error) throw error;
+      const newVocab = { ...vocab, [editingLesson]: rows.map(r => ({ hanzi: r.hanzi, pinyin: r.pinyin, es: r.es })) };
+      onVocabUpdate(newVocab);
+      setStatus({ type: 'ok', msg: '✅ Lección ' + editingLesson + ' guardada con ' + rows.length + ' palabras para todos.' });
+      setEditingLesson(null);
+    } catch (err) {
+      setStatus({ type: 'err', msg: 'Error: ' + err.message });
+    }
+    setUploading(false);
+  };
+
+  const updateEditWord = (key, field, value) => setEditWords(prev => prev.map(w => w._key === key ? { ...w, [field]: value } : w));
+  const removeEditWord = (key) => setEditWords(prev => prev.filter(w => w._key !== key));
+  const addEditWord = () => setEditWords(prev => [...prev, { hanzi: '', pinyin: '', es: '', _key: Date.now() }]);
+
   const totalWords = Object.values(vocab).reduce((acc, arr) => acc + arr.length, 0);
+
+  if (loadingSession) return html('main', { style: { paddingTop: 40, textAlign: 'center' } }, '⏳ Cargando...');
+
+  // ── Editor de palabras ──
+  if (editingLesson) {
+    const theme = LESSON_THEMES[editingLesson] || { name: 'Lección ' + editingLesson };
+    const inputStyle = { padding: '7px 9px', borderRadius: 8, border: '1.5px solid var(--paper-deep)', fontSize: 13, fontFamily: 'Nunito, sans-serif', width: '100%' };
+    return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: () => setEditingLesson(null) }, '←'),
+        html('div', null,
+          html('h1', null, 'Editar lección ' + editingLesson),
+          html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, theme.name + ' · ' + editWords.length + ' palabras'),
+        ),
+      ),
+      html('div', { className: 'admin-panel' },
+        html('div', { style: { display: 'grid', gridTemplateColumns: '2fr 2fr 3fr auto', gap: 6, marginBottom: 6 } },
+          html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 } }, '汉字'),
+          html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Pīnyīn'),
+          html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Español'),
+          html('div', null),
+        ),
+        html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 } },
+          editWords.map(w => html('div', { key: w._key, style: { display: 'grid', gridTemplateColumns: '2fr 2fr 3fr auto', gap: 6, alignItems: 'center' } },
+            html('input', { value: w.hanzi, onChange: e => updateEditWord(w._key, 'hanzi', e.target.value), style: { ...inputStyle, fontFamily: 'Noto Serif SC, serif', fontSize: 16 } }),
+            html('input', { value: w.pinyin, onChange: e => updateEditWord(w._key, 'pinyin', e.target.value), style: inputStyle }),
+            html('input', { value: w.es, onChange: e => updateEditWord(w._key, 'es', e.target.value), style: inputStyle }),
+            html('button', { onClick: () => removeEditWord(w._key), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--lacquer)', padding: '0 4px' } }, '🗑️'),
+          )),
+        ),
+        html('button', { className: 'secondary-btn', style: { marginBottom: 16 }, onClick: addEditWord }, '+ Agregar palabra'),
+        html('button', { className: 'primary-btn', onClick: handleSaveEditLesson, disabled: uploading }, uploading ? '⏳ Guardando...' : '💾 Guardar para todos'),
+        status && html('div', { className: 'admin-status ' + (status.type === 'ok' ? 'ok' : 'err'), style: { marginTop: 10 } }, status.msg),
+      ),
+    );
+  }
 
   return html('main', { style: { paddingTop: '18px' } },
     html('div', { className: 'header-row' },
@@ -1724,29 +2761,242 @@ function AdminPanel({ vocab, onBack, onVocabUpdate }) {
       html('h1', null, 'Administrar'),
     ),
     html('div', { className: 'admin-panel' },
+
+      // ── Info vocab actual ──
       html('div', null,
         html('label', null, 'Vocabulario actual'),
         html('p', { className: 'admin-note', style: { marginTop: 6 } },
-          totalWords + ' palabras cargadas en ' + Object.keys(vocab).length + ' lecciones.'
+          totalWords + ' palabras en ' + Object.keys(vocab).length + ' lecciones.'
         )
       ),
-      html('div', null,
-        html('label', null, 'Cargar nuevo vocabulario'),
-        html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
-          'Pegá el texto extraído de tu Word/PDF. Formato esperado por línea: "Lección N" para iniciar un capítulo, y luego filas con carácter, pinyin y significado separados por tabulación o por "|". Ejemplo:'
+
+      // ── Panel admin (solo si hay sesión) ──
+      session
+        ? html(React.Fragment, null,
+            html('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--jade-light)', borderRadius: 12, padding: '10px 14px' } },
+              html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--jade-dark)' } }, '🔓 Admin: ' + session.user.email),
+              html('button', { className: 'secondary-btn', style: { margin: 0, padding: '6px 14px', fontSize: 13 }, onClick: handleLogout }, 'Cerrar sesión'),
+            ),
+
+            // ── Nueva lección desde CSV ──
+            html('div', null,
+              html('label', null, '➕ Cargar lecciones desde CSV'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
+                'El archivo puede contener ', html('strong', null, 'una o varias lecciones'),
+                '. Las lecciones y nombres se detectan automáticamente. Si ya existe una lección con el mismo número, se reemplaza.'
+              ),
+              html('p', { className: 'admin-note', style: { fontFamily: 'monospace', background: 'var(--paper)', padding: '8px 10px', borderRadius: 8, fontSize: 12, whiteSpace: 'pre' } },
+                'Lección,Nº,Pīnyīn,汉字,Tipo,Significado en español\nLección 1 — 你好 (Nǐ hǎo),1,nǐ,你,Pr.,tú\nLección 1 — 你好 (Nǐ hǎo),2,hǎo,好,A,bien / bueno'
+              ),
+              html('input', {
+                type: 'file', accept: '.csv',
+                style: { margin: '8px 0 10px', width: '100%' },
+                onChange: (e) => setCsvFile(e.target.files[0] || null),
+              }),
+              csvFile && html('p', { className: 'admin-note', style: { margin: '0 0 8px', color: 'var(--ink-mid)' } }, '📄 ' + csvFile.name),
+              html('button', {
+                className: 'primary-btn',
+                onClick: handleCsvUpload,
+                disabled: uploading || !csvFile,
+              }, uploading ? '⏳ Subiendo lecciones...' : '➕ Subir a Supabase para todos'),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Sincronizar lecciones integradas ──
+            html('div', null,
+              html('label', null, '☁️ Sincronizar lecciones integradas'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
+                'Sube las lecciones 5 a 10 (campus, clima, presentaciones, familia, países y números) a Supabase para que sean administrables desde aquí.'
+              ),
+              html('button', {
+                className: 'secondary-btn',
+                onClick: handleSeedDefaults,
+                disabled: uploading,
+              }, uploading ? '⏳ Sincronizando...' : '☁️ Sincronizar a Supabase'),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Gestión de lecciones ──
+            html('div', null,
+              html('label', null, '📚 Lecciones cargadas'),
+              html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                Object.keys(vocab).sort().filter(id => id !== 'mod-paises' && id !== 'mod-numeros').map(id => {
+                  const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+                  const count = vocab[id].length;
+                  const isRenaming = renamingLesson === id;
+                  const isConfirmingDelete = confirmDelete === id;
+                  return html('div', {
+                    key: id,
+                    style: { background: '#fff', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', flexDirection: 'column', gap: 6 }
+                  },
+                    html('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                      html('span', { className: 'hanzi-font', style: { fontSize: 22, color: 'var(--lacquer)', minWidth: 32 } }, theme.icon || id),
+                      isRenaming
+                        ? html('input', {
+                            autoFocus: true,
+                            value: renameValue,
+                            onChange: e => setRenameValue(e.target.value),
+                            onKeyDown: e => { if (e.key === 'Enter') handleRenameSave(id); if (e.key === 'Escape') setRenamingLesson(null); },
+                            style: { flex: 1, padding: '6px 10px', borderRadius: 8, border: '2px solid var(--jade)', fontSize: 14, fontFamily: 'Nunito, sans-serif' }
+                          })
+                        : html('div', { style: { flex: 1 } },
+                            html('div', { style: { fontWeight: 800, fontSize: 14 } }, 'Lección ' + id + ' · ' + theme.name),
+                            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, count + ' palabras'),
+                          ),
+                      isRenaming
+                        ? html(React.Fragment, null,
+                            html('button', { onClick: () => handleRenameSave(id), style: { background: 'var(--jade)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, '✓ Guardar'),
+                            html('button', { onClick: () => setRenamingLesson(null), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-soft)' } }, '✕'),
+                          )
+                        : html(React.Fragment, null,
+                            html('button', { onClick: () => handleToggleVisibility(id), title: theme.hidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: theme.hidden ? 0.4 : 1 } }, theme.hidden ? '🚫' : '👁️'),
+                            html('button', { onClick: () => handleEditLesson(id), title: 'Editar palabras', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '📝'),
+                            html('button', { onClick: () => handleRenameLesson(id), title: 'Renombrar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '✏️'),
+                            html('button', { onClick: () => setConfirmDelete(id), title: 'Eliminar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '🗑️'),
+                          ),
+                    ),
+                    isConfirmingDelete && html('div', { style: { background: '#FDE4DD', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                      html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--lacquer-dark)' } }, '¿Eliminar "' + theme.name + '" y sus ' + count + ' palabras?'),
+                      html('div', { style: { display: 'flex', gap: 6 } },
+                        html('button', { onClick: () => handleDeleteLesson(id), style: { background: 'var(--lacquer)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, 'Eliminar'),
+                        html('button', { onClick: () => setConfirmDelete(null), style: { background: 'none', border: '2px solid var(--paper-deep)', borderRadius: 8, padding: '6px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 13 } }, 'Cancelar'),
+                      ),
+                    ),
+                  );
+                })
+              ),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Módulos especiales (países y números) ──
+            html('div', null,
+              html('label', null, '🌍 Módulos especiales'),
+              html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                ['mod-paises', 'mod-numeros'].filter(id => vocab[id]).map(id => {
+                  const theme = LESSON_THEMES[id] || { name: 'Módulo ' + id };
+                  const count = vocab[id].length;
+                  const isRenaming = renamingLesson === id;
+                  const isConfirmingDelete = confirmDelete === id;
+                  return html('div', {
+                    key: id,
+                    style: { background: '#fff', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', flexDirection: 'column', gap: 6 }
+                  },
+                    html('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                      html('span', { className: 'hanzi-font', style: { fontSize: 22, color: 'var(--lacquer)', minWidth: 32 } }, theme.icon || id),
+                      isRenaming
+                        ? html('input', {
+                            autoFocus: true,
+                            value: renameValue,
+                            onChange: e => setRenameValue(e.target.value),
+                            onKeyDown: e => { if (e.key === 'Enter') handleRenameSave(id); if (e.key === 'Escape') setRenamingLesson(null); },
+                            style: { flex: 1, padding: '6px 10px', borderRadius: 8, border: '2px solid var(--jade)', fontSize: 14, fontFamily: 'Nunito, sans-serif' }
+                          })
+                        : html('div', { style: { flex: 1 } },
+                            html('div', { style: { fontWeight: 800, fontSize: 14 } }, theme.name),
+                            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, count + ' palabras'),
+                          ),
+                      isRenaming
+                        ? html(React.Fragment, null,
+                            html('button', { onClick: () => handleRenameSave(id), style: { background: 'var(--jade)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, '✓ Guardar'),
+                            html('button', { onClick: () => setRenamingLesson(null), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-soft)' } }, '✕'),
+                          )
+                        : html(React.Fragment, null,
+                            html('button', { onClick: () => handleToggleVisibility(id), title: theme.hidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: theme.hidden ? 0.4 : 1 } }, theme.hidden ? '🚫' : '👁️'),
+                            html('button', { onClick: () => handleEditLesson(id), title: 'Editar palabras', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '📝'),
+                            html('button', { onClick: () => handleRenameLesson(id), title: 'Renombrar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '✏️'),
+                            html('button', { onClick: () => setConfirmDelete(id), title: 'Eliminar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '🗑️'),
+                          ),
+                    ),
+                    isConfirmingDelete && html('div', { style: { background: '#FDE4DD', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                      html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--lacquer-dark)' } }, '¿Eliminar "' + theme.name + '" y sus ' + count + ' palabras?'),
+                      html('div', { style: { display: 'flex', gap: 6 } },
+                        html('button', { onClick: () => handleDeleteLesson(id), style: { background: 'var(--lacquer)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, 'Eliminar'),
+                        html('button', { onClick: () => setConfirmDelete(null), style: { background: 'none', border: '2px solid var(--paper-deep)', borderRadius: 8, padding: '6px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 13 } }, 'Cancelar'),
+                      ),
+                    ),
+                  );
+                })
+              ),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Módulos de práctica ──
+            html('div', null,
+              html('label', null, '🎮 Módulos de práctica'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Activá o desactivá cada módulo para todos los alumnos.'),
+              html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                [
+                  { id: 'mod-clas',     icon: '🔢', name: 'Clasificadores' },
+                  { id: 'mod-dialogo',  icon: '💬', name: 'Completa el diálogo' },
+                  { id: 'mod-orden',    icon: '🔀', name: 'Ordena la oración' },
+                  { id: 'mod-audio',    icon: '🔊', name: 'Reconocer por audio' },
+                  { id: 'mod-refuerzo', icon: '💪', name: 'Reforcemos' },
+                ].map(m => {
+                  const theme = LESSON_THEMES[m.id] || {};
+                  const isHidden = !!theme.hidden;
+                  return html('div', {
+                    key: m.id,
+                    style: { background: '#fff', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', alignItems: 'center', gap: 10, opacity: isHidden ? 0.6 : 1 }
+                  },
+                    html('span', { style: { fontSize: 22, minWidth: 32 } }, m.icon),
+                    html('div', { style: { flex: 1, fontWeight: 700, fontSize: 14 } }, m.name),
+                    html('button', {
+                      onClick: () => handleToggleVisibility(m.id),
+                      title: isHidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos',
+                      style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: isHidden ? 0.4 : 1 }
+                    }, isHidden ? '🚫' : '👁️'),
+                  );
+                })
+              ),
+            ),
+          )
+
+        // ── Login ──
+        : html('div', null,
+            html('label', null, '🔐 Acceso admin'),
+            html('p', { className: 'admin-note', style: { marginBottom: 14 } }, 'Solo el administrador puede cargar vocabulario para todos los usuarios.'),
+            html('form', { onSubmit: handleLogin, style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+              html('input', { type: 'email', placeholder: 'Email', value: email, onChange: e => setEmail(e.target.value), style: { padding: '12px 14px', borderRadius: 12, border: '2px solid var(--paper-deep)', fontSize: 15, fontFamily: 'Nunito, sans-serif' } }),
+              html('input', { type: 'password', placeholder: 'Contraseña', value: password, onChange: e => setPassword(e.target.value), style: { padding: '12px 14px', borderRadius: 12, border: '2px solid var(--paper-deep)', fontSize: 15, fontFamily: 'Nunito, sans-serif' } }),
+              loginStatus && html('div', { className: 'admin-status err' }, loginStatus.msg),
+              html('button', { type: 'submit', className: 'primary-btn', style: { marginTop: 4 } }, 'Iniciar sesión'),
+            ),
+          ),
+
+      // ── Reiniciar progreso (visible para todos) ──
+      html('div', { style: { borderTop: '1px solid var(--paper-deep)', paddingTop: 16, marginTop: 8 } },
+        html('label', null, '🔄 Mi progreso'),
+        html('p', { className: 'admin-note', style: { margin: '6px 0 12px' } },
+          'Borra todo tu progreso local: puntajes, estrellas, nombre y errores guardados. No afecta a otros usuarios.'
         ),
-        html('p', { className: 'admin-note', style: { fontFamily: 'monospace', background: 'var(--paper)', padding: '8px 10px', borderRadius: 8 } },
-          'Lección 5' + String.fromCharCode(10) + '餐厅 | cāntīng | comedor' + String.fromCharCode(10) + '在 | zài | estar, en'
-        ),
-        html('textarea', {
-          value: text,
-          onChange: (e) => setText(e.target.value),
-          placeholder: 'Pegá aquí el texto del vocabulario...'
-        })
+        confirmDelete === 'reset'
+          ? html('div', { style: { background: '#FDE4DD', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 } },
+              html('span', { style: { fontWeight: 800, fontSize: 14, color: 'var(--lacquer-dark)' } }, '¿Seguro que querés borrar todo tu progreso? Esta acción no se puede deshacer.'),
+              html('div', { style: { display: 'flex', gap: 8 } },
+                html('button', {
+                  className: 'primary-btn', style: { margin: 0, background: 'var(--lacquer)' },
+                  onClick: () => {
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(NAME_KEY);
+                    setConfirmDelete(null);
+                    setTimeout(() => window.location.reload(), 300);
+                  }
+                }, '🗑️ Sí, borrar todo'),
+                html('button', { className: 'secondary-btn', style: { margin: 0 }, onClick: () => setConfirmDelete(null) }, 'Cancelar'),
+              ),
+            )
+          : html('button', {
+              className: 'secondary-btn',
+              style: { borderColor: 'var(--lacquer)', color: 'var(--lacquer)' },
+              onClick: () => setConfirmDelete('reset'),
+            }, '🔄 Reiniciar mi progreso'),
       ),
+
       status && html('div', { className: 'admin-status ' + (status.type === 'ok' ? 'ok' : 'err') }, status.msg),
-      html('button', { className: 'primary-btn', onClick: handleApply }, 'Aplicar cambios'),
-      html('button', { className: 'secondary-btn', onClick: handleReset }, 'Restaurar vocabulario original'),
     )
   );
 }

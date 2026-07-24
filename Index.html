@@ -1,0 +1,3553 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  汉字 Practice · Hanzi Practice App                         ║
+  ║  © 2026 大卫 · dawei.com.ar                                 ║
+  ║  Prohibida su reproducción o distribución sin autorización   ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+<meta name="author" content="大卫 · dawei.com.ar" />
+<meta name="copyright" content="© 2026 大卫 · dawei.com.ar" />
+<meta name="generator" content="Hanzi Practice App · 大卫 · dawei.com.ar" />
+<meta name="description" content="Repaso interactivo de chino mandarín · 汉语课 CUI Nivel 2 · Ariel 老师" />
+<!-- Open Graph (WhatsApp, Facebook, LinkedIn) -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="汉字 Practice · Repaso de chino" />
+<meta property="og:description" content="Lecciones, tarjetas, quiz y juegos de gramática para repasar chino mandarín. 汉语课 CUI · Nivel 2 · Ariel 老师" />
+<meta property="og:image" content="https://davidoterodarien-stack.github.io/hanzi-practice-v2/preview.png" />
+<meta property="og:url" content="https://davidoterodarien-stack.github.io/hanzi-practice-v2" />
+<!-- Twitter/X -->
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="汉字 Practice · Repaso de chino" />
+<meta name="twitter:description" content="Lecciones, tarjetas, quiz y juegos de gramática · CUI Nivel 2" />
+<title>汉字 Practice - Repaso de chino mandarín</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FBF4E6;
+    --paper-deep: #F3E6CC;
+    --ink: #2E2A26;
+    --ink-soft: #6E645A;
+    --lacquer: #C1432B;
+    --lacquer-dark: #93301E;
+    --gold: #E0A93B;
+    --gold-light: #F6E2B0;
+    --jade: #3A7D6E;
+    --jade-light: #DCEEE9;
+    --jade-dark: #235048;
+    --error: #C1432B;
+    --shadow-paper: 0 2px 0 rgba(46,42,38,0.06), 0 8px 24px rgba(46,42,38,0.06);
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 10% 8%, var(--paper-deep) 0%, transparent 35%),
+      radial-gradient(circle at 92% 85%, var(--paper-deep) 0%, transparent 40%);
+  }
+  #root { min-height: 100vh; }
+  .hanzi-font { font-family: 'Noto Serif SC', serif; }
+
+  /* layout */
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 8px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-mark {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: var(--lacquer);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 900;
+    font-size: 20px;
+    box-shadow: var(--shadow-paper);
+  }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+  .brand-text strong { font-size: 17px; font-weight: 800; letter-spacing: 0.2px; }
+  .brand-text span { font-size: 11px; color: var(--ink-soft); }
+
+  .icon-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    box-shadow: var(--shadow-paper);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--ink-soft);
+  }
+  .icon-btn:active { transform: scale(0.94); }
+
+  main { flex: 1; padding: 8px 20px 32px; }
+
+  /* score bar */
+  .score-strip {
+    display: flex;
+    gap: 10px;
+    margin: 4px 0 18px;
+  }
+  .score-chip {
+    flex: 1;
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px 14px;
+    box-shadow: var(--shadow-paper);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .score-chip .num { font-size: 20px; font-weight: 800; color: var(--lacquer-dark); }
+  .score-chip .lbl { font-size: 11px; color: var(--ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* lesson grid */
+  h2.section-title {
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    margin: 24px 0 12px;
+  }
+  .lesson-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .lesson-card {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    box-shadow: var(--shadow-paper);
+    cursor: pointer;
+    text-align: left;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s ease;
+  }
+  .lesson-card:active { transform: scale(0.97); }
+  .lesson-card .hanzi-big {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--lacquer);
+  }
+  .lesson-card .lesson-name { font-size: 15px; font-weight: 800; }
+  .lesson-card .lesson-meta { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .lesson-card .progress-track {
+    height: 6px;
+    background: var(--paper-deep);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .lesson-card .progress-fill {
+    height: 100%;
+    background: var(--jade);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+  .lesson-card .seal {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--lacquer);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 900;
+    font-size: 13px;
+    transform: rotate(8deg);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  }
+
+  /* mode select */
+  .mode-list { display: flex; flex-direction: column; gap: 12px; }
+  .mode-card {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-paper);
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .mode-card:active { transform: scale(0.98); }
+  .mode-emoji {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  .mode-emoji.match { background: var(--jade-light); color: var(--jade-dark); }
+  .mode-emoji.cards { background: var(--gold-light); color: #8a5d12; }
+  .mode-emoji.quiz { background: #FDE4DD; color: var(--lacquer-dark); }
+  .mode-title { font-size: 15px; font-weight: 800; }
+  .mode-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+  /* back / header row */
+  .header-row {
+    display: flex; align-items: center; gap: 12px;
+    margin: 4px 0 18px;
+  }
+  .header-row h1 {
+    font-size: 19px;
+    font-weight: 800;
+    margin: 0;
+    flex: 1;
+  }
+  .back-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: none; background: #fff; box-shadow: var(--shadow-paper);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer; color: var(--ink);
+  }
+
+  /* matching game */
+  .match-progress-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px;
+  }
+  .match-progress-track {
+    flex: 1; height: 10px; background: var(--paper-deep);
+    border-radius: 6px; overflow: hidden;
+  }
+  .match-progress-fill {
+    height: 100%; background: var(--jade); border-radius: 6px;
+    transition: width 0.3s ease;
+  }
+  .match-counter { font-size: 13px; font-weight: 800; color: var(--ink-soft); min-width: 50px; text-align: right; }
+
+  .match-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .match-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 14px;
+    align-items: start;
+  }
+  .match-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .match-tile {
+    background: #fff;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 16px 10px;
+    min-height: 64px;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-paper);
+    transition: all 0.15s ease;
+    font-weight: 700;
+  }
+  .match-tile.hanzi { font-family: 'Noto Serif SC', serif; font-size: 26px; grid-column: span 1; }
+  .match-tile.text { font-size: 14px; line-height: 1.3; }
+  .match-tile.selected { border-color: var(--gold); background: var(--gold-light); }
+  .match-tile.correct { border-color: var(--jade); background: var(--jade-light); color: var(--jade-dark); cursor: default; }
+  .match-tile.wrong { border-color: var(--error); background: #FDE4DD; animation: shake 0.3s; }
+  .match-tile.pinyin { position: relative; }
+  .match-tile .es-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 5;
+  }
+  .match-tile .es-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--ink);
+  }
+  .match-tile.pinyin:hover .es-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .match-tile.matched-hidden { opacity: 0; pointer-events: none; }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+
+  /* flashcards */
+  .flashcard-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  .flashcard {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: var(--shadow-paper);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer;
+    padding: 20px;
+    text-align: center;
+    position: relative;
+  }
+  .flashcard .front {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 64px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .flashcard .back-content { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .flashcard .back-pinyin { font-size: 22px; font-weight: 800; color: var(--lacquer-dark); }
+  .flashcard .back-es { font-size: 16px; color: var(--ink-soft); font-weight: 700; }
+  .flashcard .tap-hint {
+    position: absolute; bottom: 14px; font-size: 11px; color: var(--ink-soft);
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .flash-controls {
+    display: flex; gap: 12px; width: 100%;
+  }
+  .flash-btn {
+    flex: 1; padding: 14px; border-radius: 14px; border: none;
+    font-weight: 800; font-size: 14px; cursor: pointer;
+  }
+  .flash-btn.no { background: #FDE4DD; color: var(--lacquer-dark); }
+  .flash-btn.yes { background: var(--jade-light); color: var(--jade-dark); }
+  .flash-counter { font-size: 13px; font-weight: 800; color: var(--ink-soft); }
+  .flash-score-row {
+    display: flex; gap: 10px; margin-bottom: 16px;
+  }
+  .flash-score-chip {
+    flex: 1;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .flash-score-chip i { font-style: normal; font-size: 14px; }
+  .flash-score-chip.no { background: #FDE4DD; color: var(--lacquer-dark); }
+  .flash-score-chip.yes { background: var(--jade-light); color: var(--jade-dark); }
+
+  /* review list */
+  .review-list {
+    width: 100%;
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-paper);
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    text-align: left;
+    margin-top: 4px;
+  }
+  .review-list-title {
+    font-size: 12px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-soft);
+  }
+  .review-item {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--paper-deep);
+  }
+  .review-item:first-of-type { border-top: none; }
+  .review-item .review-hanzi {
+    font-family: 'Noto Serif SC', serif; font-size: 22px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .review-item .review-info {
+    text-align: right;
+  }
+  .review-item .review-pinyin { font-size: 13px; font-weight: 800; color: var(--lacquer-dark); }
+  .review-item .review-es { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+
+  /* quiz */
+  .quiz-prompt {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: var(--shadow-paper);
+    padding: 32px 20px;
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .quiz-prompt .q-hanzi {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 56px;
+    font-weight: 700;
+  }
+  .quiz-prompt .q-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-soft); font-weight: 800; margin-bottom: 10px;
+  }
+  .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+  .quiz-option {
+    background: #fff;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-paper);
+  }
+  .quiz-option.correct { border-color: var(--jade); background: var(--jade-light); color: var(--jade-dark); }
+  .quiz-option.wrong { border-color: var(--error); background: #FDE4DD; color: var(--lacquer-dark); }
+  .quiz-option.disabled { cursor: default; }
+
+  /* result screen */
+  .result-screen {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; padding-top: 30px; gap: 16px;
+  }
+  .result-seal {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: var(--lacquer);
+    color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: 'Noto Serif SC', serif;
+    box-shadow: var(--shadow-paper);
+    transform: rotate(-6deg);
+  }
+  .result-seal .pct { font-size: 28px; font-weight: 900; }
+  .result-seal .label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; }
+  .result-seal.celebrate {
+    background: var(--jade);
+    animation: pop 0.5s ease;
+  }
+  .result-seal.celebrate .pct { font-size: 40px; }
+  @keyframes pop {
+    0% { transform: rotate(-6deg) scale(0.4); }
+    60% { transform: rotate(-6deg) scale(1.15); }
+    100% { transform: rotate(-6deg) scale(1); }
+  }
+  .result-title { font-size: 20px; font-weight: 800; }
+  .result-sub { font-size: 14px; color: var(--ink-soft); font-weight: 600; }
+  .result-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px; }
+  .primary-btn {
+    background: var(--lacquer);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: var(--shadow-paper);
+  }
+  .primary-btn:active { transform: scale(0.98); }
+  .secondary-btn {
+    background: #fff;
+    color: var(--ink);
+    border: none;
+    border-radius: 14px;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: var(--shadow-paper);
+  }
+
+  /* admin */
+  .admin-panel {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow-paper);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .admin-panel label {
+    font-size: 13px; font-weight: 800; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .admin-panel input[type="file"], .admin-panel textarea {
+    width: 100%;
+    border: 2px dashed var(--paper-deep);
+    border-radius: 12px;
+    padding: 14px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    background: var(--paper);
+  }
+  .admin-panel textarea { min-height: 140px; resize: vertical; }
+  .admin-note { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .admin-status {
+    font-size: 13px; font-weight: 700; padding: 10px 14px; border-radius: 10px;
+  }
+  .admin-status.ok { background: var(--jade-light); color: var(--jade-dark); }
+  .admin-status.err { background: #FDE4DD; color: var(--lacquer-dark); }
+
+  /* empty */
+  .empty-state {
+    text-align: center; padding: 40px 20px; color: var(--ink-soft);
+    font-weight: 700; font-size: 14px;
+  }
+
+  ::-webkit-scrollbar { width: 0; }
+
+  /* prueba section */
+  .prueba-grid { display: flex; flex-direction: column; gap: 12px; }
+  .prueba-card {
+    background: #fff; border-radius: var(--radius); padding: 16px 18px;
+    box-shadow: var(--shadow-paper); border: none;
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer; text-align: left; width: 100%;
+  }
+  .prueba-card:active { transform: scale(0.98); }
+  .prueba-icon {
+    width: 46px; height: 46px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0;
+  }
+  .prueba-icon.clas { background: #EDE9FE; color: #5B21B6; }
+  .prueba-icon.dial { background: #DBEAFE; color: #1E40AF; }
+  .prueba-icon.orden { background: #D1FAE5; color: #065F46; }
+  .prueba-icon.audio { background: #FEF3C7; color: #92400E; }
+
+  /* audio game */
+  .audio-game-cols { display: flex; gap: 16px; margin-top: 8px; }
+  .audio-col { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .audio-sound-btn {
+    background: #fff; border: 2px solid var(--paper-deep);
+    border-radius: 14px; padding: 14px 10px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; font-size: 22px; cursor: pointer; font-weight: 800;
+    font-family: 'Nunito', sans-serif; transition: all .15s;
+    box-shadow: var(--shadow-paper);
+  }
+  .audio-sound-btn.playing { border-color: var(--gold); background: #FEF3C7; transform: scale(1.04); }
+  .audio-sound-btn.selected { border-color: var(--jade); background: var(--jade-light); }
+  .audio-sound-btn.matched { border-color: var(--jade); background: var(--jade-light); opacity: 0.5; pointer-events: none; }
+  .audio-sound-btn.wrong { border-color: var(--error); background: #FDE4DD; animation: shake .3s; }
+  .audio-hanzi-btn {
+    background: #fff; border: 2px solid var(--paper-deep);
+    border-radius: 14px; padding: 16px 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-family: 'Noto Serif SC', serif;
+    font-weight: 700; cursor: pointer; transition: all .15s;
+    box-shadow: var(--shadow-paper);
+  }
+  .audio-hanzi-btn.selected { border-color: var(--lacquer); background: #FDE4DD; transform: scale(1.04); }
+  .audio-hanzi-btn.matched { border-color: var(--jade); background: var(--jade-light); opacity: 0.5; pointer-events: none; }
+  .audio-hanzi-btn.wrong { border-color: var(--error); background: #FDE4DD; animation: shake .3s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  /* name modal */
+  .name-modal-overlay {
+    position: fixed; inset: 0; background: rgba(46,42,38,0.55); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; z-index: 999; padding: 24px;
+  }
+  .name-modal {
+    background: var(--paper); border-radius: 24px; padding: 36px 28px 28px;
+    max-width: 360px; width: 100%; text-align: center;
+    box-shadow: 0 24px 64px rgba(46,42,38,0.22);
+    animation: modal-in .22s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes modal-in { from { transform: scale(.88); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .name-modal-hanzi { font-size: 52px; line-height: 1; margin-bottom: 8px; color: var(--lacquer); }
+  .name-modal-title { font-size: 22px; font-weight: 800; margin: 0 0 6px; }
+  .name-modal-sub { font-size: 13px; color: var(--ink-soft); font-weight: 600; margin: 0 0 20px; }
+  .name-modal-input {
+    width: 100%; border: 2px solid var(--paper-deep); border-radius: 12px;
+    padding: 13px 16px; font-size: 17px; font-family: 'Nunito', sans-serif;
+    font-weight: 700; background: #fff; outline: none; color: var(--ink);
+    transition: border-color .15s;
+  }
+  .name-modal-input:focus { border-color: var(--jade); }
+
+  /* greeting bar */
+  .greeting-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 20px; background: var(--jade-light);
+    font-size: 14px; font-weight: 700; color: var(--jade-dark);
+  }
+  .change-name-btn {
+    background: none; border: none; font-size: 16px; cursor: pointer; padding: 2px 6px;
+    border-radius: 8px; opacity: 0.7; transition: opacity .15s;
+  }
+  .change-name-btn:hover { opacity: 1; }
+
+  .download-resumen-btn {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; margin-top: 20px;
+    background: linear-gradient(135deg, var(--jade) 0%, var(--jade-dark) 100%);
+    color: #fff; border: none; border-radius: var(--radius);
+    padding: 16px 20px; cursor: pointer; text-align: left;
+    box-shadow: 0 4px 16px rgba(58,125,110,0.30);
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .download-resumen-btn:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(58,125,110,0.20); }
+  .download-resumen-btn:hover { box-shadow: 0 6px 20px rgba(58,125,110,0.40); }
+
+  /* clasificador game */
+  .clas-sentence {
+    font-size: 20px; font-weight: 700; font-family: 'Noto Serif SC', serif;
+    text-align: center; padding: 24px 16px; background: #fff;
+    border-radius: 16px; box-shadow: var(--shadow-paper); margin-bottom: 12px;
+    line-height: 1.8;
+  }
+  .clas-blank {
+    display: inline-block; min-width: 48px; border-bottom: 3px solid var(--lacquer);
+    text-align: center; color: var(--lacquer); margin: 0 2px; vertical-align: bottom;
+    font-size: 20px;
+  }
+  .clas-hint { font-size: 12px; color: var(--ink-soft); font-weight: 600; text-align: center; margin-bottom: 16px; }
+
+  /* dialogo game */
+  .dialogo-context {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-soft); margin-bottom: 8px;
+  }
+  .dialogo-card {
+    background: #fff; border-radius: 16px; box-shadow: var(--shadow-paper);
+    padding: 18px 16px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .dialogo-line { font-size: 18px; font-weight: 700; line-height: 1.8; }
+  .dialogo-speaker { font-size: 11px; font-weight: 800; letter-spacing: 0.05em; margin-right: 6px; }
+  .dialogo-speaker.a { color: var(--lacquer-dark); }
+  .dialogo-speaker.b { color: var(--jade-dark); }
+  .dialogo-blank {
+    display: inline-block; min-width: 54px; border-bottom: 3px solid var(--lacquer);
+    text-align: center; color: var(--lacquer); font-family: 'Noto Serif SC', serif;
+    font-size: 16px; vertical-align: bottom; margin: 0 2px;
+  }
+  .dialogo-explanation {
+    font-size: 12px; color: var(--jade-dark); background: var(--jade-light);
+    border-radius: 10px; padding: 8px 12px; font-weight: 700; margin-bottom: 14px;
+  }
+
+  /* orden game */
+  .orden-answer-zone {
+    min-height: 58px; background: var(--paper-deep); border-radius: 14px;
+    padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px;
+    align-items: center; margin-bottom: 12px;
+    border: 2px dashed rgba(46,42,38,0.18);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .orden-answer-zone.correct-zone { border-color: var(--jade); background: var(--jade-light); }
+  .orden-answer-zone.wrong-zone { border-color: var(--error); background: #FDE4DD; }
+  .orden-words { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .orden-hint { font-size: 12px; color: var(--ink-soft); font-weight: 700; text-align: center; margin-bottom: 12px; }
+  .word-chip {
+    background: #fff; border: 2px solid var(--paper-deep); border-radius: 10px;
+    padding: 12px 20px; font-size: 26px; font-weight: 700; cursor: pointer;
+    font-family: 'Noto Serif SC', serif; transition: transform 0.1s; display: inline-block;
+  }
+  .word-chip:active { transform: scale(0.94); }
+  .word-chip.placed { background: var(--gold-light); border-color: var(--gold); }
+  .orden-feedback { font-size: 13px; font-weight: 700; text-align: center; margin-bottom: 10px; }
+  .orden-feedback.ok { color: var(--jade-dark); }
+  .orden-feedback.err { color: var(--error); }
+  .clas-pinyin { font-size: 13px; color: var(--lacquer-dark); font-weight: 700; text-align: center; margin-bottom: 10px; letter-spacing: 0.03em; }
+  .orden-numbered { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 8px 0 14px; }
+  .orden-numbered-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .orden-num { font-size: 11px; font-weight: 800; color: var(--lacquer-dark); }
+  @media (min-width: 600px) {
+    .clas-sentence { font-size: 28px; padding: 28px 24px; }
+    .dialogo-line { font-size: 19px; }
+    .word-chip { font-size: 19px; padding: 10px 18px; }
+    .quiz-option { font-size: 17px; padding: 16px 18px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://pwqwlfrlaxnybnkdauvk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__0T0_tkgiEdgUGtwMoSHjA_xRd8btWE';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
+<script>
+const { useState, useEffect, useMemo } = React;
+const { createRoot } = ReactDOM;
+
+const DEFAULT_VOCAB = {
+  "5": [
+    {"hanzi": "餐厅", "pinyin": "cāntīng", "es": "comedor"},
+    {"hanzi": "在", "pinyin": "zài", "es": "estar, en"},
+    {"hanzi": "哪儿", "pinyin": "nǎr", "es": "dónde"},
+    {"hanzi": "请问", "pinyin": "qǐngwèn", "es": "¿podría preguntar...?"},
+    {"hanzi": "这", "pinyin": "zhè", "es": "este/esta/esto"},
+    {"hanzi": "宿舍", "pinyin": "sùshè", "es": "dormitorio"},
+    {"hanzi": "女", "pinyin": "nǚ", "es": "mujer"},
+    {"hanzi": "学生", "pinyin": "xuésheng", "es": "estudiante"},
+    {"hanzi": "进", "pinyin": "jìn", "es": "entrar"},
+    {"hanzi": "坐", "pinyin": "zuò", "es": "sentarse"},
+    {"hanzi": "谢谢", "pinyin": "xièxie", "es": "gracias"},
+    {"hanzi": "对不起", "pinyin": "duìbuqǐ", "es": "lo siento"},
+    {"hanzi": "我", "pinyin": "wǒ", "es": "yo"},
+    {"hanzi": "知道", "pinyin": "zhīdào", "es": "saber"},
+    {"hanzi": "没关系", "pinyin": "méi guānxi", "es": "no importa"},
+    {"hanzi": "好", "pinyin": "hǎo", "es": "bien, de acuerdo"},
+    {"hanzi": "再见", "pinyin": "zàijiàn", "es": "hasta luego"},
+    {"hanzi": "小姐", "pinyin": "xiǎojiě", "es": "señorita"},
+    {"hanzi": "二", "pinyin": "èr", "es": "dos"},
+    {"hanzi": "层", "pinyin": "céng", "es": "piso, planta"},
+    {"hanzi": "零", "pinyin": "líng", "es": "cero"},
+    {"hanzi": "四", "pinyin": "sì", "es": "cuatro"},
+    {"hanzi": "号", "pinyin": "hào", "es": "número"},
+    {"hanzi": "不用谢", "pinyin": "búyòng xiè", "es": "de nada"},
+    {"hanzi": "这儿", "pinyin": "zhèr", "es": "aquí"},
+    {"hanzi": "晚", "pinyin": "wǎn", "es": "tarde"},
+    {"hanzi": "了", "pinyin": "le", "es": "partícula de aspecto"}
+  ],
+  "6": [
+    {"hanzi": "去", "pinyin": "qù", "es": "ir"},
+    {"hanzi": "游泳", "pinyin": "yóuyǒng", "es": "nadar"},
+    {"hanzi": "昨天", "pinyin": "zuótiān", "es": "ayer"},
+    {"hanzi": "京剧", "pinyin": "jīngjù", "es": "ópera de Pekín"},
+    {"hanzi": "怎么样", "pinyin": "zěnmeyàng", "es": "¿qué tal?"},
+    {"hanzi": "有意思", "pinyin": "yǒu yìsi", "es": "interesante"},
+    {"hanzi": "今天", "pinyin": "jīntiān", "es": "hoy"},
+    {"hanzi": "天", "pinyin": "tiān", "es": "día"},
+    {"hanzi": "天气", "pinyin": "tiānqì", "es": "clima, tiempo"},
+    {"hanzi": "太", "pinyin": "tài", "es": "demasiado / muy"},
+    {"hanzi": "什么", "pinyin": "shénme", "es": "¿qué?"},
+    {"hanzi": "时候", "pinyin": "shíhou", "es": "momento, tiempo"},
+    {"hanzi": "现在", "pinyin": "xiànzài", "es": "ahora"},
+    {"hanzi": "明天", "pinyin": "míngtiān", "es": "mañana"},
+    {"hanzi": "有", "pinyin": "yǒu", "es": "tener, haber"},
+    {"hanzi": "时间", "pinyin": "shíjiān", "es": "tiempo"},
+    {"hanzi": "说", "pinyin": "shuō", "es": "hablar"},
+    {"hanzi": "遍", "pinyin": "biàn", "es": "vez (de una acción)"},
+    {"hanzi": "打球", "pinyin": "dǎ qiú", "es": "jugar a la pelota"},
+    {"hanzi": "抱歉", "pinyin": "bàoqiàn", "es": "lo siento"},
+    {"hanzi": "忙", "pinyin": "máng", "es": "ocupado"},
+    {"hanzi": "恐怕", "pinyin": "kǒngpà", "es": "quizás, temo que"},
+    {"hanzi": "行", "pinyin": "xíng", "es": "estar bien"},
+    {"hanzi": "你们", "pinyin": "nǐmen", "es": "vosotros"}
+  ],
+  "7": [
+    {"hanzi": "认识", "pinyin": "rènshi", "es": "conocer (a alguien)"},
+    {"hanzi": "开学", "pinyin": "kāixué", "es": "empezar el curso"},
+    {"hanzi": "开", "pinyin": "kāi", "es": "abrir, empezar"},
+    {"hanzi": "很", "pinyin": "hěn", "es": "muy"},
+    {"hanzi": "高兴", "pinyin": "gāoxìng", "es": "feliz, contento"},
+    {"hanzi": "看", "pinyin": "kàn", "es": "mirar, ver"},
+    {"hanzi": "问", "pinyin": "wèn", "es": "preguntar"},
+    {"hanzi": "一下", "pinyin": "yíxià", "es": "un momento, brevemente"},
+    {"hanzi": "学院", "pinyin": "xuéyuàn", "es": "instituto, universidad"},
+    {"hanzi": "名片", "pinyin": "míngpiàn", "es": "tarjeta de visita"},
+    {"hanzi": "啊", "pinyin": "à", "es": "ah, oh"},
+    {"hanzi": "教授", "pinyin": "jiàoshòu", "es": "profesor universitario"},
+    {"hanzi": "教", "pinyin": "jiāo", "es": "enseñar"},
+    {"hanzi": "谁", "pinyin": "shéi", "es": "quién"},
+    {"hanzi": "来", "pinyin": "lái", "es": "venir"},
+    {"hanzi": "介绍", "pinyin": "jièshào", "es": "presentar"},
+    {"hanzi": "名字", "pinyin": "míngzi", "es": "nombre"},
+    {"hanzi": "中文", "pinyin": "Zhōngwén", "es": "lengua china"},
+    {"hanzi": "爸爸", "pinyin": "bàba", "es": "papá"},
+    {"hanzi": "学习", "pinyin": "xuéxí", "es": "aprender, estudiar"},
+    {"hanzi": "专业", "pinyin": "zhuānyè", "es": "carrera, especialidad"},
+    {"hanzi": "美术", "pinyin": "měishù", "es": "bellas artes"},
+    {"hanzi": "文学", "pinyin": "wénxué", "es": "literatura"},
+    {"hanzi": "系", "pinyin": "xì", "es": "facultad, departamento"},
+    {"hanzi": "加拿大", "pinyin": "Jiānádà", "es": "Canadá"},
+    {"hanzi": "美国", "pinyin": "Měiguó", "es": "Estados Unidos"},
+    {"hanzi": "他", "pinyin": "tā", "es": "él"},
+    {"hanzi": "也", "pinyin": "yě", "es": "también"},
+    {"hanzi": "都", "pinyin": "dōu", "es": "todos, ambos"}
+  ],
+  "8": [
+    {"hanzi": "家", "pinyin": "jiā", "es": "familia, hogar"},
+    {"hanzi": "几", "pinyin": "jǐ", "es": "cuántos"},
+    {"hanzi": "口", "pinyin": "kǒu", "es": "clasificador de familia"},
+    {"hanzi": "照片", "pinyin": "zhàopiàn", "es": "fotografía"},
+    {"hanzi": "和", "pinyin": "hé", "es": "y"},
+    {"hanzi": "个", "pinyin": "gè", "es": "clasificador general"},
+    {"hanzi": "姐姐", "pinyin": "jiějie", "es": "hermana mayor"},
+    {"hanzi": "两", "pinyin": "liǎng", "es": "dos (con clasificador)"},
+    {"hanzi": "弟弟", "pinyin": "dìdi", "es": "hermano menor"},
+    {"hanzi": "还", "pinyin": "hái", "es": "además, también"},
+    {"hanzi": "一共", "pinyin": "yígòng", "es": "en total"},
+    {"hanzi": "妹妹", "pinyin": "mèimei", "es": "hermana menor"},
+    {"hanzi": "小", "pinyin": "xiǎo", "es": "pequeño"},
+    {"hanzi": "狗", "pinyin": "gǒu", "es": "perro"},
+    {"hanzi": "张", "pinyin": "zhāng", "es": "clasificador para objetos planos"},
+    {"hanzi": "当然", "pinyin": "dāngrán", "es": "por supuesto"},
+    {"hanzi": "真", "pinyin": "zhēn", "es": "realmente, verdadero"},
+    {"hanzi": "可爱", "pinyin": "kě'ài", "es": "adorable"},
+    {"hanzi": "爱", "pinyin": "ài", "es": "amar"},
+    {"hanzi": "没", "pinyin": "méi", "es": "no (negación de 有)"},
+    {"hanzi": "男", "pinyin": "nán", "es": "hombre, masculino"},
+    {"hanzi": "做", "pinyin": "zuò", "es": "hacer"},
+    {"hanzi": "工作", "pinyin": "gōngzuò", "es": "trabajo, trabajar"},
+    {"hanzi": "大", "pinyin": "dà", "es": "grande"},
+    {"hanzi": "多少", "pinyin": "duōshao", "es": "cuántos"},
+    {"hanzi": "多", "pinyin": "duō", "es": "mucho"},
+    {"hanzi": "少", "pinyin": "shǎo", "es": "poco"},
+    {"hanzi": "喜欢", "pinyin": "xǐhuan", "es": "gustar, preferir"},
+    {"hanzi": "外语", "pinyin": "wàiyǔ", "es": "lengua extranjera"},
+    {"hanzi": "外国", "pinyin": "wàiguó", "es": "país extranjero"},
+    {"hanzi": "百", "pinyin": "bǎi", "es": "cien"},
+    {"hanzi": "哥哥", "pinyin": "gēge", "es": "hermano mayor"},
+    {"hanzi": "妈妈", "pinyin": "māma", "es": "mamá"}
+  ],
+  "9": [
+    {"hanzi": "生日", "pinyin": "shēngrì", "es": "cumpleaños"},
+    {"hanzi": "聚会", "pinyin": "jùhuì", "es": "fiesta / reunión"},
+    {"hanzi": "今年", "pinyin": "jīnnián", "es": "este año"},
+    {"hanzi": "多大", "pinyin": "duō dà", "es": "¿cuántos años?"},
+    {"hanzi": "岁", "pinyin": "suì", "es": "años de edad"},
+    {"hanzi": "出生", "pinyin": "chūshēng", "es": "nacer"},
+    {"hanzi": "属", "pinyin": "shǔ", "es": "pertenecer al zodíaco"},
+    {"hanzi": "一起", "pinyin": "yīqǐ", "es": "juntos"},
+    {"hanzi": "参加", "pinyin": "cānjiā", "es": "participar / asistir"},
+    {"hanzi": "星期", "pinyin": "xīngqī", "es": "semana / día de la semana"},
+    {"hanzi": "上午", "pinyin": "shàngwǔ", "es": "por la mañana"},
+    {"hanzi": "下午", "pinyin": "xiàwǔ", "es": "por la tarde"},
+    {"hanzi": "晚上", "pinyin": "wǎnshang", "es": "por la noche"},
+    {"hanzi": "祝贺", "pinyin": "zhùhè", "es": "felicitar"},
+    {"hanzi": "快乐", "pinyin": "kuàilè", "es": "feliz"},
+    {"hanzi": "买", "pinyin": "mǎi", "es": "comprar"},
+    {"hanzi": "茶", "pinyin": "chá", "es": "té"},
+    {"hanzi": "蛋糕", "pinyin": "dàngāo", "es": "pastel / torta"},
+    {"hanzi": "中餐", "pinyin": "zhōngcān", "es": "comida china"},
+    {"hanzi": "西餐", "pinyin": "xīcān", "es": "comida occidental"},
+    {"hanzi": "啤酒", "pinyin": "píjiǔ", "es": "cerveza"},
+    {"hanzi": "红葡萄酒", "pinyin": "hóng pútaojiǔ", "es": "vino tinto"},
+    {"hanzi": "可乐", "pinyin": "kělè", "es": "Coca-Cola"},
+    {"hanzi": "牛奶", "pinyin": "niúnǎi", "es": "leche"},
+    {"hanzi": "面包", "pinyin": "miànbāo", "es": "pan"},
+    {"hanzi": "米饭", "pinyin": "mǐfàn", "es": "arroz cocido"},
+    {"hanzi": "热狗", "pinyin": "règǒu", "es": "pancho / hot dog"},
+    {"hanzi": "汉堡", "pinyin": "hànbǎo", "es": "hamburguesa"}
+  ],
+  "mod-paises": [
+    {"hanzi": "中国", "pinyin": "Zhōngguó", "es": "🇨🇳 China"},
+    {"hanzi": "阿根廷", "pinyin": "Āgēntíng", "es": "🇦🇷 Argentina"},
+    {"hanzi": "墨西哥", "pinyin": "Mòxīgē", "es": "🇲🇽 México"},
+    {"hanzi": "巴西", "pinyin": "Bāxī", "es": "🇧🇷 Brasil"},
+    {"hanzi": "哥伦比亚", "pinyin": "Gēlúnbǐyà", "es": "🇨🇴 Colombia"},
+    {"hanzi": "智利", "pinyin": "Zhìlì", "es": "🇨🇱 Chile"},
+    {"hanzi": "委内瑞拉", "pinyin": "Wěinèiruìlā", "es": "🇻🇪 Venezuela"},
+    {"hanzi": "玻利维亚", "pinyin": "Bōlìwéiyà", "es": "🇧🇴 Bolivia"},
+    {"hanzi": "秘鲁", "pinyin": "Bìlǔ", "es": "🇵🇪 Perú"},
+    {"hanzi": "乌拉圭", "pinyin": "Wūlāguī", "es": "🇺🇾 Uruguay"},
+    {"hanzi": "巴拉圭", "pinyin": "Bālāguī", "es": "🇵🇾 Paraguay"},
+    {"hanzi": "厄瓜多尔", "pinyin": "Èkuǎduōěr", "es": "🇪🇨 Ecuador"},
+    {"hanzi": "古巴", "pinyin": "Gǔbā", "es": "🇨🇺 Cuba"},
+    {"hanzi": "巴拿马", "pinyin": "Pānámǎ", "es": "🇵🇦 Panamá"},
+    {"hanzi": "哥斯达黎加", "pinyin": "Gēsīdálígā", "es": "🇨🇷 Costa Rica"},
+    {"hanzi": "洪都拉斯", "pinyin": "Hóngdūlāsī", "es": "🇭🇳 Honduras"},
+    {"hanzi": "危地马拉", "pinyin": "Wēidìmǎlā", "es": "🇬🇹 Guatemala"},
+    {"hanzi": "波多黎各", "pinyin": "Bōduōlígē", "es": "🇵🇷 Puerto Rico"},
+    {"hanzi": "美国", "pinyin": "Měiguó", "es": "🇺🇸 Estados Unidos"},
+    {"hanzi": "加拿大", "pinyin": "Jiānádà", "es": "🇨🇦 Canadá"},
+    {"hanzi": "日本", "pinyin": "Rìběn", "es": "🇯🇵 Japón"},
+    {"hanzi": "英国", "pinyin": "Yīngguó", "es": "🇬🇧 Reino Unido"},
+    {"hanzi": "西班牙", "pinyin": "Xībānyá", "es": "🇪🇸 España"},
+    {"hanzi": "法国", "pinyin": "Fǎguó", "es": "🇫🇷 Francia"},
+    {"hanzi": "德国", "pinyin": "Déguó", "es": "🇩🇪 Alemania"},
+    {"hanzi": "意大利", "pinyin": "Yīdàlì", "es": "🇮🇹 Italia"},
+    {"hanzi": "葡萄牙", "pinyin": "Pútáoyá", "es": "🇵🇹 Portugal"},
+    {"hanzi": "俄罗斯", "pinyin": "Éluósī", "es": "🇷🇺 Rusia"},
+    {"hanzi": "荷兰", "pinyin": "Hélán", "es": "🇳🇱 Países Bajos"},
+    {"hanzi": "瑞士", "pinyin": "Ruìshì", "es": "🇨🇭 Suiza"},
+    {"hanzi": "瑞典", "pinyin": "Ruìdiǎn", "es": "🇸🇪 Suecia"},
+    {"hanzi": "波兰", "pinyin": "Bōlán", "es": "🇵🇱 Polonia"}
+  ],
+  "mod-numeros": [
+    {"hanzi": "零", "pinyin": "líng", "es": "0 · cero"},
+    {"hanzi": "一", "pinyin": "yī", "es": "1 · uno"},
+    {"hanzi": "二", "pinyin": "èr", "es": "2 · dos"},
+    {"hanzi": "三", "pinyin": "sān", "es": "3 · tres"},
+    {"hanzi": "四", "pinyin": "sì", "es": "4 · cuatro"},
+    {"hanzi": "五", "pinyin": "wǔ", "es": "5 · cinco"},
+    {"hanzi": "六", "pinyin": "liù", "es": "6 · seis"},
+    {"hanzi": "七", "pinyin": "qī", "es": "7 · siete"},
+    {"hanzi": "八", "pinyin": "bā", "es": "8 · ocho"},
+    {"hanzi": "九", "pinyin": "jiǔ", "es": "9 · nueve"},
+    {"hanzi": "十", "pinyin": "shí", "es": "10 · diez"},
+    {"hanzi": "二十", "pinyin": "èrshí", "es": "20 · veinte"},
+    {"hanzi": "三十", "pinyin": "sānshí", "es": "30 · treinta"},
+    {"hanzi": "四十", "pinyin": "sìshí", "es": "40 · cuarenta"},
+    {"hanzi": "五十", "pinyin": "wǔshí", "es": "50 · cincuenta"},
+    {"hanzi": "六十", "pinyin": "liùshí", "es": "60 · sesenta"},
+    {"hanzi": "七十", "pinyin": "qīshí", "es": "70 · setenta"},
+    {"hanzi": "八十", "pinyin": "bāshí", "es": "80 · ochenta"},
+    {"hanzi": "九十", "pinyin": "jiǔshí", "es": "90 · noventa"},
+    {"hanzi": "一百", "pinyin": "yībǎi", "es": "100 · cien"}
+  ]
+};
+
+const html = React.createElement;
+const STORAGE_KEY = 'hanzi-practice-progress-v1';
+const VOCAB_KEY = 'hanzi-practice-vocab-v1';
+const NAME_KEY = 'hanzi-practice-name-v1';
+
+function loadVocab() {
+  try {
+    const stored = localStorage.getItem(VOCAB_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch (e) {}
+  return DEFAULT_VOCAB;
+}
+
+function loadProgress() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch (e) {}
+  return { lessons: {} };
+}
+
+function saveProgress(p) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const LESSON_THEMES = Object.assign({
+  "5": { name: "En el campus", icon: "宿" },
+  "6": { name: "El clima y el tiempo", icon: "天" },
+  "7": { name: "Presentaciones", icon: "介" },
+  "8": { name: "La familia", icon: "家" },
+  "9": { name: "Fechas y celebraciones", icon: "🎂" },
+  "mod-paises": { name: "Países del mundo", icon: "国" },
+  "mod-numeros": { name: "Los números", icon: "数" },
+}, JSON.parse(localStorage.getItem('hanzi-lesson-themes') || '{}'));
+
+// ----------------- Lección 9: datos actividades especiales -----------------
+const L9_COMIDA_QUESTIONS = [
+  { sentence: '___：汉堡 🍔', pinyin: 'Hànbǎo', answer: '西餐', options: ['中餐', '西餐'], hint: 'hamburguesa' },
+  { sentence: '___：米饭 🍚', pinyin: 'Mǐfàn', answer: '中餐', options: ['中餐', '西餐'], hint: 'arroz cocido' },
+  { sentence: '___：热狗 🌭', pinyin: 'Règǒu', answer: '西餐', options: ['中餐', '西餐'], hint: 'pancho / hot dog' },
+  { sentence: '___：茶 🍵', pinyin: 'Chá', answer: '中餐', options: ['中餐', '西餐'], hint: 'té' },
+  { sentence: '___：面包 🍞', pinyin: 'Miànbāo', answer: '西餐', options: ['中餐', '西餐'], hint: 'pan' },
+  { sentence: '___：可乐 🥤', pinyin: 'Kělè', answer: '西餐', options: ['中餐', '西餐'], hint: 'Coca-Cola' },
+  { sentence: '___：啤酒 🍺', pinyin: 'Píjiǔ', answer: '西餐', options: ['中餐', '西餐'], hint: 'cerveza' },
+  { sentence: '___：红葡萄酒 🍷', pinyin: 'Hóng pútaojiǔ', answer: '西餐', options: ['中餐', '西餐'], hint: 'vino tinto' },
+  { sentence: '___：蛋糕 🎂', pinyin: 'Dàngāo', answer: '西餐', options: ['中餐', '西餐'], hint: 'pastel / torta' },
+  { sentence: '___：牛奶 🥛', pinyin: 'Niúnǎi', answer: '西餐', options: ['中餐', '西餐'], hint: 'leche' },
+];
+
+const L9_DIALOGO_QUESTIONS = [
+  { context: 'Es el cumpleaños de tu amigo', A: '今天是你的___吗？', B: '是的，今天是我的生日！', blankIn: 'A', answer: '生日', answerPinyin: 'shēngrì', answerEs: 'cumpleaños', options: ['生日', '聚会', '课', '星期'], explanation: '生日 = cumpleaños. 今天是你的生日吗？= ¿Hoy es tu cumpleaños?' },
+  { context: 'Preguntas la edad de alguien', A: '你今年___？', B: '我今年二十岁。', blankIn: 'A', answer: '多大', answerPinyin: 'duō dà', answerEs: '¿cuántos años tienes?', options: ['多大', '多少', '几岁', '怎么样'], explanation: '多大 se usa para preguntar la edad de personas adultas.' },
+  { context: 'Invitas a una fiesta', A: '我们___参加聚会吧！', B: '好的，几点？', blankIn: 'A', answer: '一起', answerPinyin: 'yīqǐ', answerEs: 'juntos', options: ['一起', '都', '也', '很'], explanation: '一起 = juntos. 我们一起去 = vamos juntos.' },
+  { context: 'Ofreces algo de comer', A: '你喝___还是可乐？', B: '我喝茶，谢谢。', blankIn: 'A', answer: '茶', answerPinyin: 'chá', answerEs: 'té', options: ['茶', '啤酒', '牛奶', '酒'], explanation: '还是 = o (en preguntas de elección). ¿Té o Coca-Cola?' },
+  { context: 'Felicitas a alguien', A: '___你生日快乐！', B: '谢谢你！', blankIn: 'A', answer: '祝贺', answerPinyin: 'zhùhè', answerEs: 'felicitar', options: ['祝贺', '参加', '聚会', '属'], explanation: '祝贺 = felicitar. 祝贺你生日快乐 = ¡Felicidades en tu cumpleaños!' },
+  { context: 'Hablas del horario de la clase', A: '你的___是上午还是下午？', B: '是上午九点。', blankIn: 'A', answer: '课', answerPinyin: 'kè', answerEs: 'clase', options: ['课', '星期', '生日', '聚会'], explanation: '课 = clase. 你的课是几点？= ¿A qué hora es tu clase?' },
+  { context: 'Preguntas cuándo nació alguien', A: '你是哪年___的？', B: '我是1998年出生的。', blankIn: 'A', answer: '出生', answerPinyin: 'chūshēng', answerEs: 'nacer', options: ['出生', '属', '生日', '聚会'], explanation: '出生 = nacer. 你是哪年出生的？= ¿En qué año naciste?' },
+  { context: 'Comprás algo para la fiesta', A: '我去___一瓶红葡萄酒。', B: '好主意！', blankIn: 'A', answer: '买', answerPinyin: 'mǎi', answerEs: 'comprar', options: ['买', '吃', '喝', '参加'], explanation: '买 = comprar. 我去买 = voy a comprar.' },
+];
+
+const L9_ORDEN_QUESTIONS = [
+  { words: ['今天', '是', '我的', '生日'], correct: '今天是我的生日', es: 'Hoy es mi cumpleaños', pinyin: 'Jīntiān shì wǒde shēngrì' },
+  { words: ['你', '今年', '多大', '了'], correct: '你今年多大了', es: '¿Cuántos años tienes este año?', pinyin: 'Nǐ jīnnián duō dà le' },
+  { words: ['我', '上午', '有', '课'], correct: '我上午有课', es: 'Por la mañana tengo clase', pinyin: 'Wǒ shàngwǔ yǒu kè' },
+  { words: ['我们', '去', '参加', '聚会', '吧'], correct: '我们去参加聚会吧', es: 'Vayamos a la fiesta', pinyin: 'Wǒmen qù cānjiā jùhuì ba' },
+  { words: ['我', '买', '了', '一瓶', '红葡萄酒'], correct: '我买了一瓶红葡萄酒', es: 'Compré una botella de vino tinto', pinyin: 'Wǒ mǎi le yī píng hóng pútaojiǔ' },
+  { words: ['晚上', '我们', '吃', '中餐', '好吗'], correct: '晚上我们吃中餐好吗', es: '¿Comemos comida china esta noche?', pinyin: 'Wǎnshang wǒmen chī zhōngcān hǎo ma' },
+  { words: ['祝贺', '你', '生日', '快乐'], correct: '祝贺你生日快乐', es: '¡Feliz cumpleaños!', pinyin: 'Zhùhè nǐ shēngrì kuàilè' },
+];
+
+const L9_EDAD_QUESTIONS = [
+  { sentence: '___ = "este año"', pinyin: 'jīnnián', answer: '今年', options: ['今年', '今天', '明天', '昨天'], hint: '今(jīn) = ahora · 年(nián) = año' },
+  { sentence: '___ = "años de edad"', pinyin: 'suì', answer: '岁', options: ['岁', '年', '课', '天'], hint: 'Clasificador para la edad de las personas' },
+  { sentence: '___ = "nacer en el año del..."', pinyin: 'shǔ', answer: '属', options: ['属', '出生', '聚会', '生日'], hint: 'Zodiaco chino · 你属什么？' },
+  { sentence: '___ = "¿cuántos años?" (informal)', pinyin: 'duō dà', answer: '多大', options: ['多大', '多少', '怎么样', '几岁'], hint: 'Para preguntar la edad a adultos' },
+  { sentence: '___ = "semana"', pinyin: 'xīngqī', answer: '星期', options: ['星期', '上午', '下午', '年'], hint: '星期一 = lunes, 星期日 = domingo' },
+  { sentence: '___ = "por la mañana"', pinyin: 'shàngwǔ', answer: '上午', options: ['上午', '下午', '晚上', '今天'], hint: '上 = arriba/encima → mañana' },
+  { sentence: '___ = "por la tarde"', pinyin: 'xiàwǔ', answer: '下午', options: ['下午', '上午', '晚上', '星期'], hint: '下 = abajo/debajo → tarde' },
+  { sentence: '___ = "noche"', pinyin: 'wǎnshang', answer: '晚上', options: ['晚上', '下午', '上午', '今天'], hint: '晚(wǎn) = tardío, noche' },
+];
+
+// ----------------- Prueba data -----------------
+const CLASIFICADOR_QUESTIONS = [
+  { sentence: '我有两___照片。', pinyin: 'Wǒ yǒu liǎng ___ zhàopiàn.', answer: '张', options: ['张', '个', '口', '层'], hint: '照片 = fotografía' },
+  { sentence: '你们家有几___人？', pinyin: 'Nǐmen jiā yǒu jǐ ___ rén?', answer: '口', options: ['口', '个', '张', '位'], hint: 'Para contar miembros de la familia' },
+  { sentence: '我有一___名片。', pinyin: 'Wǒ yǒu yī ___ míngpiàn.', answer: '张', options: ['张', '个', '口', '层'], hint: '名片 = tarjeta de visita' },
+  { sentence: '我有两___姐姐。', pinyin: 'Wǒ yǒu liǎng ___ jiějie.', answer: '个', options: ['个', '口', '张', '位'], hint: 'Clasificador general para personas' },
+  { sentence: '我们学院有十二___系。', pinyin: 'Wǒmen xuéyuàn yǒu shí\'èr ___ xì.', answer: '个', options: ['个', '口', '张', '层'], hint: '系 = facultad / departamento' },
+  { sentence: '餐厅在二___。', pinyin: 'Cāntīng zài èr ___.', answer: '层', options: ['层', '个', '号', '口'], hint: '层 = piso / planta del edificio' },
+  { sentence: '我住零四___。', pinyin: 'Wǒ zhù líng sì ___.', answer: '号', options: ['号', '层', '口', '张'], hint: '号 = número de habitación' },
+  { sentence: '我有一___弟弟。', pinyin: 'Wǒ yǒu yī ___ dìdi.', answer: '个', options: ['个', '口', '张', '层'], hint: 'Clasificador general para personas' },
+];
+
+const DIALOGO_QUESTIONS = [
+  { context: 'Buscas el comedor en el campus', A: '请问，餐厅___哪儿？', B: '在二层。', blankIn: 'A', answer: '在', answerPinyin: 'zài', answerEs: 'estar / encontrarse en', options: ['在', '是', '去', '有'], explanation: '在 + 哪儿 pregunta la ubicación de un lugar.' },
+  { context: 'Preguntas si alguien está en casa', A: '请问，李明___吗？', B: '对不起，他不在。', blankIn: 'A', answer: '在', answerPinyin: 'zài', answerEs: 'estar presente', options: ['在', '来', '去', '好'], explanation: '在吗 = ¿está presente? / ¿está en casa?' },
+  { context: 'Alguien choca contigo', A: '对不起！', B: '___。', blankIn: 'B', answer: '没关系', answerPinyin: 'méi guānxi', answerEs: 'no importa', options: ['没关系', '不用谢', '再见', '请问'], explanation: '没关系 = no importa. Respuesta a 对不起.' },
+  { context: 'Propones una actividad', A: '我们去游泳，___？', B: '太好了！', blankIn: 'A', answer: '好吗', answerPinyin: 'hǎo ma', answerEs: '¿de acuerdo? / ¿bien?', options: ['好吗', '怎么', '什么', '对吗'], explanation: '...好吗 o ...可以吗 se usan para hacer sugerencias.' },
+  { context: 'No puedes quedar', A: '明天我们打球，好吗？', B: '很抱歉，___不行。', blankIn: 'B', answer: '恐怕', answerPinyin: 'kǒngpà', answerEs: 'temo que... / me temo', options: ['恐怕', '太', '很', '都'], explanation: '恐怕 = temo que... Se usa para rechazar educadamente.' },
+  { context: 'Te dan las gracias', A: '谢谢你！', B: '___！', blankIn: 'B', answer: '不用谢', answerPinyin: 'búyòng xiè', answerEs: 'de nada', options: ['不用谢', '没关系', '对不起', '再见'], explanation: '不用谢 = de nada. Respuesta a 谢谢.' },
+  { context: 'Pregunta sobre tu carrera', A: '你学习什么___？', B: '我学习中文。', blankIn: 'A', answer: '专业', answerPinyin: 'zhuānyè', answerEs: 'carrera / especialidad', options: ['专业', '名字', '工作', '时间'], explanation: '专业 = carrera / especialidad académica.' },
+  { context: 'Cuántas personas en tu familia', A: '你们家有___口人？', B: '我们家有四口人。', blankIn: 'A', answer: '几', answerPinyin: 'jǐ', answerEs: '¿cuántos? (número pequeño)', options: ['几', '多少', '什么', '哪'], explanation: '几 se usa para preguntar números pequeños (con clasificador).' },
+  { context: 'Cuántos departamentos hay', A: '你们学院有___个系？', B: '有十二个系。', blankIn: 'A', answer: '多少', answerPinyin: 'duōshao', answerEs: '¿cuántos? (cualquier número)', options: ['多少', '几', '什么', '哪'], explanation: '多少 se usa para números potencialmente grandes.' },
+  { context: 'Presentas a alguien', A: '他是我们___王老师。', B: '您好！', blankIn: 'A', answer: '的', answerPinyin: 'de', answerEs: 'partícula posesiva', options: ['的', '了', '吗', '呢'], explanation: '的 conecta el poseedor con lo poseído. 他是我们的王老师 = Él es nuestro profesor Wang.' },
+];
+
+const ORDEN_QUESTIONS = [
+  { words: ['我们家', '有', '四口', '人'], correct: '我们家有四口人', es: 'En mi familia hay cuatro personas', pinyin: 'Wǒmen jiā yǒu sì kǒu rén' },
+  { words: ['餐厅', '在', '二层'], correct: '餐厅在二层', es: 'El comedor está en el segundo piso', pinyin: 'Cāntīng zài èr céng' },
+  { words: ['我', '也', '学习', '中文'], correct: '我也学习中文', es: 'Yo también estudio chino', pinyin: 'Wǒ yě xuéxí Zhōngwén' },
+  { words: ['今天', '天气', '太', '好', '了'], correct: '今天天气太好了', es: 'Hoy hace muy buen tiempo', pinyin: 'Jīntiān tiānqì tài hǎo le' },
+  { words: ['这', '是', '我的', '名片'], correct: '这是我的名片', es: 'Esta es mi tarjeta de visita', pinyin: 'Zhè shì wǒde míngpiàn' },
+  { words: ['我', '喜欢', '学习', '外语'], correct: '我喜欢学习外语', es: 'Me gusta estudiar idiomas extranjeros', pinyin: 'Wǒ xǐhuan xuéxí wàiyǔ' },
+  { words: ['你们', '都', '是', '学生', '吗'], correct: '你们都是学生吗', es: '¿Son todos ustedes estudiantes?', pinyin: 'Nǐmen dōu shì xuésheng ma' },
+  { words: ['我有', '两个', '姐姐', '和', '一个', '弟弟'], correct: '我有两个姐姐和一个弟弟', es: 'Tengo dos hermanas mayores y un hermano menor', pinyin: 'Wǒ yǒu liǎng gè jiějie hé yī gè dìdi' },
+];
+
+// ----------------- Descarga resumen -----------------
+function downloadResumen(vocab, progress, lessons, playerName) {
+  const date = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const pp = progress.prueba || {};
+
+  const scoreColor = (p) => p >= 80 ? '#3A7D6E' : p >= 50 ? '#E0A93B' : '#C1432B';
+  const star = (p) => p >= 80 ? '⭐' : p > 0 ? '🔸' : '—';
+
+  // Helper: render a table of missed words (hanzi / pinyin / español)
+  const wordRows = (arr) => arr.map(w =>
+    `<tr>
+      <td style="font-family:'Noto Serif SC',serif;font-size:20px;padding:10px 12px;border-bottom:1px solid #F3E6CC">${w.hanzi}</td>
+      <td style="color:#C1432B;font-weight:700;padding:10px 12px;border-bottom:1px solid #F3E6CC">${w.pinyin}</td>
+      <td style="color:#6E645A;padding:10px 12px;border-bottom:1px solid #F3E6CC">${w.es}</td>
+    </tr>`
+  ).join('');
+
+  // ── Lecciones regulares (1-8): tabla de puntajes ─────────────────────────
+  const regularLessons = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros');
+  const specialLessons = lessons.filter(id => id === 'mod-paises' || id === 'mod-numeros');
+
+  const lessonRows = regularLessons.map(id => {
+    const lp = progress.lessons[id] || {};
+    const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+    const m = lp.match || 0, c = lp.cards || 0, q = lp.quiz || 0;
+    return `<tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #F3E6CC"><strong>Lección ${id}</strong><br><span style="font-size:12px;color:#6E645A">${theme.name}</span></td>
+      <td style="color:${scoreColor(m)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(m)} ${m}%</td>
+      <td style="color:${scoreColor(c)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(c)} ${c}%</td>
+      <td style="color:${scoreColor(q)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(q)} ${q}%</td>
+    </tr>`;
+  }).join('');
+
+  // ── Módulos especiales (países y números) ─────────────────────────────────
+  const specialRows = specialLessons.map(id => {
+    const lp = progress.lessons[id] || {};
+    const theme = LESSON_THEMES[id] || { name: id === 'mod-paises' ? 'Países del mundo' : 'Los números' };
+    const m = lp.match || 0, c = lp.cards || 0, q = lp.quiz || 0;
+    return `<tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #F3E6CC"><strong>${theme.name}</strong></td>
+      <td style="color:${scoreColor(m)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(m)} ${m}%</td>
+      <td style="color:${scoreColor(c)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(c)} ${c}%</td>
+      <td style="color:${scoreColor(q)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(q)} ${q}%</td>
+    </tr>`;
+  }).join('');
+
+  // ── Para repasar: errores reales por módulo ───────────────────────────────
+  let repasarHTML = '';
+
+  // Lecciones regulares
+  regularLessons.forEach(id => {
+    const lp = progress.lessons[id] || {};
+    const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+    ['match', 'cards', 'quiz'].forEach(mode => {
+      const modeLabel = { match: 'Emparejar', cards: 'Tarjetas', quiz: 'Quiz' }[mode];
+      const missed = lp[mode + '_missed'] || [];
+      if (missed.length === 0) return;
+      const unique = missed.filter((w, i, arr) => arr.findIndex(x => x.hanzi === w.hanzi) === i);
+      repasarHTML += `<h3 style="margin:24px 0 6px;color:#2E2A26;font-size:15px">
+        Lección ${id} · ${theme.name} — <em>${modeLabel}</em>
+        <span style="font-size:12px;color:#C1432B;font-weight:700">(${unique.length} ${unique.length === 1 ? 'error' : 'errores'})</span>
+      </h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px">${wordRows(unique)}</table>`;
+    });
+  });
+
+  // Módulos especiales
+  specialLessons.forEach(id => {
+    const lp = progress.lessons[id] || {};
+    const theme = LESSON_THEMES[id] || { name: id === 'mod-paises' ? 'Países del mundo' : 'Los números' };
+    ['match', 'cards', 'quiz'].forEach(mode => {
+      const modeLabel = { match: 'Emparejar', cards: 'Tarjetas', quiz: 'Quiz' }[mode];
+      const missed = lp[mode + '_missed'] || [];
+      if (missed.length === 0) return;
+      const unique = missed.filter((w, i, arr) => arr.findIndex(x => x.hanzi === w.hanzi) === i);
+      repasarHTML += `<h3 style="margin:24px 0 6px;color:#2E2A26;font-size:15px">
+        ${theme.name} — <em>${modeLabel}</em>
+        <span style="font-size:12px;color:#C1432B;font-weight:700">(${unique.length} ${unique.length === 1 ? 'error' : 'errores'})</span>
+      </h3>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px">${wordRows(unique)}</table>`;
+    });
+  });
+
+  // Prueba games
+  const pruebaLabels = { clas: 'Clasificadores', dialogo: 'Completa el diálogo', orden: 'Ordena la oración' };
+  ['clas', 'dialogo', 'orden'].forEach(game => {
+    const missed = pp[game + '_missed'] || [];
+    if (missed.length === 0) return;
+    const unique = missed.filter((w, i, arr) => arr.findIndex(x => x.hanzi === w.hanzi) === i);
+    repasarHTML += `<h3 style="margin:24px 0 6px;color:#2E2A26;font-size:15px">
+      ${pruebaLabels[game]}
+      <span style="font-size:12px;color:#C1432B;font-weight:700">(${unique.length} ${unique.length === 1 ? 'error' : 'errores'})</span>
+    </h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:4px">${wordRows(unique)}</table>`;
+  });
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <!-- © 2026 大卫 · dawei.com.ar -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+  <title>Hanzi Practice · Resumen${playerName ? ' · ' + playerName : ''}</title>
+  <style>
+    body{font-family:'Nunito',sans-serif;background:#FBF4E6;color:#2E2A26;max-width:700px;margin:40px auto;padding:0 24px}
+    h1{color:#C1432B;margin-bottom:4px}
+    h2{color:#2E2A26;border-bottom:2px solid #F3E6CC;padding-bottom:8px;margin-top:32px}
+    table{width:100%;border-collapse:collapse}
+    th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#6E645A;padding:8px 12px;border-bottom:2px solid #F3E6CC;text-align:left}
+    @media print{body{background:#fff}}
+  </style></head><body>
+  <h1>汉字 Practice · Resumen de repaso</h1>
+  ${playerName ? `<p style="margin-top:0;font-size:18px">👋 <strong>${playerName}</strong></p>` : ''}
+  <p style="color:#6E645A;margin-top:0">汉语课 CUI · Nivel 2 · Ariel 老师 &nbsp;|&nbsp; ${date}</p>
+
+  <h2>📚 Lecciones</h2>
+  <table><thead><tr>
+    <th>Lección</th><th>Emparejar</th><th>Tarjetas</th><th>Quiz</th>
+  </tr></thead><tbody>${lessonRows}</tbody></table>
+
+  ${specialRows ? `<h2>🌍 Módulos especiales</h2>
+  <table><thead><tr>
+    <th>Módulo</th><th>Emparejar</th><th>Tarjetas</th><th>Quiz</th>
+  </tr></thead><tbody>${specialRows}</tbody></table>` : ''}
+
+  <h2>🧠 ¿Cuánto aprendiste?</h2>
+  <table><tbody>
+    <tr><td style="padding:10px 12px;border-bottom:1px solid #F3E6CC">Clasificadores</td><td style="color:${scoreColor(pp.clas||0)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(pp.clas||0)} ${pp.clas||0}%</td></tr>
+    <tr><td style="padding:10px 12px;border-bottom:1px solid #F3E6CC">Completa el diálogo</td><td style="color:${scoreColor(pp.dialogo||0)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(pp.dialogo||0)} ${pp.dialogo||0}%</td></tr>
+    <tr><td style="padding:10px 12px;border-bottom:1px solid #F3E6CC">Ordena la oración</td><td style="color:${scoreColor(pp.orden||0)};font-weight:800;padding:10px 12px;border-bottom:1px solid #F3E6CC">${star(pp.orden||0)} ${pp.orden||0}%</td></tr>
+  </tbody></table>
+
+  ${repasarHTML
+    ? '<h2>📝 Errores para repasar</h2>' + repasarHTML
+    : '<h2>✅ ¡Sin errores pendientes!</h2><p>No cometiste errores en ningún módulo. ¡Excelente trabajo!</p>'
+  }
+  <p style="margin-top:48px;font-size:11px;color:#aaa;text-align:center">© 2026 大卫 · dawei.com.ar</p>
+  </body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = playerName ? '-' + playerName.toLowerCase().replace(/\s+/g, '_') : '';
+  a.download = 'hanzi-resumen' + safeName + '-' + new Date().toISOString().slice(0,10) + '.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ----------------- Prueba: Audio -----------------
+let _zhVoice = null;
+function getZhVoice() {
+  if (_zhVoice) return _zhVoice;
+  const voices = window.speechSynthesis.getVoices();
+  _zhVoice = voices.find(v => v.lang === 'zh-CN') ||
+             voices.find(v => v.lang.startsWith('zh')) ||
+             null;
+  return _zhVoice;
+}
+window.speechSynthesis.onvoiceschanged = () => { _zhVoice = null; };
+
+function speak(text) {
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = 0.85;
+  const voice = getZhVoice();
+  if (voice) u.voice = voice;
+  window.speechSynthesis.speak(u);
+}
+
+function buildAudioRound(allWords) {
+  const picked = shuffle([...allWords]).slice(0, 6);
+  const soundCol = shuffle(picked.map((w, i) => ({ ...w, sid: 's' + i })));
+  const hanziCol = shuffle(picked.map((w, i) => ({ ...w, hid: 'h' + i })));
+  return { picked, soundCol, hanziCol };
+}
+
+function AudioGame({ allWords, onBack, onFinish, playerName }) {
+  const [round, setRound] = useState(() => buildAudioRound(allWords));
+  const [selectedSound, setSelectedSound] = useState(null);
+  const [selectedHanzi, setSelectedHanzi] = useState(null);
+  const [matched, setMatched] = useState(new Set());
+  const [wrong, setWrong] = useState([]);
+  const [errors, setErrors] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [playing, setPlaying] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const { soundCol, hanziCol, picked } = round;
+
+  const playSound = (item) => {
+    setPlaying(item.sid);
+    speak(item.hanzi);
+    setTimeout(() => setPlaying(null), 1200);
+    if (!matched.has(item.hanzi)) setSelectedSound(item);
+  };
+
+  const pickHanzi = (item) => {
+    if (matched.has(item.hanzi) || !selectedSound) return;
+    setSelectedHanzi(item);
+
+    if (selectedSound.hanzi === item.hanzi) {
+      // Correcto
+      const newMatched = new Set(matched);
+      newMatched.add(item.hanzi);
+      setMatched(newMatched);
+      setSelectedSound(null);
+      setSelectedHanzi(null);
+
+      if (newMatched.size === picked.length) {
+        const pct = Math.round((picked.length / (picked.length + errors)) * 100);
+        if (onFinish) onFinish(pct, missed);
+        setDone(true);
+      }
+    } else {
+      // Incorrecto
+      const newErrors = errors + 1;
+      setErrors(newErrors);
+      if (!missed.find(m => m.hanzi === selectedSound.hanzi)) {
+        setMissed(prev => [...prev, { hanzi: selectedSound.hanzi, pinyin: selectedSound.pinyin, es: selectedSound.es }]);
+      }
+      setWrong([selectedSound.sid, item.hid]);
+      setTimeout(() => {
+        setWrong([]);
+        setSelectedSound(null);
+        setSelectedHanzi(null);
+      }, 600);
+    }
+  };
+
+  const retry = () => {
+    setRound(buildAudioRound(allWords));
+    setSelectedSound(null);
+    setSelectedHanzi(null);
+    setMatched(new Set());
+    setWrong([]);
+    setErrors(0);
+    setMissed([]);
+    setPlaying(null);
+    setDone(false);
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((picked.length / (picked.length + errors)) * 100),
+    total: picked.length, correct: picked.length, missed,
+    onRetry: retry, onBack, playerName,
+  });
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px', paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Reconocer por audio'),
+        html('div', { className: 'flash-counter' }, matched.size + '/' + picked.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' }, html('i', null, '✕'), 'Errores: ' + errors),
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), 'Aciertos: ' + matched.size),
+      ),
+      html('p', { style: { textAlign: 'center', fontSize: 13, color: 'var(--ink-soft)', fontWeight: 700, margin: '4px 0 12px' } },
+        selectedSound
+          ? '👆 Ahora tocá el hanzi que corresponde'
+          : '👆 Tocá un 🔊 para escuchar la palabra'
+      ),
+      html('div', { className: 'audio-game-cols' },
+        // Columna izquierda: botones de audio
+        html('div', { className: 'audio-col' },
+          soundCol.map(item => {
+            const isMatched = matched.has(item.hanzi);
+            const isPlaying = playing === item.sid;
+            const isSelected = selectedSound && selectedSound.sid === item.sid;
+            const isWrong = wrong.includes(item.sid);
+            let cls = 'audio-sound-btn';
+            if (isMatched) cls += ' matched';
+            else if (isWrong) cls += ' wrong';
+            else if (isPlaying) cls += ' playing';
+            else if (isSelected) cls += ' selected';
+            return html('button', { key: item.sid, className: cls, onClick: () => !isMatched && playSound(item) },
+              html('span', null, isMatched ? '✓' : '🔊'),
+              html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)' } }, isMatched ? item.hanzi : '#' + (soundCol.indexOf(item) + 1)),
+            );
+          })
+        ),
+        // Columna derecha: hanzi
+        html('div', { className: 'audio-col' },
+          hanziCol.map(item => {
+            const isMatched = matched.has(item.hanzi);
+            const isSelected = selectedHanzi && selectedHanzi.hid === item.hid;
+            const isWrong = wrong.includes(item.hid);
+            let cls = 'audio-hanzi-btn';
+            if (isMatched) cls += ' matched';
+            else if (isWrong) cls += ' wrong';
+            else if (isSelected) cls += ' selected';
+            return html('button', { key: item.hid, className: cls, onClick: () => pickHanzi(item) },
+              item.hanzi,
+            );
+          })
+        ),
+      ),
+    ),
+  );
+}
+
+// ----------------- Name Modal -----------------
+function NameModal({ onSave }) {
+  const [name, setName] = useState('');
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed) onSave(trimmed);
+  };
+  return html('div', { className: 'name-modal-overlay' },
+    html('div', { className: 'name-modal' },
+      html('div', { className: 'name-modal-hanzi hanzi-font' }, '你好！'),
+      html('h2', { className: 'name-modal-title' }, '¿Cómo te llamás?'),
+      html('p', { className: 'name-modal-sub' }, 'Ingresá tu nombre para personalizar tu experiencia de repaso'),
+      html('form', { onSubmit: handleSubmit },
+        html('input', {
+          className: 'name-modal-input',
+          type: 'text',
+          placeholder: 'Tu nombre...',
+          value: name,
+          autoFocus: true,
+          maxLength: 30,
+          onChange: (e) => setName(e.target.value),
+        }),
+        html('button', {
+          className: 'primary-btn',
+          type: 'submit',
+          disabled: !name.trim(),
+          style: { width: '100%', marginTop: 8 },
+        }, '¡Comenzar! →'),
+      ),
+    ),
+  );
+}
+
+// ----------------- App -----------------
+function App() {
+  const [vocab, setVocab] = useState(loadVocab);
+  const [progress, setProgress] = useState(loadProgress);
+  const [screen, setScreen] = useState({ name: 'home' });
+  const [lastResults, setLastResults] = useState({});
+
+  // Cargar vocab y temas desde Supabase al iniciar (sin bloquear la UI)
+  useEffect(() => {
+    db.from('vocabulary').select('lesson,hanzi,pinyin,es').then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        const remote = supabaseRowsToVocab(data);
+        // Merge: DEFAULT_VOCAB base + Supabase encima (Supabase gana si hay conflicto)
+        const merged = { ...DEFAULT_VOCAB, ...remote };
+        setVocab(merged);
+        localStorage.setItem(VOCAB_KEY, JSON.stringify(merged));
+      }
+    });
+    db.from('lesson_themes').select('lesson,name,icon,hidden').then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        data.forEach(r => { LESSON_THEMES[r.lesson] = { name: r.name, icon: r.icon || r.lesson, hidden: !!r.hidden }; });
+      }
+    });
+  }, []);
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem(NAME_KEY) || '');
+
+  useEffect(() => { saveProgress(progress); }, [progress]);
+
+  const lessons = Object.keys(vocab).sort();
+
+  const updateLessonResult = (lessonId, mode, percent, missed) => {
+    setProgress(prev => {
+      const next = { ...prev, lessons: { ...prev.lessons } };
+      const current = next.lessons[lessonId] || {};
+      const prevBest = current[mode] || 0;
+      const missedKey = mode + '_missed';
+      // Always overwrite missed list with latest run (most recent attempt)
+      next.lessons[lessonId] = {
+        ...current,
+        [mode]: Math.max(prevBest, percent),
+        [missedKey]: missed || [],
+      };
+      return next;
+    });
+  };
+
+  const resultKey = (lessonId, mode) => lessonId + ':' + mode;
+
+  const setLastResult = (lessonId, mode, result) => {
+    setLastResults(prev => ({ ...prev, [resultKey(lessonId, mode)]: result }));
+  };
+
+  const clearLastResult = (lessonId, mode) => {
+    setLastResults(prev => {
+      const next = { ...prev };
+      delete next[resultKey(lessonId, mode)];
+      return next;
+    });
+  };
+
+  const totalWords = lessons.reduce((acc, l) => acc + vocab[l].length, 0);
+  const totalStars = lessons.reduce((acc, l) => {
+    const lp = progress.lessons[l] || {};
+    const vals = [lp.match || 0, lp.cards || 0, lp.quiz || 0];
+    return acc + vals.filter(v => v >= 80).length;
+  }, 0);
+
+  let content;
+  if (screen.name === 'home') {
+    content = html(Home, {
+      vocab, lessons, progress, totalWords, totalStars,
+      onSelectLesson: (id) => setScreen({ name: 'lesson', lessonId: id }),
+      onAdmin: () => setScreen({ name: 'admin' }),
+      onPrueba: (game) => setScreen({ name: 'prueba', game }),
+      pruebaProgress: progress.prueba || {},
+      onRefuerzo: () => setScreen({ name: 'refuerzo' }),
+      onDownload: () => downloadResumen(vocab, progress, lessons, playerName),
+      playerName,
+      onChangeName: () => { localStorage.removeItem(NAME_KEY); setPlayerName(''); },
+    });
+  } else if (screen.name === 'lesson') {
+    content = html(LessonMenu, {
+      vocab, lessonId: screen.lessonId, progress,
+      onBack: () => setScreen({ name: 'home' }),
+      onSelectMode: (mode) => setScreen({ name: 'play', lessonId: screen.lessonId, mode }),
+    });
+  } else if (screen.name === 'play') {
+    const modeOrder = ['match', 'cards', 'quiz'];
+    const modeIdx = modeOrder.indexOf(screen.mode);
+    const lessonIdx = lessons.indexOf(screen.lessonId);
+    let nextAction = null;
+    if (modeIdx < modeOrder.length - 1) {
+      const nextMode = modeOrder[modeIdx + 1];
+      nextAction = { label: 'Siguiente ejercicio', go: () => setScreen({ name: 'play', lessonId: screen.lessonId, mode: nextMode }) };
+    } else if (lessonIdx < lessons.length - 1) {
+      const nextLessonId = lessons[lessonIdx + 1];
+      nextAction = { label: 'Siguiente lección', go: () => setScreen({ name: 'play', lessonId: nextLessonId, mode: 'match' }) };
+    }
+    const key = resultKey(screen.lessonId, screen.mode);
+    content = html(PlayScreen, {
+      key,
+      vocab, lessonId: screen.lessonId, mode: screen.mode,
+      playerName,
+      onBack: () => setScreen({ name: 'lesson', lessonId: screen.lessonId }),
+      onHome: () => setScreen({ name: 'home' }),
+      onFinish: (percent, missed) => updateLessonResult(screen.lessonId, screen.mode, percent, missed),
+      nextAction,
+      savedResult: lastResults[key] || null,
+      onSaveResult: (result) => setLastResult(screen.lessonId, screen.mode, result),
+      onClearResult: () => clearLastResult(screen.lessonId, screen.mode),
+    });
+  } else if (screen.name === 'refuerzo') {
+    const missedWords = getMissedWords(progress);
+    const allWords = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').flatMap(id => vocab[id]);
+    content = html(RefuerzoSession, {
+      words: missedWords, allWords,
+      onBack: () => setScreen({ name: 'home' }),
+      playerName,
+    });
+  } else if (screen.name === 'admin') {
+    content = html(AdminPanel, {
+      vocab,
+      onBack: () => setScreen({ name: 'home' }),
+      onVocabUpdate: (newVocab) => {
+        setVocab(newVocab);
+        localStorage.setItem(VOCAB_KEY, JSON.stringify(newVocab));
+      },
+    });
+  } else if (screen.name === 'prueba') {
+    const onPruebaFinish = (percent, missed) => {
+      setProgress(prev => {
+        const pp = prev.prueba || {};
+        const next = { ...prev, prueba: {
+          ...pp,
+          [screen.game]: Math.max(pp[screen.game] || 0, percent),
+          [screen.game + '_missed']: missed || [],
+        }};
+        return next;
+      });
+    };
+    const gameProps = { onBack: () => setScreen({ name: 'home' }), onFinish: onPruebaFinish, playerName };
+    if (screen.game === 'clas') content = html(ClasificadorGame, gameProps);
+    else if (screen.game === 'dialogo') content = html(DialogoGame, gameProps);
+    else if (screen.game === 'orden') content = html(OrdenGame, gameProps);
+    else if (screen.game === 'audio') {
+      const allWords = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').flatMap(id => vocab[id]);
+      content = html(AudioGame, { ...gameProps, allWords });
+    }
+  }
+
+  const handleSaveName = (name) => {
+    localStorage.setItem(NAME_KEY, name);
+    setPlayerName(name);
+    db.from('student_log').insert({ name }).then(() => {});
+  };
+
+  return html('div', { className: 'app' },
+    !playerName && html(NameModal, { onSave: handleSaveName }),
+    playerName && content,
+  );
+}
+
+// ----------------- Home -----------------
+function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName }) {
+  return html(React.Fragment, null,
+    html('div', { className: 'topbar' },
+      html('div', { className: 'brand' },
+        html('div', { className: 'brand-mark hanzi-font' }, '汉'),
+        html('div', { className: 'brand-text' },
+          html('strong', null, 'Hanzi Practice'),
+          html('span', null, '汉语课 CUI · Nivel 2 · Ariel 老师'),
+        ),
+      ),
+      html('button', { className: 'icon-btn', onClick: onAdmin, title: 'Administrar vocabulario' }, '⚙')
+    ),
+    playerName && html('div', { className: 'greeting-bar' },
+      html('span', null, '👋 ¡Hola, ', html('strong', null, playerName), '!'),
+      html('button', { className: 'change-name-btn', onClick: onChangeName, title: 'Cambiar nombre' }, '✏️'),
+    ),
+    html('main', null,
+      html('div', { className: 'score-strip' },
+        html('div', { className: 'score-chip' },
+          html('div', { className: 'num' }, totalWords),
+          html('div', { className: 'lbl' }, 'palabras')
+        ),
+        html('div', { className: 'score-chip' },
+          html('div', { className: 'num' }, lessons.length),
+          html('div', { className: 'lbl' }, 'lecciones')
+        ),
+        html('div', { className: 'score-chip' },
+          html('div', { className: 'num' }, totalStars + '/' + (lessons.length * 3)),
+          html('div', { className: 'lbl' }, 'estrellas')
+        ),
+      ),
+      html(PanelLectura, { playerName }),
+      html('h2', { className: 'section-title' }, 'Elegí una lección'),
+      html('div', { className: 'lesson-grid' },
+        lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros' && !LESSON_THEMES[id]?.hidden).map(id => {
+          const words = vocab[id];
+          const theme = LESSON_THEMES[id] || { name: 'Lección ' + id, icon: words[0]?.hanzi?.[0] || '汉' };
+          const lp = progress.lessons[id] || {};
+          const best = Math.max(lp.match || 0, lp.cards || 0, lp.quiz || 0);
+          const stars = [lp.match || 0, lp.cards || 0, lp.quiz || 0].filter(v => v >= 80).length;
+          return html('button', {
+            key: id,
+            className: 'lesson-card',
+            onClick: () => onSelectLesson(id),
+          },
+            stars > 0 && html('div', { className: 'seal hanzi-font' }, stars === 3 ? '✓' : stars),
+            html('div', { className: 'hanzi-big hanzi-font' }, theme.icon),
+            html('div', { className: 'lesson-name' }, 'Lección ' + id),
+            html('div', { className: 'lesson-meta' }, theme.name + ' · ' + words.length + ' palabras'),
+            html('div', { className: 'progress-track' },
+              html('div', { className: 'progress-fill', style: { width: best + '%' } })
+            ),
+          );
+        })
+      ),
+
+      // ── Módulos especiales ──
+      vocab['mod-paises'] && !LESSON_THEMES['mod-paises']?.hidden && html(React.Fragment, null,
+        html('h2', { className: 'section-title' }, 'Aprende los países'),
+        html('button', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14,
+            background: '#fff', border: '2px solid var(--paper-deep)', borderRadius: 'var(--radius)',
+            padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
+            boxShadow: 'var(--shadow-paper)',
+          },
+          onClick: () => onSelectLesson('mod-paises'),
+        },
+          html('div', { className: 'hanzi-font', style: { fontSize: 36, color: 'var(--lacquer)', minWidth: 44 } }, '国'),
+          html('div', null,
+            html('div', { style: { fontWeight: 800, fontSize: 15, color: 'var(--ink)' } }, 'Nombres de países en chino'),
+            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 } },
+              (vocab['mod-paises'] ? vocab['mod-paises'].length : 0) + ' países · Latinoamérica, Europa, Asia'
+            ),
+          ),
+        ),
+      ),
+
+      vocab['mod-numeros'] && !LESSON_THEMES['mod-numeros']?.hidden && html(React.Fragment, null,
+        html('h2', { className: 'section-title' }, 'Aprende los números'),
+        html('button', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 14, width: '100%', marginBottom: 14,
+            background: '#fff', border: '2px solid var(--paper-deep)', borderRadius: 'var(--radius)',
+            padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
+            boxShadow: 'var(--shadow-paper)',
+          },
+          onClick: () => onSelectLesson('mod-numeros'),
+        },
+          html('div', { className: 'hanzi-font', style: { fontSize: 36, color: 'var(--lacquer)', minWidth: 44 } }, '数'),
+          html('div', null,
+            html('div', { style: { fontWeight: 800, fontSize: 15, color: 'var(--ink)' } }, 'Del 0 al 100 en chino'),
+            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 } }, '0 al 10 · decenas del 20 al 100'),
+          ),
+        ),
+      ),
+      html('h2', { className: 'section-title' }, '¿Cuánto aprendiste?'),
+      html('div', { className: 'prueba-grid' },
+        [
+          { id: 'clas', icon: '🔢', cls: 'clas', title: 'Clasificadores', sub: 'Elige 个, 口, 张, 层 o 号 correctamente' },
+          { id: 'dialogo', icon: '💬', cls: 'dial', title: 'Completa el diálogo', sub: 'Rellena el hueco de la conversación' },
+          { id: 'orden', icon: '🔀', cls: 'orden', title: 'Ordena la oración', sub: 'Coloca las palabras en el orden correcto' },
+          { id: 'audio', icon: '🔊', cls: 'audio', title: 'Reconocer por audio', sub: 'Escuchá y uní el sonido con el hanzi' },
+        ].filter(g => !LESSON_THEMES['mod-' + g.id]?.hidden).map(g => {
+          const best = pruebaProgress[g.id] || 0;
+          const hasStar = best >= 80;
+          return html('button', { key: g.id, className: 'prueba-card', onClick: () => onPrueba(g.id) },
+            html('div', { className: 'prueba-icon ' + g.cls }, g.icon),
+            html('div', { style: { flex: 1 } },
+              html('div', { className: 'mode-title' }, g.title),
+              html('div', { className: 'mode-sub' }, best > 0 ? '⭐ Mejor: ' + best + '%' : g.sub),
+            ),
+            hasStar && html('div', { style: { fontSize: 20 } }, '⭐'),
+          );
+        })
+      ),
+      html('button', {
+        className: 'download-resumen-btn',
+        onClick: onDownload,
+      },
+        html('span', { style: { fontSize: 22 } }, '📥'),
+        html('span', null,
+          html('div', { style: { fontWeight: 800, fontSize: 15 } }, 'Descargar mi resumen de repaso'),
+          html('div', { style: { fontSize: 12, opacity: 0.75, fontWeight: 600 } }, 'Aciertos, errores y palabras para repasar'),
+        ),
+      ),
+      !LESSON_THEMES['mod-refuerzo']?.hidden && html('h2', { className: 'section-title' }, 'Reforcemos'),
+      !LESSON_THEMES['mod-refuerzo']?.hidden && html('button', {
+        style: {
+          display: 'flex', alignItems: 'center', gap: 14,
+          width: '100%', marginTop: 0, marginBottom: 12,
+          background: 'linear-gradient(135deg, var(--lacquer) 0%, var(--lacquer-dark) 100%)',
+          color: '#fff', border: 'none', borderRadius: 'var(--radius)',
+          padding: '16px 20px', cursor: 'pointer', textAlign: 'left',
+          boxShadow: '0 4px 16px rgba(193,67,43,0.28)',
+        },
+        onClick: onRefuerzo,
+      },
+        html('span', { style: { fontSize: 22 } }, '💪'),
+        html('span', null,
+          html('div', { style: { fontWeight: 800, fontSize: 15 } }, 'Práctica personalizada'),
+          html('div', { style: { fontSize: 12, opacity: 0.8, fontWeight: 600, marginTop: 2 } }, 'Ejercicios con tus palabras para reforzar'),
+        ),
+      ),
+    )
+  );
+}
+
+// ----------------- Números: tabla interactiva -----------------
+function NumbersIntro({ words, onBack, onPlay }) {
+  const [active, setActive] = useState(null);
+
+  const playNum = (w) => {
+    setActive(w.hanzi);
+    speak(w.hanzi);
+    setTimeout(() => setActive(null), 1200);
+  };
+
+  const singles = words.filter(w => ['零','一','二','三','四','五','六','七','八','九','十'].includes(w.hanzi));
+  const tens    = words.filter(w => w.hanzi.length > 1 && w.es.includes('·'));
+
+  const NumCard = ({ w }) => html('button', {
+    key: w.hanzi,
+    onClick: () => playNum(w),
+    style: {
+      background: active === w.hanzi ? 'var(--lacquer)' : '#fff',
+      border: '2px solid ' + (active === w.hanzi ? 'var(--lacquer)' : 'var(--paper-deep)'),
+      borderRadius: 14, padding: '10px 6px', cursor: 'pointer',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+      transition: 'all 0.15s',
+    }
+  },
+    html('div', { className: 'hanzi-font', style: { fontSize: 32, color: active === w.hanzi ? '#fff' : 'var(--lacquer)', lineHeight: 1 } }, w.hanzi),
+    html('div', { style: { fontSize: 11, fontWeight: 800, color: active === w.hanzi ? 'rgba(255,255,255,0.85)' : 'var(--lacquer-dark)', letterSpacing: 0.5 } }, w.pinyin),
+    html('div', { style: { fontSize: 10, color: active === w.hanzi ? 'rgba(255,255,255,0.75)' : 'var(--ink-soft)', fontWeight: 600 } }, w.es.split('·')[0].trim()),
+  );
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Los números'),
+        html('div', { style: { fontSize: 11, color: 'var(--ink-soft)', fontWeight: 700 } }, 'Tocá para escuchar'),
+      ),
+      html('div', { style: { padding: '0 16px' } },
+
+        html('p', { className: 'admin-note', style: { marginBottom: 12, textAlign: 'center' } }, '🔊 Tocá cada número para escuchar cómo suena'),
+
+        html('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 } },
+          singles.map(w => html(NumCard, { key: w.hanzi, w }))
+        ),
+
+        html('div', { style: { background: 'var(--jade-light)', borderRadius: 14, padding: '14px 16px', marginBottom: 20 } },
+          html('div', { style: { fontWeight: 800, fontSize: 13, color: 'var(--jade-dark)', marginBottom: 8 } }, '💡 ¿Cómo se forman las decenas?'),
+          html('div', { style: { fontSize: 13, color: 'var(--jade-dark)', lineHeight: 1.7 } },
+            '二 + 十 = 二十 (20) · tres dieces = tres dieces', html('br', null),
+            'El patrón es: ', html('strong', null, '[número] + 十'), ' para las decenas.',  html('br', null),
+            'Ejemplo: 七十 = qīshí = 70 (siete + diez)',
+          ),
+        ),
+
+        html('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 24 } },
+          tens.map(w => html(NumCard, { key: w.hanzi, w }))
+        ),
+
+        html('button', { className: 'primary-btn', onClick: onPlay }, '¡Listo! Ir a practicar →'),
+      ),
+    )
+  );
+}
+
+// ----------------- Panel de lectura diaria -----------------
+const FRASES_DEL_DIA = [
+  { zh: '今天天气很好！', py: 'Jīntiān tiānqì hěn hǎo!', es: '¡Hoy hace muy buen tiempo!' },
+  { zh: '我想喝一杯茶。', py: 'Wǒ xiǎng hē yī bēi chá.', es: 'Me gustaría tomar una taza de té.' },
+  { zh: '这个周末有聚会！', py: 'Zhège zhōumò yǒu jùhuì!', es: '¡Este fin de semana hay una fiesta!' },
+  { zh: '我们去吃中餐吧。', py: 'Wǒmen qù chī zhōngcān ba.', es: 'Vamos a comer comida china.' },
+  { zh: '明天是我的生日。', py: 'Míngtiān shì wǒde shēngrì.', es: 'Mañana es mi cumpleaños.' },
+  { zh: '下午我有汉语课。', py: 'Xiàwǔ wǒ yǒu Hànyǔ kè.', es: 'Por la tarde tengo clase de chino.' },
+  { zh: '我买了一瓶红葡萄酒。', py: 'Wǒ mǎi le yī píng hóng pútaojiǔ.', es: 'Compré una botella de vino tinto.' },
+  { zh: '你今年多大了？', py: 'Nǐ jīnnián duō dà le?', es: '¿Cuántos años tienes este año?' },
+  { zh: '晚上我们去参加聚会。', py: 'Wǎnshang wǒmen qù cānjiā jùhuì.', es: 'Esta noche vamos a la fiesta.' },
+  { zh: '祝贺你生日快乐！', py: 'Zhùhè nǐ shēngrì kuàilè!', es: '¡Feliz cumpleaños!' },
+  { zh: '我上午没有课。', py: 'Wǒ shàngwǔ méiyǒu kè.', es: 'Por la mañana no tengo clase.' },
+  { zh: '今天星期几？', py: 'Jīntiān xīngqī jǐ?', es: '¿Qué día de la semana es hoy?' },
+  { zh: '我属龙。你呢？', py: 'Wǒ shǔ lóng. Nǐ ne?', es: 'Soy del año del dragón. ¿Y tú?' },
+  { zh: '我们去吃蛋糕吧！', py: 'Wǒmen qù chī dàngāo ba!', es: '¡Vamos a comer torta!' },
+  { zh: '你喝可乐还是茶？', py: 'Nǐ hē kělè háishì chá?', es: '¿Tomás Coca-Cola o té?' },
+  { zh: '今天是个好日子！', py: 'Jīntiān shì gè hǎo rìzi!', es: '¡Hoy es un buen día!' },
+  { zh: '我出生在北京。', py: 'Wǒ chūshēng zài Běijīng.', es: 'Nací en Pekín.' },
+  { zh: '我想吃热狗和面包。', py: 'Wǒ xiǎng chī règǒu hé miànbāo.', es: 'Quiero comer pancho y pan.' },
+  { zh: '这个星期我很忙。', py: 'Zhège xīngqī wǒ hěn máng.', es: 'Esta semana estoy muy ocupado/a.' },
+  { zh: '晚上好！今天怎么样？', py: 'Wǎnshang hǎo! Jīntiān zěnmeyàng?', es: '¡Buenas noches! ¿Cómo estuvo el día?' },
+];
+
+const DIAS_ZH = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function PanelLectura({ playerName }) {
+  const [mostrarPinyin, setMostrarPinyin] = useState(false);
+  const [mostrarTrad, setMostrarTrad] = useState(false);
+
+  const now = new Date();
+  const hora = now.getHours();
+  const minutos = String(now.getMinutes()).padStart(2, '0');
+  const periodo = hora < 12 ? '上午' : hora < 20 ? '下午' : '晚上';
+  const horaStr = (hora % 12 || 12) + ':' + minutos;
+  const diaSemana = DIAS_ZH[now.getDay()];
+  const diaNum = now.getDate();
+  const mes = MESES_ES[now.getMonth()];
+  const anio = now.getFullYear();
+
+  const idx = (now.getFullYear() * 1000 + now.getMonth() * 31 + now.getDate()) % FRASES_DEL_DIA.length;
+  const frase = FRASES_DEL_DIA[idx];
+
+  const saludo = hora < 12 ? '早上好' : hora < 20 ? '下午好' : '晚上好';
+  const saludoEs = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches';
+
+  const nombre = playerName || '同学';
+
+  return html('div', {
+    style: {
+      background: 'linear-gradient(135deg, #3A7D6E 0%, #2d6359 100%)',
+      borderRadius: 'var(--radius)', padding: '16px 18px', marginBottom: 18,
+      color: '#fff', position: 'relative', overflow: 'hidden',
+    }
+  },
+    html('div', { style: { fontSize: 11, fontWeight: 700, opacity: 0.75, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 } }, '📖 Lectura del día'),
+    html('div', { className: 'hanzi-font', style: { fontSize: 22, fontWeight: 700, lineHeight: 1.4, marginBottom: 4 } },
+      saludo + '，', html('span', { style: { color: '#FFD97D' } }, nombre), '！'
+    ),
+    html('div', { className: 'hanzi-font', style: { fontSize: 17, lineHeight: 1.6, marginBottom: 2 } },
+      '今天是' + anio + '年' + (now.getMonth()+1) + '月' + diaNum + '日，' + diaSemana + '。'
+    ),
+    html('div', { className: 'hanzi-font', style: { fontSize: 17, lineHeight: 1.6, marginBottom: 12 } },
+      '现在是' + periodo + horaStr + '。'
+    ),
+    html('div', { style: { borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: 10, marginBottom: 10 } },
+      html('div', { className: 'hanzi-font', style: { fontSize: 19, fontWeight: 700, marginBottom: 4 } }, '💬 ' + frase.zh),
+      mostrarPinyin && html('div', { style: { fontSize: 13, opacity: 0.85, fontStyle: 'italic', marginBottom: 4 } }, frase.py),
+      mostrarTrad && html('div', { style: { fontSize: 14, opacity: 0.9, marginBottom: 4 } }, '→ ' + frase.es),
+    ),
+    html('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+      html('button', {
+        onClick: () => setMostrarPinyin(p => !p),
+        style: { fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, border: '1.5px solid rgba(255,255,255,0.5)', background: mostrarPinyin ? 'rgba(255,255,255,0.25)' : 'transparent', color: '#fff', cursor: 'pointer' },
+      }, mostrarPinyin ? '🙈 Ocultar pīnyīn' : '👁 Ver pīnyīn'),
+      html('button', {
+        onClick: () => setMostrarTrad(t => !t),
+        style: { fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20, border: '1.5px solid rgba(255,255,255,0.5)', background: mostrarTrad ? 'rgba(255,255,255,0.25)' : 'transparent', color: '#fff', cursor: 'pointer' },
+      }, mostrarTrad ? '🙈 Ocultar traducción' : '🌐 Ver traducción'),
+      html('div', { style: { marginLeft: 'auto', fontSize: 11, opacity: 0.6, alignSelf: 'center' } }, diaNum + ' de ' + mes + ', ' + anio),
+    )
+  );
+}
+
+// ----------------- Lesson menu -----------------
+function LessonMenu({ vocab, lessonId, progress, onBack, onSelectMode }) {
+  const theme = LESSON_THEMES[lessonId] || { name: 'Lección ' + lessonId };
+  const lp = progress.lessons[lessonId] || {};
+
+  const modes = [
+    { id: 'match', emoji: '🔗', title: 'Emparejar', sub: 'Une carácter, pinyin y significado', cls: 'match', best: lp.match },
+    { id: 'cards', emoji: '🀄', title: 'Tarjetas', sub: 'Repasá carácter por carácter', cls: 'cards', best: lp.cards },
+    { id: 'quiz', emoji: '✅', title: 'Opción múltiple', sub: 'Elegí el significado correcto', cls: 'quiz', best: lp.quiz },
+  ];
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, (lessonId === 'mod-paises' || lessonId === 'mod-numeros') ? theme.name : 'Lección ' + lessonId + ' · ' + theme.name),
+      ),
+      html('div', { className: 'mode-list' },
+        lessonId === 'mod-numeros' && html('button', { className: 'mode-card', onClick: () => onSelectMode('intro') },
+          html('div', { className: 'mode-emoji', style: { background: '#FFF3C4', fontSize: 22 } }, '📊'),
+          html('div', null,
+            html('div', { className: 'mode-title' }, 'Explorar los números'),
+            html('div', { className: 'mode-sub' }, 'Tabla interactiva con audio · toca para escuchar'),
+          )
+        ),
+        modes.map(m => html('button', { key: m.id, className: 'mode-card', onClick: () => onSelectMode(m.id) },
+          html('div', { className: 'mode-emoji ' + m.cls }, m.emoji),
+          html('div', null,
+            html('div', { className: 'mode-title' }, m.title),
+            html('div', { className: 'mode-sub' }, m.sub + (m.best ? ' · mejor: ' + m.best + '%' : '')),
+          )
+        )),
+        lessonId === '9' && html('div', null,
+          html('div', { style: { margin: '18px 0 8px', fontWeight: 800, fontSize: 13, color: 'var(--ink-soft)', letterSpacing: 1, textTransform: 'uppercase' } }, '🎯 Actividades de la lección'),
+          html('button', { className: 'mode-card', onClick: () => onSelectMode('l9-comida') },
+            html('div', { className: 'mode-emoji clas' }, '🍜'),
+            html('div', null, html('div', { className: 'mode-title' }, '中餐 vs 西餐'), html('div', { className: 'mode-sub' }, '¿Es comida china o occidental?'))
+          ),
+          html('button', { className: 'mode-card', onClick: () => onSelectMode('l9-dialogo') },
+            html('div', { className: 'mode-emoji dial' }, '🎂'),
+            html('div', null, html('div', { className: 'mode-title' }, 'Diálogo de cumpleaños'), html('div', { className: 'mode-sub' }, 'Completa conversaciones de la lección'))
+          ),
+          html('button', { className: 'mode-card', onClick: () => onSelectMode('l9-orden') },
+            html('div', { className: 'mode-emoji orden' }, '🔀'),
+            html('div', null, html('div', { className: 'mode-title' }, 'Ordena las frases'), html('div', { className: 'mode-sub' }, 'Frases de fechas y celebraciones'))
+          ),
+          html('button', { className: 'mode-card', onClick: () => onSelectMode('l9-edad') },
+            html('div', { className: 'mode-emoji audio' }, '🕐'),
+            html('div', null, html('div', { className: 'mode-title' }, 'Vocabulario de tiempo'), html('div', { className: 'mode-sub' }, 'Reconocé 岁, 星期, 上午, 下午...'))
+          ),
+        )
+      )
+    )
+  );
+}
+
+// ----------------- Play screen router -----------------
+function PlayScreen({ vocab, lessonId, mode, onBack, onHome, onFinish, nextAction, savedResult, onSaveResult, onClearResult, playerName }) {
+  const words = vocab[lessonId];
+  const extra = { savedResult, onSaveResult, onClearResult };
+  if (mode === 'intro') return html(NumbersIntro, { words, onBack, onPlay: onBack });
+  if (mode === 'match') return html(MatchGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
+  if (mode === 'cards') return html(FlashcardGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
+  if (mode === 'quiz') return html(QuizGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
+  if (mode === 'l9-comida') return html(ClasificadorGame, { onBack, onFinish, playerName, questionsOverride: L9_COMIDA_QUESTIONS, title: '🍜 中餐 vs 西餐' });
+  if (mode === 'l9-dialogo') return html(DialogoGame, { onBack, onFinish, playerName, questionsOverride: L9_DIALOGO_QUESTIONS, title: '🎂 Diálogo de cumpleaños' });
+  if (mode === 'l9-orden') return html(OrdenGame, { onBack, onFinish, playerName, questionsOverride: L9_ORDEN_QUESTIONS, title: '🔀 Ordena las frases' });
+  if (mode === 'l9-edad') return html(ClasificadorGame, { onBack, onFinish, playerName, questionsOverride: L9_EDAD_QUESTIONS, title: '🕐 Vocabulario de tiempo' });
+  return null;
+}
+
+// ----------------- Matching game -----------------
+const ROUND_SIZE = 6;
+
+function buildMatchRound(words) {
+  const picked = shuffle(words).slice(0, Math.min(ROUND_SIZE, words.length));
+  const left = picked.map((w, i) => ({ id: i + '-h', pairId: i, kind: 'hanzi', text: w.hanzi, es: w.es }));
+  const right = picked.map((w, i) => ({ id: i + '-p', pairId: i, kind: 'pinyin', text: w.pinyin, es: w.es }));
+  return { left: shuffle(left), right: shuffle(right) };
+}
+
+function MatchGame({ words, lessonId, onBack, onHome, onFinish, nextAction, savedResult, onSaveResult, onClearResult }) {
+  const [columns, setColumns] = useState(() => buildMatchRound(words));
+  const [selected, setSelected] = useState(null);
+  const [wrongPair, setWrongPair] = useState(null);
+  const [matchedPairs, setMatchedPairs] = useState(new Set());
+  const [mistakes, setMistakes] = useState(0);
+  const [missedWords, setMissedWords] = useState(() => (savedResult ? savedResult.reviewWords || [] : []));
+  const [done, setDone] = useState(!!savedResult);
+
+  const totalPairs = columns.left.length;
+
+  const handleTap = (tile) => {
+    if (matchedPairs.has(tile.pairId) || wrongPair) return;
+    if (!selected) {
+      setSelected(tile);
+      return;
+    }
+    if (selected.id === tile.id) {
+      setSelected(null);
+      return;
+    }
+    if (selected.kind === tile.kind) {
+      // Misma columna: simplemente cambia la selección
+      setSelected(tile);
+      return;
+    }
+    if (selected.pairId === tile.pairId) {
+      const newMatched = new Set(matchedPairs);
+      newMatched.add(tile.pairId);
+      setMatchedPairs(newMatched);
+      setSelected(null);
+      if (newMatched.size === totalPairs) {
+        const percent = Math.round((totalPairs / (totalPairs + mistakes)) * 100);
+        setTimeout(() => {
+          setDone(true);
+          onFinish(percent, missedWords);
+          onSaveResult({ percent, completed: mistakes === 0, reviewWords: missedWords });
+        }, 400);
+      }
+    } else {
+      const newMistakes = mistakes + 1;
+      setMistakes(newMistakes);
+      // Record the word that was missed (from the selected tile's pairId)
+      const missedWord = words.find(w => w.hanzi === selected.pairId || w.pinyin === selected.pairId || (selected.kind === 'hanzi' ? selected.text === w.hanzi : selected.text === w.pinyin));
+      if (missedWord && !missedWords.find(m => m.hanzi === missedWord.hanzi)) {
+        setMissedWords(prev => [...prev, missedWord]);
+      }
+      setWrongPair([selected.id, tile.id]);
+      setTimeout(() => {
+        setWrongPair(null);
+        setSelected(null);
+      }, 500);
+    }
+  };
+
+  if (done) {
+    const percent = savedResult ? savedResult.percent : Math.round((totalPairs / (totalPairs + mistakes)) * 100);
+    const completed = savedResult ? savedResult.completed : mistakes === 0;
+    const shownReview = savedResult ? (savedResult.reviewWords || []) : missedWords;
+    return html(ResultScreen, {
+      percent, lessonId, mode: 'match',
+      completed,
+      reviewWords: shownReview,
+      onRetry: () => {
+        setColumns(buildMatchRound(words));
+        setSelected(null);
+        setWrongPair(null);
+        setMatchedPairs(new Set());
+        setMistakes(0);
+        setMissedWords([]);
+        setDone(false);
+        onClearResult();
+      },
+      onHome,
+      nextAction,
+    });
+  }
+
+  const renderTile = (tile) => {
+    const isMatched = matchedPairs.has(tile.pairId);
+    const isSelected = selected && selected.id === tile.id;
+    const isWrong = wrongPair && wrongPair.includes(tile.id);
+    let cls = 'match-tile ' + (tile.kind === 'hanzi' ? 'hanzi hanzi-font' : 'text pinyin');
+    if (isMatched) cls += ' correct matched-hidden';
+    else if (isWrong) cls += ' wrong';
+    else if (isSelected) cls += ' selected';
+    return html('button', {
+      key: tile.id, className: cls,
+      onClick: () => handleTap(tile),
+      disabled: isMatched,
+    },
+      tile.text,
+      tile.kind === 'pinyin' && html('span', { className: 'es-tooltip' }, tile.es)
+    );
+  };
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Emparejar'),
+        html('button', { className: 'back-btn', onClick: onHome, title: 'Ir al inicio' }, '⌂'),
+      ),
+      html('div', { className: 'match-progress-row' },
+        html('div', { className: 'match-progress-track' },
+          html('div', { className: 'match-progress-fill', style: { width: (matchedPairs.size / totalPairs * 100) + '%' } })
+        ),
+        html('div', { className: 'match-counter' }, matchedPairs.size + '/' + totalPairs)
+      ),
+      html('p', { className: 'admin-note', style: { textAlign: 'center', marginBottom: 14 } }, 'Pasá el mouse sobre el pinyin para ver el significado'),
+      html('div', { className: 'match-columns' },
+        html('div', { className: 'match-column' }, columns.left.map(renderTile)),
+        html('div', { className: 'match-column' }, columns.right.map(renderTile)),
+      )
+    )
+  );
+}
+
+// ----------------- Flashcards -----------------
+function FlashcardGame({ words, lessonId, onBack, onHome, onFinish, nextAction, savedResult, onSaveResult, onClearResult }) {
+  const [deck, setDeck] = useState(() => shuffle(words));
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [known, setKnown] = useState(0);
+  const [reviewWords, setReviewWords] = useState(() => (savedResult ? savedResult.reviewWords || [] : []));
+  const [done, setDone] = useState(!!savedResult);
+
+  const card = deck[index];
+
+  const advance = (gotIt) => {
+    const newKnown = known + (gotIt ? 1 : 0);
+    const newReview = gotIt ? reviewWords : [...reviewWords, card];
+    if (index + 1 >= deck.length) {
+      const percent = Math.round((newKnown / deck.length) * 100);
+      setKnown(newKnown);
+      setReviewWords(newReview);
+      setDone(true);
+      onFinish(percent, newReview);
+      onSaveResult({ percent, completed: newKnown === deck.length, reviewWords: newReview });
+    } else {
+      setKnown(newKnown);
+      setReviewWords(newReview);
+      setIndex(index + 1);
+      setFlipped(false);
+    }
+  };
+
+  if (done) {
+    const percent = savedResult ? savedResult.percent : Math.round((known / deck.length) * 100);
+    const completed = savedResult ? savedResult.completed : known === deck.length;
+    const shownReview = savedResult ? (savedResult.reviewWords || []) : reviewWords;
+    return html(ResultScreen, {
+      percent, lessonId, mode: 'cards',
+      completed,
+      reviewWords: shownReview,
+      onRetry: () => {
+        setDeck(shuffle(words));
+        setIndex(0);
+        setFlipped(false);
+        setKnown(0);
+        setReviewWords([]);
+        setDone(false);
+        onClearResult();
+      },
+      onHome,
+      nextAction,
+    });
+  }
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Tarjetas'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + deck.length),
+        html('button', { className: 'back-btn', onClick: onHome, title: 'Ir al inicio' }, '⌂'),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' },
+          html('i', null, '✕'), 'No la sabía: ' + reviewWords.length
+        ),
+        html('div', { className: 'flash-score-chip yes' },
+          html('i', null, '✓'), 'La sabía: ' + known
+        ),
+      ),
+      html('div', { className: 'flashcard-wrap' },
+        html('div', { className: 'flashcard', onClick: () => setFlipped(f => !f) },
+          !flipped
+            ? html('div', { className: 'front hanzi-font' }, card.hanzi)
+            : html('div', { className: 'back-content' },
+                html('div', { className: 'back-pinyin' }, card.pinyin),
+                html('div', { className: 'back-es' }, card.es),
+              ),
+          html('div', { className: 'tap-hint' }, flipped ? 'Toca para ver el carácter' : 'Toca para ver la respuesta')
+        ),
+        flipped && html('div', { className: 'flash-controls' },
+          html('button', { className: 'flash-btn no', onClick: () => advance(false) }, 'No lo sabía'),
+          html('button', { className: 'flash-btn yes', onClick: () => advance(true) }, 'Lo sabía'),
+        )
+      )
+    )
+  );
+}
+
+// ----------------- Quiz -----------------
+const FLAG_RE = /^\p{Emoji_Presentation}/u;
+const FLAG_CODE_RE = /^([\u{1F1E0}-\u{1F1FF}]{2})/u;
+function getFlagCode(es) {
+  if (!es) return null;
+  const m = es.match(FLAG_CODE_RE);
+  if (!m) return null;
+  return [...m[1]].map(c => String.fromCharCode(c.codePointAt(0) - 0x1F1A5)).join('').toLowerCase();
+}
+function stripFlag(es) {
+  return es ? es.replace(/^[\u{1F1E0}-\u{1F1FF}]{2}\s*/u, '') : es;
+}
+function FlagImg({ es, size }) {
+  const code = getFlagCode(es);
+  if (!code) return null;
+  const h = size || 18;
+  const w = Math.round(h * 1.33);
+  return html('img', { src: 'https://flagcdn.com/' + w + 'x' + h + '/' + code + '.png', style: { borderRadius: 2, verticalAlign: 'middle', marginRight: 6 }, alt: code.toUpperCase() });
+}
+function sameCategory(a, b) {
+  // Si ambas tienen bandera (países) o ambas no tienen, son misma categoría
+  return FLAG_RE.test(a.es) === FLAG_RE.test(b.es);
+}
+function buildQuizQuestions(words) {
+  const picked = shuffle(words).slice(0, Math.min(8, words.length));
+  return picked.map(w => {
+    // Preferir distractores de la misma categoría (países con países, palabras con palabras)
+    const samePool = shuffle(words.filter(x => x.es !== w.es && sameCategory(w, x)));
+    const diffPool = shuffle(words.filter(x => x.es !== w.es && !sameCategory(w, x)));
+    const pool = [...samePool, ...diffPool];
+    const distractors = pool.slice(0, 3).map(x => x.es);
+    const options = shuffle([w.es, ...distractors]);
+    return { hanzi: w.hanzi, pinyin: w.pinyin, correct: w.es, options };
+  });
+}
+
+function QuizGame({ words, lessonId, onBack, onHome, onFinish, nextAction, savedResult, onSaveResult, onClearResult }) {
+  const [questions, setQuestions] = useState(() => buildQuizQuestions(words));
+  const [index, setIndex] = useState(0);
+  const [selectedOpt, setSelectedOpt] = useState(null);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [wrongCount, setWrongCount] = useState(0);
+  const [reviewWords, setReviewWords] = useState(() => (savedResult ? savedResult.reviewWords || [] : []));
+  const [done, setDone] = useState(!!savedResult);
+
+  const q = questions[index];
+
+  const handlePick = (opt) => {
+    if (selectedOpt) return;
+    setSelectedOpt(opt);
+    const isCorrect = opt === q.correct;
+    const newCount = correctCount + (isCorrect ? 1 : 0);
+    const newWrong = wrongCount + (isCorrect ? 0 : 1);
+    const newReview = isCorrect ? reviewWords : [...reviewWords, { hanzi: q.hanzi, pinyin: q.pinyin, es: q.correct }];
+    setTimeout(() => {
+      if (index + 1 >= questions.length) {
+        const percent = Math.round((newCount / questions.length) * 100);
+        setCorrectCount(newCount);
+        setWrongCount(newWrong);
+        setReviewWords(newReview);
+        setDone(true);
+        onFinish(percent, newReview);
+        onSaveResult({ percent, completed: newCount === questions.length, reviewWords: newReview });
+      } else {
+        setCorrectCount(newCount);
+        setWrongCount(newWrong);
+        setReviewWords(newReview);
+        setIndex(index + 1);
+        setSelectedOpt(null);
+      }
+    }, 700);
+  };
+
+  if (done) {
+    const percent = savedResult ? savedResult.percent : Math.round((correctCount / questions.length) * 100);
+    const completed = savedResult ? savedResult.completed : correctCount === questions.length;
+    const shownReview = savedResult ? (savedResult.reviewWords || []) : reviewWords;
+    return html(ResultScreen, {
+      percent, lessonId, mode: 'quiz',
+      completed,
+      reviewWords: shownReview,
+      onRetry: () => {
+        setQuestions(buildQuizQuestions(words));
+        setIndex(0);
+        setSelectedOpt(null);
+        setCorrectCount(0);
+        setWrongCount(0);
+        setReviewWords([]);
+        setDone(false);
+        onClearResult();
+      },
+      onHome,
+      nextAction,
+    });
+  }
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Opción múltiple'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + questions.length),
+        html('button', { className: 'back-btn', onClick: onHome, title: 'Ir al inicio' }, '⌂'),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' },
+          html('i', null, '✕'), 'Incorrectas: ' + wrongCount
+        ),
+        html('div', { className: 'flash-score-chip yes' },
+          html('i', null, '✓'), 'Correctas: ' + correctCount
+        ),
+      ),
+      html('div', { className: 'quiz-prompt' },
+        html('div', { className: 'q-label' }, q.pinyin),
+        html('div', { className: 'q-hanzi hanzi-font' }, q.hanzi),
+      ),
+      html('div', { className: 'quiz-options' },
+        q.options.map(opt => {
+          let cls = 'quiz-option';
+          if (selectedOpt) {
+            cls += ' disabled';
+            if (opt === q.correct) cls += ' correct';
+            else if (opt === selectedOpt) cls += ' wrong';
+          }
+          return html('button', { key: opt, className: cls, onClick: () => handlePick(opt) }, stripFlag(opt));
+        })
+      )
+    )
+  );
+}
+
+// ----------------- Result screen -----------------
+function ReviewList({ reviewWords }) {
+  if (!reviewWords || reviewWords.length === 0) return null;
+  return html('div', { className: 'review-list' },
+    html('div', { className: 'review-list-title' }, 'Para repasar (' + reviewWords.length + ')'),
+    reviewWords.map((w, i) => html('div', { key: i, className: 'review-item' },
+      html('div', { className: 'review-hanzi hanzi-font' }, w.hanzi),
+      html('div', { className: 'review-info' },
+        html('div', { className: 'review-pinyin' }, w.pinyin),
+        html('div', { className: 'review-es' }, w.es),
+      )
+    ))
+  );
+}
+
+function ResultScreen({ percent, mode, completed, reviewWords, onRetry, onHome, nextAction }) {
+  if (completed) {
+    return html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'result-screen' },
+        html('div', { className: 'result-seal hanzi-font celebrate' },
+          html('div', { className: 'pct' }, '完'),
+          html('div', { className: 'label' }, '100%')
+        ),
+        html('div', { className: 'result-title' }, '¡Felicitaciones!'),
+        html('div', { className: 'result-sub' }, 'Completaste este ejercicio sin errores'),
+        html('div', { className: 'result-actions' },
+          nextAction && html('button', { className: 'primary-btn', onClick: nextAction.go }, nextAction.label),
+          html('button', { className: nextAction ? 'secondary-btn' : 'primary-btn', onClick: onRetry }, 'Volver a intentar'),
+          html('button', { className: 'secondary-btn', onClick: onHome }, 'Volver al inicio'),
+        ),
+        html(ReviewList, { reviewWords })
+      )
+    );
+  }
+
+  let title, sub;
+  if (percent >= 90) { title = '¡Excelente!'; sub = 'Dominaste esta lección'; }
+  else if (percent >= 70) { title = '¡Muy bien!'; sub = 'Casi perfecto, seguí practicando'; }
+  else if (percent >= 50) { title = 'Buen intento'; sub = 'Repasá un poco más y volvé a intentar'; }
+  else { title = 'Sigamos practicando'; sub = 'Cada repaso ayuda a memorizar'; }
+
+  return html('main', { style: { paddingTop: '18px' } },
+    html('div', { className: 'result-screen' },
+      html('div', { className: 'result-seal hanzi-font' },
+        html('div', { className: 'pct' }, percent + '%'),
+        html('div', { className: 'label' }, 'SCORE')
+      ),
+      html('div', { className: 'result-title' }, title),
+      html('div', { className: 'result-sub' }, sub),
+      html('div', { className: 'result-actions' },
+        nextAction && html('button', { className: 'primary-btn', onClick: nextAction.go }, nextAction.label),
+        html('button', { className: nextAction ? 'secondary-btn' : 'primary-btn', onClick: onRetry }, 'Volver a intentar'),
+        html('button', { className: 'secondary-btn', onClick: onHome }, 'Volver al inicio'),
+      ),
+      html(ReviewList, { reviewWords })
+    )
+  );
+}
+
+// ----------------- Refuerzo: helpers -----------------
+function getMissedWords(progress) {
+  const all = [];
+  const lp = progress.lessons || {};
+  Object.keys(lp).forEach(lid => {
+    ['match', 'cards', 'quiz'].forEach(mode => {
+      (lp[lid][mode + '_missed'] || []).forEach(w => { if (w && w.hanzi) all.push(w); });
+    });
+  });
+  const pp = progress.prueba || {};
+  ['clas', 'dialogo', 'orden', 'audio'].forEach(game => {
+    (pp[game + '_missed'] || []).forEach(w => { if (w && w.hanzi) all.push(w); });
+  });
+  const seen = new Set();
+  return all.filter(w => {
+    if (seen.has(w.hanzi)) return false;
+    seen.add(w.hanzi);
+    return true;
+  });
+}
+
+// ----------------- Refuerzo: Tarjetas de estudio -----------------
+function StudyCardsPhase({ words, onDone, onBack }) {
+  const [deck] = useState(() => shuffle([...words]));
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const w = deck[index];
+  const isLast = index === deck.length - 1;
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, 'Tarjetas de estudio'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + deck.length),
+      ),
+      html('div', { style: { padding: '16px 16px 0' } },
+        html('div', {
+          onClick: () => setFlipped(f => !f),
+          style: {
+            minHeight: 220, borderRadius: 20, background: '#fff',
+            boxShadow: 'var(--shadow-paper)', cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '32px 24px', gap: 14, marginBottom: 24, transition: 'background 0.2s',
+          }
+        },
+          !flipped
+            ? html(React.Fragment, null,
+                html('div', { className: 'hanzi-font', style: { fontSize: 72, color: 'var(--lacquer)', lineHeight: 1.1 } }, w.hanzi),
+                html('div', { style: { fontSize: 13, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 8 } }, '👆 Tocá para ver'),
+              )
+            : html(React.Fragment, null,
+                html('div', { className: 'hanzi-font', style: { fontSize: 52, color: 'var(--lacquer)', lineHeight: 1.1, marginBottom: 4 } }, w.hanzi),
+                html('div', { style: { fontSize: 20, fontWeight: 800, color: 'var(--lacquer-dark)', letterSpacing: 1 } }, w.pinyin),
+                html('div', { style: { fontSize: 16, color: 'var(--ink-mid)', fontWeight: 600, textAlign: 'center', marginTop: 6 } }, w.es),
+              ),
+        ),
+        html('div', { style: { display: 'flex', gap: 12 } },
+          html('button', {
+            className: 'secondary-btn', style: { margin: 0, flex: 1 },
+            disabled: index === 0,
+            onClick: () => { setFlipped(false); setIndex(i => i - 1); },
+          }, '← Anterior'),
+          isLast
+            ? html('button', { className: 'primary-btn', style: { flex: 1 }, onClick: onDone }, '¡Listo! →')
+            : html('button', { className: 'primary-btn', style: { flex: 1 }, onClick: () => { setFlipped(false); setIndex(i => i + 1); } }, 'Siguiente →'),
+        ),
+      ),
+    )
+  );
+}
+
+// ----------------- Refuerzo: Quiz genérico -----------------
+function buildRefuerzoMC(words, allWords, mode) {
+  return shuffle([...words]).map(w => {
+    let show, hint, correct, distractor;
+    if (mode === 'pinyin') { show = w.hanzi; hint = w.es; correct = w.pinyin; distractor = x => x.pinyin; }
+    else if (mode === 'hanzi') { show = w.es; hint = w.pinyin; correct = w.hanzi; distractor = x => x.hanzi; }
+    else { show = w.hanzi; hint = w.pinyin; correct = w.es; distractor = x => x.es; }
+    const pool = shuffle([...allWords].filter(x => x.hanzi !== w.hanzi && distractor(x) !== correct));
+    const options = shuffle([correct, ...pool.slice(0, 2).map(distractor)]);
+    return { show, hint, correct, options };
+  });
+}
+
+function RefuerzoMC({ words, allWords, mode, title, onDone, onBack, playerName }) {
+  const [questions] = useState(() => buildRefuerzoMC(words, allWords, mode));
+  const [index, setIndex] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [correctRef, setCorrectRef] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [done, setDone] = useState(false);
+
+  const q = questions[index];
+  const isHanzi = mode === 'hanzi';
+  const isCorrect = selected !== null && selected === q.correct;
+
+  const handlePick = (opt) => {
+    if (selected !== null) return;
+    setSelected(opt);
+    const ok = opt === q.correct;
+    const nc = correct + (ok ? 1 : 0);
+    setCorrectRef(nc);
+    if (ok) setCorrect(nc);
+    else {
+      const orig = words.find(w => (mode === 'pinyin' || mode === 'es' ? w.hanzi : w.es) === q.show) || {};
+      setMissed(m => [...m, orig]);
+    }
+  };
+
+  const handleNext = () => {
+    const next = index + 1;
+    if (next >= questions.length) {
+      setDone(true);
+      if (onDone) onDone();
+    } else { setIndex(next); setSelected(null); }
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((correctRef / questions.length) * 100),
+    total: questions.length, correct: correctRef, missed,
+    onRetry: () => { setIndex(0); setSelected(null); setCorrect(0); setCorrectRef(0); setMissed([]); setDone(false); },
+    onBack, playerName,
+  });
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, title),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + questions.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), correct + ' correctas'),
+      ),
+      html('div', { style: { padding: '16px 16px 0' } },
+        html('div', { style: { background: '#fff', borderRadius: 20, boxShadow: 'var(--shadow-paper)', padding: '28px 24px', textAlign: 'center', marginBottom: 20 } },
+          isHanzi
+            ? html(React.Fragment, null,
+                html('div', { style: { fontSize: 16, color: 'var(--ink-mid)', fontWeight: 600, marginBottom: 10 } }, q.show),
+                html('div', { style: { fontSize: 15, color: 'var(--lacquer-dark)', fontWeight: 700, letterSpacing: 0.5 } }, q.hint),
+              )
+            : html(React.Fragment, null,
+                html('div', { className: 'hanzi-font', style: { fontSize: 60, color: 'var(--lacquer)', lineHeight: 1.1, marginBottom: 8 } }, q.show),
+                html('div', { style: { fontSize: 14, color: 'var(--ink-soft)', fontWeight: 600 } }, q.hint),
+              ),
+        ),
+        selected !== null
+          ? html(React.Fragment, null,
+              html('div', { style: {
+                borderRadius: 16, padding: '18px 20px', textAlign: 'center', fontWeight: 800, marginBottom: 16,
+                background: isCorrect ? 'var(--jade-light)' : '#FDE4DD',
+                color: isCorrect ? 'var(--jade-dark)' : 'var(--lacquer-dark)',
+              }},
+                html('div', { style: { fontSize: 36 } }, isCorrect ? '✓' : '✗'),
+                html('div', { style: { fontSize: 18, marginTop: 4 } }, isCorrect ? '¡Correcto!' : 'Correcto: ' + q.correct),
+              ),
+              html('button', { className: 'primary-btn', onClick: handleNext },
+                index < questions.length - 1 ? 'Siguiente →' : 'Ver resultado'
+              ),
+            )
+          : html('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+              q.options.map((opt, i) => html('button', {
+                key: i, className: 'quiz-option',
+                style: {
+                  textAlign: 'center',
+                  fontFamily: isHanzi ? 'Noto Serif SC, serif' : 'Nunito, sans-serif',
+                  fontSize: isHanzi ? 24 : 15,
+                },
+                onClick: () => handlePick(opt),
+              }, String.fromCharCode(65 + i) + '.  ' + opt)),
+            ),
+      ),
+    )
+  );
+}
+
+// ----------------- Refuerzo: Session hub -----------------
+const REFUERZO_EXERCISES = [
+  { id: 'cards',  icon: '📖', label: 'Tarjetas de estudio',    sub: 'Repasá hanzi, pinyin y significado' },
+  { id: 'es',     icon: '🇪🇸', label: '¿Qué significa?',        sub: 'Ves el hanzi, elegís el significado' },
+  { id: 'pinyin', icon: '🔤', label: '¿Cuál es el pinyin?',      sub: 'Ves el hanzi, elegís el pinyin' },
+  { id: 'hanzi',  icon: '汉', label: '¿Cómo se escribe?',       sub: 'Ves el significado, elegís el hanzi' },
+  { id: 'match',  icon: '🔗', label: 'Emparejamiento',          sub: 'Une hanzi con su pinyin y significado' },
+];
+
+function RefuerzoSession({ words, allWords, onBack, playerName }) {
+  const [current, setCurrent] = useState(null);
+  const [done, setDone] = useState(new Set());
+
+  const markDone = (id) => { setDone(prev => new Set([...prev, id])); setCurrent(null); };
+  const goBack = () => setCurrent(null);
+  const noop = () => {};
+
+  if (current === 'cards') return html(StudyCardsPhase, { words, onDone: () => markDone('cards'), onBack: goBack });
+  if (current === 'es')    return html(RefuerzoMC, { words, allWords, mode: 'es',    title: '¿Qué significa?',   onDone: () => markDone('es'),    onBack: goBack, playerName });
+  if (current === 'pinyin') return html(RefuerzoMC, { words, allWords, mode: 'pinyin', title: '¿Cuál es el pinyin?',     onDone: () => markDone('pinyin'), onBack: goBack, playerName });
+  if (current === 'hanzi')  return html(RefuerzoMC, { words, allWords, mode: 'hanzi',  title: '¿Cómo se escribe?', onDone: () => markDone('hanzi'),  onBack: goBack, playerName });
+  if (current === 'match')  return html(MatchGame, {
+    words, lessonId: null,
+    onBack: goBack, onHome: goBack,
+    onFinish: () => markDone('match'),
+    nextAction: null, savedResult: null, onSaveResult: noop, onClearResult: noop,
+  });
+
+  // Hub
+  const allDone = done.size === REFUERZO_EXERCISES.length;
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('div', null,
+          html('h1', null, 'Reforcemos'),
+          html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 } }, 'Práctica personalizada · ' + words.length + ' palabras'),
+        ),
+        html('div', { style: { fontSize: 13, fontWeight: 800, color: done.size === REFUERZO_EXERCISES.length ? 'var(--jade)' : 'var(--ink-soft)' } },
+          done.size + '/' + REFUERZO_EXERCISES.length + ' ✓'
+        ),
+      ),
+      html('div', { style: { padding: '0 16px' } },
+        html('div', { style: { display: 'flex', gap: 6, marginBottom: 20 } },
+          REFUERZO_EXERCISES.map((e, i) => html('div', {
+            key: e.id,
+            style: {
+              flex: 1, height: 5, borderRadius: 4,
+              background: done.has(e.id) ? 'var(--jade)' : 'var(--paper-deep)',
+            }
+          }))
+        ),
+        allDone && html('div', { style: {
+          background: 'var(--jade-light)', borderRadius: 16, padding: '16px 20px',
+          textAlign: 'center', marginBottom: 20, fontWeight: 800, color: 'var(--jade-dark)',
+        }},
+          html('div', { style: { fontSize: 32 } }, '🎉'),
+          html('div', { style: { fontSize: 17, marginTop: 6 } }, '¡Completaste todos los ejercicios!'),
+        ),
+        REFUERZO_EXERCISES.map(e => html('button', {
+          key: e.id,
+          className: 'prueba-card',
+          style: { marginBottom: 10, opacity: 1 },
+          onClick: () => setCurrent(e.id),
+        },
+          html('div', { className: 'prueba-icon', style: { fontFamily: 'Noto Serif SC, serif', fontSize: e.id === 'hanzi' ? 22 : 20, background: done.has(e.id) ? 'var(--jade-light)' : 'var(--paper)' } }, e.icon),
+          html('div', { style: { flex: 1 } },
+            html('div', { className: 'mode-title' }, e.label),
+            html('div', { className: 'mode-sub' }, e.sub),
+          ),
+          done.has(e.id) && html('div', { style: { fontSize: 20, color: 'var(--jade)' } }, '✓'),
+        )),
+      ),
+    )
+  );
+}
+
+// ----------------- Admin panel -----------------
+function parseVocabText(text) {
+  // Expects lines like: 5 | 餐厅 | cāntīng | comedor
+  // or tab-separated, grouped by "Lección N" headers
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const result = {};
+  let currentLesson = null;
+  for (const line of lines) {
+    const lessonMatch = line.match(/lecci[oó]n\s+(\d+)/i);
+    if (lessonMatch) {
+      currentLesson = lessonMatch[1];
+      if (!result[currentLesson]) result[currentLesson] = [];
+      continue;
+    }
+    const parts = line.split(/\t|\|/).map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      let lesson = currentLesson;
+      let hanzi, pinyin, es;
+      if (parts.length >= 4 && /^\d+$/.test(parts[0])) {
+        lesson = parts[0];
+        [hanzi, pinyin, es] = [parts[1], parts[2], parts[3]];
+      } else {
+        [hanzi, pinyin, es] = [parts[0], parts[1], parts[2]];
+      }
+      if (!lesson) lesson = '1';
+      if (!result[lesson]) result[lesson] = [];
+      if (hanzi && pinyin && es && hanzi !== 'Carácter') {
+        result[lesson].push({ hanzi, pinyin, es });
+      }
+    }
+  }
+  return result;
+}
+
+// Helper: convierte filas de Supabase al formato { "5": [{hanzi,pinyin,es},...], ... }
+function supabaseRowsToVocab(rows) {
+  const vocab = {};
+  rows.forEach(r => {
+    if (!vocab[r.lesson]) vocab[r.lesson] = [];
+    vocab[r.lesson].push({ hanzi: r.hanzi, pinyin: r.pinyin, es: r.es });
+  });
+  return vocab;
+}
+
+function AdminPanel({ vocab, onBack, onVocabUpdate }) {
+  const [session, setSession] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginStatus, setLoginStatus] = useState(null);
+
+  // texto manual (modo legacy)
+  const [text, setText] = useState('');
+  // archivo CSV
+  const [csvFile, setCsvFile] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  // gestión de lecciones
+  const [renamingLesson, setRenamingLesson] = useState(null);
+  const [visibilityTick, setVisibilityTick] = useState(0);
+  const [renameValue, setRenameValue] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  // editor de contenido de lección
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [editWords, setEditWords] = useState([]);
+
+  // log de inicios de sesión (admins)
+  const [loginLog, setLoginLog] = useState([]);
+  const [showLoginLog, setShowLoginLog] = useState(false);
+  const loadLoginLog = () => {
+    db.from('login_log').select('email,created_at').order('created_at', { ascending: false }).limit(50)
+      .then(({ data }) => setLoginLog(data || []));
+    setShowLoginLog(true);
+  };
+
+  // log de alumnos conectados
+  const [studentLog, setStudentLog] = useState([]);
+  const [showStudentLog, setShowStudentLog] = useState(false);
+  const loadStudentLog = () => {
+    db.from('student_log').select('name,created_at').order('created_at', { ascending: false }).limit(100)
+      .then(({ data }) => setStudentLog(data || []));
+    setShowStudentLog(true);
+  };
+
+  const handleRenameLesson = (id) => {
+    const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+    setRenamingLesson(id);
+    setRenameValue(theme.name);
+  };
+
+  const handleRenameSave = async (id) => {
+    if (renameValue.trim()) {
+      const theme = { ...(LESSON_THEMES[id] || {}), name: renameValue.trim() };
+      LESSON_THEMES[id] = theme;
+      // Guardar en Supabase (para todos)
+      await db.from('lesson_themes').upsert({ lesson: id, name: theme.name, icon: theme.icon || id });
+      // Guardar en localStorage (fallback offline)
+      const saved = JSON.parse(localStorage.getItem('hanzi-lesson-themes') || '{}');
+      saved[id] = theme;
+      localStorage.setItem('hanzi-lesson-themes', JSON.stringify(saved));
+      setStatus({ type: 'ok', msg: '✅ Nombre de Lección ' + id + ' actualizado para todos.' });
+    }
+    setRenamingLesson(null);
+  };
+
+
+  useEffect(() => {
+    db.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoadingSession(false);
+    });
+    const { data: listener } = db.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginStatus(null);
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) { setLoginStatus({ type: 'err', msg: error.message }); return; }
+    db.from('login_log').insert({ email: data.user?.email || email }).then(() => {});
+  };
+
+  const handleLogout = async () => {
+    await db.auth.signOut();
+    setStatus(null);
+  };
+
+  // nueva lección
+
+  // Parsea CSV con formato: Lección, 汉字, Pīnyīn, Significado en español
+  // Agrupa automáticamente por número de lección
+  const parseCsvMultiLesson = (text) => {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const sep = lines[0].includes(';') ? ';' : ',';
+    // Saltar encabezado si la primera celda empieza con "Lecci"
+    const startIdx = /^lecci/i.test(lines[0].split(sep)[0]) ? 1 : 0;
+    const lessons = {}; // { id: { name, icon, words: [] } }
+    lines.slice(startIdx).forEach(line => {
+      // Parsear respetando comillas
+      const parts = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') { inQ = !inQ; }
+        else if (c === sep && !inQ) { parts.push(cur.trim()); cur = ''; }
+        else { cur += c; }
+      }
+      parts.push(cur.trim());
+      if (parts.length < 4) return;
+      const [lecCol, hanzi, pinyin, es] = parts;
+      if (!hanzi || !pinyin || !es) return;
+      // Extraer número de lección: "Lección 3 — ..." → "3"
+      const numMatch = lecCol.match(/lecci[oó]n\s+(\d+)/i);
+      if (!numMatch) return;
+      const lid = numMatch[1];
+      if (!lessons[lid]) {
+        // Nombre: lo que viene después de "—" en la primera aparición
+        const nameMatch = lecCol.match(/[—-]\s*(.+)/);
+        const rawName = nameMatch ? nameMatch[1].trim() : ('Lección ' + lid);
+        // Ícono: primer carácter chino del nombre
+        const iconMatch = rawName.match(/[一-鿿]/);
+        lessons[lid] = { name: rawName, icon: iconMatch ? iconMatch[0] : lid, words: [] };
+      }
+      lessons[lid].words.push({ lesson: lid, hanzi, pinyin, es });
+    });
+    return lessons;
+  };
+
+  // Subir CSV multi-lección al Supabase
+  const handleCsvUpload = async () => {
+    if (!csvFile) { setStatus({ type: 'err', msg: 'Seleccioná un archivo CSV primero.' }); return; }
+    setUploading(true);
+    setStatus(null);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const lessons = parseCsvMultiLesson(e.target.result);
+        const lessonIds = Object.keys(lessons);
+        if (lessonIds.length === 0) { setStatus({ type: 'err', msg: 'No se encontraron lecciones. Verificá el formato del CSV.' }); setUploading(false); return; }
+
+        let totalWords = 0;
+        const newVocab = { ...vocab };
+
+        for (const lid of lessonIds) {
+          const { name, icon, words } = lessons[lid];
+          // Borrar palabras existentes de esa lección en Supabase antes de insertar
+          await db.from('vocabulary').delete().eq('lesson', lid);
+          const { error: insErr } = await db.from('vocabulary').insert(words);
+          if (insErr) throw insErr;
+          await db.from('lesson_themes').upsert({ lesson: lid, name, icon });
+          LESSON_THEMES[lid] = { name, icon };
+          newVocab[lid] = words.map(w => ({ hanzi: w.hanzi, pinyin: w.pinyin, es: w.es }));
+          totalWords += words.length;
+        }
+
+        onVocabUpdate(newVocab);
+        setStatus({ type: 'ok', msg: '✅ ' + lessonIds.length + ' lección(es) cargadas con ' + totalWords + ' palabras en total para todos los usuarios.' });
+        setCsvFile(null);
+      } catch (err) {
+        setStatus({ type: 'err', msg: 'Error: ' + err.message });
+      }
+      setUploading(false);
+    };
+    reader.readAsText(csvFile, 'UTF-8');
+  };
+
+  // Eliminar lección (local + Supabase)
+  const handleToggleVisibility = async (id) => {
+    const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+    const newHidden = !theme.hidden;
+    const updated = { ...theme, hidden: newHidden };
+    LESSON_THEMES[id] = updated;
+    await db.from('lesson_themes').upsert({ lesson: id, name: updated.name, icon: updated.icon || id, hidden: newHidden });
+    setStatus({ type: 'ok', msg: newHidden ? '🚫 Módulo ocultado para los alumnos.' : '👁️ Módulo visible para los alumnos.' });
+    setVisibilityTick(t => t + 1);
+  };
+
+  const handleDeleteLesson = async (id) => {
+    try {
+      await db.from('vocabulary').delete().eq('lesson', id);
+      await db.from('lesson_themes').delete().eq('lesson', id);
+    } catch (e) { /* silencioso si no estaba en Supabase */ }
+    const newVocab = { ...vocab };
+    delete newVocab[id];
+    onVocabUpdate(newVocab);
+    setConfirmDelete(null);
+    setStatus({ type: 'ok', msg: '✅ Lección ' + id + ' eliminada para todos.' });
+  };
+
+  const handleApply = () => {
+    if (!text.trim()) { setStatus({ type: 'err', msg: 'Pegá el contenido del vocabulario antes de aplicar.' }); return; }
+    try {
+      const parsed = parseVocabText(text);
+      const wordCount = Object.values(parsed).reduce((acc, arr) => acc + arr.length, 0);
+      if (wordCount === 0) { setStatus({ type: 'err', msg: 'No se encontraron palabras.' }); return; }
+      onVocabUpdate(parsed);
+      setStatus({ type: 'ok', msg: 'Listo: ' + wordCount + ' palabras cargadas localmente.' });
+    } catch (err) {
+      setStatus({ type: 'err', msg: 'Error: ' + err.message });
+    }
+  };
+
+  const handleReset = () => {
+    localStorage.removeItem(VOCAB_KEY);
+    setStatus({ type: 'ok', msg: 'Vocabulario original restaurado.' });
+    setTimeout(() => window.location.reload(), 600);
+  };
+
+  // Sincronizar DEFAULT_VOCAB a Supabase
+  const handleSeedDefaults = async () => {
+    setUploading(true);
+    setStatus(null);
+    try {
+      let total = 0;
+      for (const [lid, words] of Object.entries(DEFAULT_VOCAB)) {
+        await db.from('vocabulary').delete().eq('lesson', lid);
+        await db.from('vocabulary').insert(words.map(w => ({ lesson: lid, hanzi: w.hanzi, pinyin: w.pinyin, es: w.es })));
+        const theme = LESSON_THEMES[lid] || { name: 'Lección ' + lid, icon: lid };
+        await db.from('lesson_themes').upsert({ lesson: lid, name: theme.name, icon: theme.icon });
+        total += words.length;
+      }
+      setStatus({ type: 'ok', msg: '✅ ' + Object.keys(DEFAULT_VOCAB).length + ' lecciones sincronizadas (' + total + ' palabras) a Supabase.' });
+    } catch (err) {
+      setStatus({ type: 'err', msg: 'Error: ' + err.message });
+    }
+    setUploading(false);
+  };
+
+  // Abrir editor de palabras de una lección
+  const handleEditLesson = (id) => {
+    setEditingLesson(id);
+    setEditWords((vocab[id] || []).map((w, i) => ({ ...w, _key: Date.now() + i })));
+  };
+
+  // Guardar palabras editadas a Supabase
+  const handleSaveEditLesson = async () => {
+    setUploading(true);
+    try {
+      const rows = editWords
+        .filter(w => w.hanzi && w.pinyin && w.es)
+        .map(w => ({ lesson: editingLesson, hanzi: w.hanzi.trim(), pinyin: w.pinyin.trim(), es: w.es.trim() }));
+      if (rows.length === 0) { setStatus({ type: 'err', msg: 'No hay palabras válidas para guardar.' }); setUploading(false); return; }
+      await db.from('vocabulary').delete().eq('lesson', editingLesson);
+      const { error } = await db.from('vocabulary').insert(rows);
+      if (error) throw error;
+      const newVocab = { ...vocab, [editingLesson]: rows.map(r => ({ hanzi: r.hanzi, pinyin: r.pinyin, es: r.es })) };
+      onVocabUpdate(newVocab);
+      setStatus({ type: 'ok', msg: '✅ Lección ' + editingLesson + ' guardada con ' + rows.length + ' palabras para todos.' });
+      setEditingLesson(null);
+    } catch (err) {
+      setStatus({ type: 'err', msg: 'Error: ' + err.message });
+    }
+    setUploading(false);
+  };
+
+  const updateEditWord = (key, field, value) => setEditWords(prev => prev.map(w => w._key === key ? { ...w, [field]: value } : w));
+  const removeEditWord = (key) => setEditWords(prev => prev.filter(w => w._key !== key));
+  const addEditWord = () => setEditWords(prev => [...prev, { hanzi: '', pinyin: '', es: '', _key: Date.now() }]);
+
+  const totalWords = Object.values(vocab).reduce((acc, arr) => acc + arr.length, 0);
+
+  if (loadingSession) return html('main', { style: { paddingTop: 40, textAlign: 'center' } }, '⏳ Cargando...');
+
+  // ── Editor de palabras ──
+  if (editingLesson) {
+    const theme = LESSON_THEMES[editingLesson] || { name: 'Lección ' + editingLesson };
+    const inputStyle = { padding: '7px 9px', borderRadius: 8, border: '1.5px solid var(--paper-deep)', fontSize: 13, fontFamily: 'Nunito, sans-serif', width: '100%' };
+    return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: () => setEditingLesson(null) }, '←'),
+        html('div', null,
+          html('h1', null, 'Editar lección ' + editingLesson),
+          html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, theme.name + ' · ' + editWords.length + ' palabras'),
+        ),
+      ),
+      html('div', { className: 'admin-panel' },
+        html('div', { style: { display: 'grid', gridTemplateColumns: '2fr 2fr 3fr auto', gap: 6, marginBottom: 6 } },
+          html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 } }, '汉字'),
+          html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Pīnyīn'),
+          html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 } }, 'Español'),
+          html('div', null),
+        ),
+        html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 } },
+          editWords.map(w => html('div', { key: w._key, style: { display: 'grid', gridTemplateColumns: '2fr 2fr 3fr auto', gap: 6, alignItems: 'center' } },
+            html('input', { value: w.hanzi, onChange: e => updateEditWord(w._key, 'hanzi', e.target.value), style: { ...inputStyle, fontFamily: 'Noto Serif SC, serif', fontSize: 16 } }),
+            html('input', { value: w.pinyin, onChange: e => updateEditWord(w._key, 'pinyin', e.target.value), style: inputStyle }),
+            html('input', { value: w.es, onChange: e => updateEditWord(w._key, 'es', e.target.value), style: inputStyle }),
+            html('button', { onClick: () => removeEditWord(w._key), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--lacquer)', padding: '0 4px' } }, '🗑️'),
+          )),
+        ),
+        html('button', { className: 'secondary-btn', style: { marginBottom: 16 }, onClick: addEditWord }, '+ Agregar palabra'),
+        html('button', { className: 'primary-btn', onClick: handleSaveEditLesson, disabled: uploading }, uploading ? '⏳ Guardando...' : '💾 Guardar para todos'),
+        status && html('div', { className: 'admin-status ' + (status.type === 'ok' ? 'ok' : 'err'), style: { marginTop: 10 } }, status.msg),
+      ),
+    );
+  }
+
+  return html('main', { style: { paddingTop: '18px' } },
+    html('div', { className: 'header-row' },
+      html('button', { className: 'back-btn', onClick: onBack }, '←'),
+      html('h1', null, 'Administrar'),
+    ),
+    html('div', { className: 'admin-panel' },
+
+      // ── Info vocab actual ──
+      html('div', null,
+        html('label', null, 'Vocabulario actual'),
+        html('p', { className: 'admin-note', style: { marginTop: 6 } },
+          totalWords + ' palabras en ' + Object.keys(vocab).length + ' lecciones.'
+        )
+      ),
+
+      // ── Panel admin (solo si hay sesión) ──
+      session
+        ? html(React.Fragment, null,
+            html('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--jade-light)', borderRadius: 12, padding: '10px 14px' } },
+              html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--jade-dark)' } }, '🔓 Admin: ' + session.user.email),
+              html('button', { className: 'secondary-btn', style: { margin: 0, padding: '6px 14px', fontSize: 13 }, onClick: handleLogout }, 'Cerrar sesión'),
+            ),
+
+            // ── Nueva lección desde CSV ──
+            html('div', null,
+              html('label', null, '➕ Cargar lecciones desde CSV'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
+                'El archivo puede contener ', html('strong', null, 'una o varias lecciones'),
+                '. Las lecciones y nombres se detectan automáticamente. Si ya existe una lección con el mismo número, se reemplaza.'
+              ),
+              html('p', { className: 'admin-note', style: { fontFamily: 'monospace', background: 'var(--paper)', padding: '8px 10px', borderRadius: 8, fontSize: 12, whiteSpace: 'pre' } },
+                'Lección,Nº,Pīnyīn,汉字,Tipo,Significado en español\nLección 1 — 你好 (Nǐ hǎo),1,nǐ,你,Pr.,tú\nLección 1 — 你好 (Nǐ hǎo),2,hǎo,好,A,bien / bueno'
+              ),
+              html('input', {
+                type: 'file', accept: '.csv',
+                style: { margin: '8px 0 10px', width: '100%' },
+                onChange: (e) => setCsvFile(e.target.files[0] || null),
+              }),
+              csvFile && html('p', { className: 'admin-note', style: { margin: '0 0 8px', color: 'var(--ink-mid)' } }, '📄 ' + csvFile.name),
+              html('button', {
+                className: 'primary-btn',
+                onClick: handleCsvUpload,
+                disabled: uploading || !csvFile,
+              }, uploading ? '⏳ Subiendo lecciones...' : '➕ Subir a Supabase para todos'),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Sincronizar lecciones integradas ──
+            html('div', null,
+              html('label', null, '☁️ Sincronizar lecciones integradas'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
+                'Sube las lecciones 5 a 10 (campus, clima, presentaciones, familia, países y números) a Supabase para que sean administrables desde aquí.'
+              ),
+              html('button', {
+                className: 'secondary-btn',
+                onClick: handleSeedDefaults,
+                disabled: uploading,
+              }, uploading ? '⏳ Sincronizando...' : '☁️ Sincronizar a Supabase'),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Gestión de lecciones ──
+            html('div', null,
+              html('label', null, '📚 Lecciones cargadas'),
+              html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                Object.keys(vocab).sort().filter(id => id !== 'mod-paises' && id !== 'mod-numeros').map(id => {
+                  const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
+                  const count = vocab[id].length;
+                  const isRenaming = renamingLesson === id;
+                  const isConfirmingDelete = confirmDelete === id;
+                  return html('div', {
+                    key: id,
+                    style: { background: '#fff', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', flexDirection: 'column', gap: 6 }
+                  },
+                    html('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                      html('span', { className: 'hanzi-font', style: { fontSize: 22, color: 'var(--lacquer)', minWidth: 32 } }, theme.icon || id),
+                      isRenaming
+                        ? html('input', {
+                            autoFocus: true,
+                            value: renameValue,
+                            onChange: e => setRenameValue(e.target.value),
+                            onKeyDown: e => { if (e.key === 'Enter') handleRenameSave(id); if (e.key === 'Escape') setRenamingLesson(null); },
+                            style: { flex: 1, padding: '6px 10px', borderRadius: 8, border: '2px solid var(--jade)', fontSize: 14, fontFamily: 'Nunito, sans-serif' }
+                          })
+                        : html('div', { style: { flex: 1 } },
+                            html('div', { style: { fontWeight: 800, fontSize: 14 } }, 'Lección ' + id + ' · ' + theme.name),
+                            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, count + ' palabras'),
+                          ),
+                      isRenaming
+                        ? html(React.Fragment, null,
+                            html('button', { onClick: () => handleRenameSave(id), style: { background: 'var(--jade)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, '✓ Guardar'),
+                            html('button', { onClick: () => setRenamingLesson(null), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-soft)' } }, '✕'),
+                          )
+                        : html(React.Fragment, null,
+                            html('button', { onClick: () => handleToggleVisibility(id), title: theme.hidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: theme.hidden ? 0.4 : 1 } }, theme.hidden ? '🚫' : '👁️'),
+                            html('button', { onClick: () => handleEditLesson(id), title: 'Editar palabras', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '📝'),
+                            html('button', { onClick: () => handleRenameLesson(id), title: 'Renombrar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '✏️'),
+                            html('button', { onClick: () => setConfirmDelete(id), title: 'Eliminar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '🗑️'),
+                          ),
+                    ),
+                    isConfirmingDelete && html('div', { style: { background: '#FDE4DD', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                      html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--lacquer-dark)' } }, '¿Eliminar "' + theme.name + '" y sus ' + count + ' palabras?'),
+                      html('div', { style: { display: 'flex', gap: 6 } },
+                        html('button', { onClick: () => handleDeleteLesson(id), style: { background: 'var(--lacquer)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, 'Eliminar'),
+                        html('button', { onClick: () => setConfirmDelete(null), style: { background: 'none', border: '2px solid var(--paper-deep)', borderRadius: 8, padding: '6px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 13 } }, 'Cancelar'),
+                      ),
+                    ),
+                  );
+                })
+              ),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Módulos especiales (países y números) ──
+            html('div', null,
+              html('label', null, '🌍 Módulos especiales'),
+              html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                ['9', '10'].filter(id => vocab[id]).map(id => {
+                  const theme = LESSON_THEMES[id] || { name: 'Módulo ' + id };
+                  const count = vocab[id].length;
+                  const isRenaming = renamingLesson === id;
+                  const isConfirmingDelete = confirmDelete === id;
+                  return html('div', {
+                    key: id,
+                    style: { background: '#fff', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', flexDirection: 'column', gap: 6 }
+                  },
+                    html('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                      html('span', { className: 'hanzi-font', style: { fontSize: 22, color: 'var(--lacquer)', minWidth: 32 } }, theme.icon || id),
+                      isRenaming
+                        ? html('input', {
+                            autoFocus: true,
+                            value: renameValue,
+                            onChange: e => setRenameValue(e.target.value),
+                            onKeyDown: e => { if (e.key === 'Enter') handleRenameSave(id); if (e.key === 'Escape') setRenamingLesson(null); },
+                            style: { flex: 1, padding: '6px 10px', borderRadius: 8, border: '2px solid var(--jade)', fontSize: 14, fontFamily: 'Nunito, sans-serif' }
+                          })
+                        : html('div', { style: { flex: 1 } },
+                            html('div', { style: { fontWeight: 800, fontSize: 14 } }, theme.name),
+                            html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, count + ' palabras'),
+                          ),
+                      isRenaming
+                        ? html(React.Fragment, null,
+                            html('button', { onClick: () => handleRenameSave(id), style: { background: 'var(--jade)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, '✓ Guardar'),
+                            html('button', { onClick: () => setRenamingLesson(null), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-soft)' } }, '✕'),
+                          )
+                        : html(React.Fragment, null,
+                            html('button', { onClick: () => handleToggleVisibility(id), title: theme.hidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: theme.hidden ? 0.4 : 1 } }, theme.hidden ? '🚫' : '👁️'),
+                            html('button', { onClick: () => handleEditLesson(id), title: 'Editar palabras', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '📝'),
+                            html('button', { onClick: () => handleRenameLesson(id), title: 'Renombrar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '✏️'),
+                            html('button', { onClick: () => setConfirmDelete(id), title: 'Eliminar', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 } }, '🗑️'),
+                          ),
+                    ),
+                    isConfirmingDelete && html('div', { style: { background: '#FDE4DD', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                      html('span', { style: { fontSize: 13, fontWeight: 700, color: 'var(--lacquer-dark)' } }, '¿Eliminar "' + theme.name + '" y sus ' + count + ' palabras?'),
+                      html('div', { style: { display: 'flex', gap: 6 } },
+                        html('button', { onClick: () => handleDeleteLesson(id), style: { background: 'var(--lacquer)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 800, cursor: 'pointer', fontSize: 13 } }, 'Eliminar'),
+                        html('button', { onClick: () => setConfirmDelete(null), style: { background: 'none', border: '2px solid var(--paper-deep)', borderRadius: 8, padding: '6px 12px', fontWeight: 700, cursor: 'pointer', fontSize: 13 } }, 'Cancelar'),
+                      ),
+                    ),
+                  );
+                })
+              ),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Módulos de práctica ──
+            html('div', null,
+              html('label', null, '🎮 Módulos de práctica'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Activá o desactivá cada módulo para todos los alumnos.'),
+              html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                [
+                  { id: 'mod-clas',     icon: '🔢', name: 'Clasificadores' },
+                  { id: 'mod-dialogo',  icon: '💬', name: 'Completa el diálogo' },
+                  { id: 'mod-orden',    icon: '🔀', name: 'Ordena la oración' },
+                  { id: 'mod-audio',    icon: '🔊', name: 'Reconocer por audio' },
+                  { id: 'mod-refuerzo', icon: '💪', name: 'Reforcemos' },
+                ].map(m => {
+                  const theme = LESSON_THEMES[m.id] || {};
+                  const isHidden = !!theme.hidden;
+                  return html('div', {
+                    key: m.id,
+                    style: { background: '#fff', borderRadius: 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', alignItems: 'center', gap: 10, opacity: isHidden ? 0.6 : 1 }
+                  },
+                    html('span', { style: { fontSize: 22, minWidth: 32 } }, m.icon),
+                    html('div', { style: { flex: 1, fontWeight: 700, fontSize: 14 } }, m.name),
+                    html('button', {
+                      onClick: () => handleToggleVisibility(m.id),
+                      title: isHidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos',
+                      style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: isHidden ? 0.4 : 1 }
+                    }, isHidden ? '🚫' : '👁️'),
+                  );
+                })
+              ),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Log de inicios de sesión ──
+            html('div', null,
+              html('label', null, '🕒 Registro de inicios de sesión'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Últimos 50 accesos al panel de administrador.'),
+              !showLoginLog
+                ? html('button', { className: 'secondary-btn', onClick: loadLoginLog }, 'Ver registro')
+                : html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+                    loginLog.length === 0
+                      ? html('p', { className: 'admin-note' }, 'Sin registros todavía.')
+                      : loginLog.map((r, i) => html('div', {
+                          key: i,
+                          style: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: 'var(--shadow-paper)', display: 'flex', justifyContent: 'space-between', fontSize: 13 }
+                        },
+                          html('span', { style: { fontWeight: 700 } }, r.email),
+                          html('span', { style: { color: 'var(--ink-soft)' } }, new Date(r.created_at).toLocaleString('es-AR')),
+                        ))
+                  ),
+            ),
+
+            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+
+            // ── Log de alumnos conectados ──
+            html('div', null,
+              html('label', null, '👥 Alumnos conectados'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Registro de los nombres que los alumnos eligieron al entrar (últimos 100).'),
+              !showStudentLog
+                ? html('button', { className: 'secondary-btn', onClick: loadStudentLog }, 'Ver registro')
+                : html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' } },
+                    studentLog.length === 0
+                      ? html('p', { className: 'admin-note' }, 'Sin registros todavía.')
+                      : studentLog.map((r, i) => html('div', {
+                          key: i,
+                          style: { background: '#fff', borderRadius: 10, padding: '8px 12px', boxShadow: 'var(--shadow-paper)', display: 'flex', justifyContent: 'space-between', fontSize: 13 }
+                        },
+                          html('span', { style: { fontWeight: 700 } }, r.name),
+                          html('span', { style: { color: 'var(--ink-soft)' } }, new Date(r.created_at).toLocaleString('es-AR')),
+                        ))
+                  ),
+            ),
+          )
+
+        // ── Login ──
+        : html('div', null,
+            html('label', null, '🔐 Acceso admin'),
+            html('p', { className: 'admin-note', style: { marginBottom: 14 } }, 'Solo el administrador puede cargar vocabulario para todos los usuarios.'),
+            html('form', { onSubmit: handleLogin, style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+              html('input', { type: 'email', placeholder: 'Email', value: email, onChange: e => setEmail(e.target.value), style: { padding: '12px 14px', borderRadius: 12, border: '2px solid var(--paper-deep)', fontSize: 15, fontFamily: 'Nunito, sans-serif' } }),
+              html('input', { type: 'password', placeholder: 'Contraseña', value: password, onChange: e => setPassword(e.target.value), style: { padding: '12px 14px', borderRadius: 12, border: '2px solid var(--paper-deep)', fontSize: 15, fontFamily: 'Nunito, sans-serif' } }),
+              loginStatus && html('div', { className: 'admin-status err' }, loginStatus.msg),
+              html('button', { type: 'submit', className: 'primary-btn', style: { marginTop: 4 } }, 'Iniciar sesión'),
+            ),
+          ),
+
+      // ── Reiniciar progreso (visible para todos) ──
+      html('div', { style: { borderTop: '1px solid var(--paper-deep)', paddingTop: 16, marginTop: 8 } },
+        html('label', null, '🔄 Mi progreso'),
+        html('p', { className: 'admin-note', style: { margin: '6px 0 12px' } },
+          'Borra todo tu progreso local: puntajes, estrellas, nombre y errores guardados. No afecta a otros usuarios.'
+        ),
+        confirmDelete === 'reset'
+          ? html('div', { style: { background: '#FDE4DD', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 } },
+              html('span', { style: { fontWeight: 800, fontSize: 14, color: 'var(--lacquer-dark)' } }, '¿Seguro que querés borrar todo tu progreso? Esta acción no se puede deshacer.'),
+              html('div', { style: { display: 'flex', gap: 8 } },
+                html('button', {
+                  className: 'primary-btn', style: { margin: 0, background: 'var(--lacquer)' },
+                  onClick: () => {
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(NAME_KEY);
+                    setConfirmDelete(null);
+                    setTimeout(() => window.location.reload(), 300);
+                  }
+                }, '🗑️ Sí, borrar todo'),
+                html('button', { className: 'secondary-btn', style: { margin: 0 }, onClick: () => setConfirmDelete(null) }, 'Cancelar'),
+              ),
+            )
+          : html('button', {
+              className: 'secondary-btn',
+              style: { borderColor: 'var(--lacquer)', color: 'var(--lacquer)' },
+              onClick: () => setConfirmDelete('reset'),
+            }, '🔄 Reiniciar mi progreso'),
+      ),
+
+      status && html('div', { className: 'admin-status ' + (status.type === 'ok' ? 'ok' : 'err') }, status.msg),
+    )
+  );
+}
+
+// ----------------- Prueba: resultado -----------------
+function PruebaResult({ percent, total, correct, missed, onRetry, onBack, playerName }) {
+  let title;
+  if (percent === 100) title = (playerName ? '¡Perfecto, ' + playerName + '!' : '¡Perfecto!');
+  else if (percent >= 80) title = (playerName ? '¡Muy bien, ' + playerName + '!' : '¡Muy bien!');
+  else if (percent >= 60) title = 'Buen intento' + (playerName ? ', ' + playerName : '');
+  else title = 'Seguí practicando' + (playerName ? ', ' + playerName : '');
+  return html('main', { style: { paddingTop: '18px', paddingBottom: 40 } },
+    html('div', { className: 'result-screen' },
+      html('div', { className: 'result-seal hanzi-font' + (percent === 100 ? ' celebrate' : '') },
+        html('div', { className: 'pct' }, percent === 100 ? '完' : percent + '%'),
+        html('div', { className: 'label' }, percent === 100 ? '100%' : 'SCORE')
+      ),
+      html('div', { className: 'result-title' }, title),
+      html('div', { className: 'result-sub' }, correct + ' de ' + total + ' correctas'),
+      html('div', { className: 'result-actions' },
+        html('button', { className: 'primary-btn', onClick: onRetry }, 'Volver a intentar'),
+        html('button', { className: 'secondary-btn', onClick: onBack }, 'Volver al inicio'),
+      ),
+      missed && missed.length > 0 && html('div', { className: 'review-list', style: { textAlign: 'left', width: '100%', marginTop: 8 } },
+        html('div', { className: 'review-list-title' }, 'Para repasar (' + missed.length + ')'),
+        missed.map((m, i) => html('div', { key: i, className: 'review-item', style: { flexDirection: 'column', alignItems: 'flex-start', gap: 3 } },
+          html('div', { className: 'hanzi-font', style: { fontSize: 16, fontWeight: 700 } }, m.hanzi),
+          html('div', { style: { fontSize: 12, color: 'var(--lacquer-dark)', fontWeight: 700 } }, m.pinyin),
+          html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 600 } }, m.es),
+        ))
+      )
+    )
+  );
+}
+
+// ----------------- Prueba: Clasificadores -----------------
+function ClasificadorGame({ onBack, onFinish, playerName, questionsOverride, title: gameTitle }) {
+  const questions = useMemo(() => shuffle(questionsOverride || CLASIFICADOR_QUESTIONS), [questionsOverride]);
+  const [index, setIndex] = useState(0);
+  const [opts, setOpts] = useState(() => shuffle([...questions[0].options]));
+  const [selected, setSelected] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [errors, setErrors] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [done, setDone] = useState(false);
+
+  const q = questions[index];
+  const isCorrect = selected && selected === q.answer;
+  const parts = q.sentence.split('___');
+  const fullSentence = q.sentence.replace('___', q.answer);
+  const fullPinyin = q.pinyin.replace('___', q.answer);
+
+  const [newCorrectRef, setNewCorrectRef] = useState(0);
+
+  const handlePick = (opt) => {
+    if (selected) return;
+    setSelected(opt);
+    const ok = opt === q.answer;
+    const nc = correct + (ok ? 1 : 0);
+    setNewCorrectRef(nc);
+    if (ok) setCorrect(nc);
+    else {
+      setErrors(e => e + 1);
+      setMissed(m => [...m, { hanzi: fullSentence, pinyin: fullPinyin, es: q.hint }]);
+    }
+  };
+
+  const handleNext = () => {
+    const next = index + 1;
+    if (next >= questions.length) {
+      // Use newCorrectRef (updated synchronously) to avoid stale-closure on `correct`
+      const finalCorrect = newCorrectRef;
+      const pct = Math.round((finalCorrect / questions.length) * 100);
+      if (onFinish) onFinish(pct, missed);
+      setDone(true);
+    } else { setIndex(next); setOpts(shuffle([...questions[next].options])); setSelected(null); }
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((newCorrectRef / questions.length) * 100),
+    total: questions.length, correct: newCorrectRef, missed,
+    onRetry: () => { setIndex(0); setOpts(shuffle([...questions[0].options])); setSelected(null); setCorrect(0); setNewCorrectRef(0); setErrors(0); setMissed([]); setDone(false); },
+    onBack, playerName,
+  });
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, gameTitle || 'Clasificadores'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + questions.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' }, html('i', null, '✕'), 'Errores: ' + errors),
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), 'Correctas: ' + correct),
+      ),
+      html('div', { className: 'clas-sentence' },
+        parts[0],
+        html('span', { className: 'clas-blank', style: selected ? { color: isCorrect ? 'var(--jade-dark)' : 'var(--error)' } : {} }, selected || ''),
+        parts[1] || ''
+      ),
+      html('div', { className: 'clas-pinyin' }, selected ? fullPinyin : q.pinyin),
+      html('div', { className: 'clas-hint' }, q.hint),
+      selected
+        ? html(React.Fragment, null,
+            html('div', { style: { borderRadius: 16, padding: '18px 20px', textAlign: 'center', fontWeight: 800, marginBottom: 12,
+                background: isCorrect ? 'var(--jade-light)' : '#FDE4DD',
+                color: isCorrect ? 'var(--jade-dark)' : 'var(--lacquer-dark)' } },
+              html('div', { style: { fontSize: 40 } }, isCorrect ? '✓' : '✗'),
+              html('div', { style: { fontSize: 22, marginTop: 4 } }, isCorrect ? '¡Correcto!' : 'Incorrecto'),
+              html('div', { className: 'hanzi-font', style: { fontSize: 26, marginTop: 10 } }, fullSentence),
+              html('div', { style: { fontSize: 14, marginTop: 4, opacity: 0.85 } }, fullPinyin),
+              html('div', { style: { fontSize: 13, marginTop: 2, opacity: 0.75 } }, q.hint),
+            ),
+            html('button', { className: 'primary-btn', onClick: handleNext },
+              index + 1 >= questions.length ? 'Ver resultado' : 'Siguiente →'
+            )
+          )
+        : html('div', { className: 'quiz-options' },
+            opts.map(opt => html('button', { key: opt, className: 'quiz-option', onClick: () => handlePick(opt) }, opt))
+          )
+    )
+  );
+}
+
+// ----------------- Prueba: Diálogo -----------------
+function DialogoGame({ onBack, onFinish, playerName, questionsOverride, title: gameTitle }) {
+  const questions = useMemo(() => shuffle(questionsOverride || DIALOGO_QUESTIONS), [questionsOverride]);
+  const [index, setIndex] = useState(0);
+  const [opts, setOpts] = useState(() => shuffle([...questions[0].options]));
+  const [selected, setSelected] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [errors, setErrors] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [done, setDone] = useState(false);
+
+  const q = questions[index];
+  const isCorrect = selected && selected === q.answer;
+
+  const [correctRef, setCorrectRef] = useState(0);
+
+  const handlePick = (opt) => {
+    if (selected) return;
+    setSelected(opt);
+    const ok = opt === q.answer;
+    const newCorrect = correctRef + (ok ? 1 : 0);
+    setCorrectRef(newCorrect);
+    if (ok) setCorrect(newCorrect);
+    else {
+      setErrors(e => e + 1);
+      const full = (q.blankIn === 'A' ? q.A : q.B).replace('___', q.answer);
+      setMissed(m => [...m, { hanzi: full, pinyin: q.answerPinyin, es: q.answerEs }]);
+    }
+  };
+
+  const handleNext = () => {
+    const next = index + 1;
+    if (next >= questions.length) {
+      const pct = Math.round((correctRef / questions.length) * 100);
+      if (onFinish) onFinish(pct, missed);
+      setDone(true);
+    } else { setIndex(next); setOpts(shuffle([...questions[next].options])); setSelected(null); }
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((correctRef / questions.length) * 100),
+    total: questions.length, correct: correctRef, missed,
+    onRetry: () => { setIndex(0); setOpts(shuffle([...questions[0].options])); setSelected(null); setCorrect(0); setCorrectRef(0); setErrors(0); setMissed([]); setDone(false); },
+    onBack, playerName,
+  });
+
+  const renderLine = (speaker, text, hasBlank) => {
+    const parts = text.split('___');
+    return html('div', { className: 'dialogo-line' },
+      html('span', { className: 'dialogo-speaker ' + speaker.toLowerCase() }, speaker + ':'),
+      hasBlank
+        ? html('span', null, parts[0], html('span', { className: 'dialogo-blank' }, selected || ''), parts[1] || '')
+        : text
+    );
+  };
+
+  const FeedbackBox = ({ bg, color, icon, label, hanzi, pinyin, es }) =>
+    html('div', { style: { borderRadius: 14, padding: '12px 16px', background: bg, color, marginBottom: 8, textAlign: 'center' } },
+      html('div', { style: { fontSize: 28 } }, icon),
+      html('div', { style: { fontWeight: 800, fontSize: 17, margin: '4px 0' } }, label),
+      html('div', { className: 'hanzi-font', style: { fontSize: 22 } }, hanzi),
+      html('div', { style: { fontSize: 13, marginTop: 2, fontWeight: 700 } }, pinyin),
+      html('div', { style: { fontSize: 12, marginTop: 1, opacity: 0.8 } }, es),
+    );
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, gameTitle || 'Completa el diálogo'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + questions.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' }, html('i', null, '✕'), 'Errores: ' + errors),
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), 'Correctas: ' + correct),
+      ),
+      html('div', { className: 'dialogo-context' }, q.context),
+      html('div', { className: 'dialogo-card' },
+        renderLine('A', q.A, q.blankIn === 'A'),
+        renderLine('B', q.B, q.blankIn === 'B'),
+      ),
+      selected
+        ? html(React.Fragment, null,
+            !isCorrect && html(FeedbackBox, {
+              bg: '#FDE4DD', color: 'var(--lacquer-dark)', icon: '✗', label: 'Elegiste: ' + selected,
+              hanzi: selected, pinyin: '', es: 'Incorrecto',
+            }),
+            html(FeedbackBox, {
+              bg: 'var(--jade-light)', color: 'var(--jade-dark)',
+              icon: isCorrect ? '✓' : '→',
+              label: isCorrect ? '¡Correcto!' : 'Correcto:',
+              hanzi: q.answer, pinyin: q.answerPinyin, es: q.answerEs,
+            }),
+            html('div', { className: 'dialogo-explanation' }, '💡 ' + q.explanation),
+            html('button', { className: 'primary-btn', onClick: handleNext },
+              index + 1 >= questions.length ? 'Ver resultado' : 'Siguiente →'
+            )
+          )
+        : html('div', { className: 'quiz-options' },
+            opts.map(opt => html('button', { key: opt, className: 'quiz-option', onClick: () => handlePick(opt) }, opt))
+          )
+    )
+  );
+}
+
+// ----------------- Prueba: Ordenar -----------------
+const CIRCLE_NUMS = ['①','②','③','④','⑤','⑥','⑦','⑧'];
+
+function OrdenGame({ onBack, onFinish, playerName, questionsOverride, title: gameTitle }) {
+  const questions = useMemo(() => shuffle(questionsOverride || ORDEN_QUESTIONS), [questionsOverride]);
+  const [index, setIndex] = useState(0);
+  const [placed, setPlaced] = useState([]);
+  const [available, setAvailable] = useState(() => shuffle(questions[0].words).map((w, i) => ({ w, i })));
+  const [checked, setChecked] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [errors, setErrors] = useState(0);
+  const [missed, setMissed] = useState([]);
+  const [done, setDone] = useState(false);
+
+  const q = questions[index];
+
+  const loadQ = (i) => {
+    setPlaced([]);
+    setAvailable(shuffle(questions[i].words).map((w, idx) => ({ w, idx })));
+    setChecked(null);
+  };
+
+  const tapAvailable = (item) => {
+    if (checked) return;
+    setAvailable(av => av.filter(x => x !== item));
+    setPlaced(pl => [...pl, item]);
+  };
+
+  const tapPlaced = (item) => {
+    if (checked) return;
+    setPlaced(pl => pl.filter(x => x !== item));
+    setAvailable(av => [...av, item]);
+  };
+
+  const [correctRef, setCorrectRef] = useState(0);
+
+  const handleCheck = () => {
+    const answer = placed.map(x => x.w).join('');
+    const isCorrect = answer === q.correct;
+    setChecked(isCorrect ? 'correct' : 'wrong');
+    const newCorrect = correctRef + (isCorrect ? 1 : 0);
+    setCorrectRef(newCorrect);
+    if (isCorrect) setCorrect(newCorrect);
+    else {
+      setErrors(e => e + 1);
+      setMissed(m => [...m, { hanzi: q.correct, pinyin: q.pinyin, es: q.es }]);
+    }
+  };
+
+  const handleNext = () => {
+    const nextIdx = index + 1;
+    if (nextIdx >= questions.length) {
+      const pct = Math.round((correctRef / questions.length) * 100);
+      if (onFinish) onFinish(pct, missed);
+      setDone(true);
+    } else { setIndex(nextIdx); loadQ(nextIdx); }
+  };
+
+  if (done) return html(PruebaResult, {
+    percent: Math.round((correctRef / questions.length) * 100),
+    total: questions.length, correct: correctRef, missed,
+    onRetry: () => { setIndex(0); setCorrect(0); setCorrectRef(0); setErrors(0); setMissed([]); setDone(false); loadQ(0); },
+    onBack, playerName,
+  });
+
+  return html(React.Fragment, null,
+    html('main', { style: { paddingTop: '18px' } },
+      html('div', { className: 'header-row' },
+        html('button', { className: 'back-btn', onClick: onBack }, '←'),
+        html('h1', null, gameTitle || 'Ordena la oración'),
+        html('div', { className: 'flash-counter' }, (index + 1) + '/' + questions.length),
+      ),
+      html('div', { className: 'flash-score-row' },
+        html('div', { className: 'flash-score-chip no' }, html('i', null, '✕'), 'Errores: ' + errors),
+        html('div', { className: 'flash-score-chip yes' }, html('i', null, '✓'), 'Correctas: ' + correct),
+      ),
+      html('div', { className: 'orden-hint' }, 'Toca las palabras en el orden correcto'),
+      html('div', { className: 'orden-answer-zone' + (checked === 'correct' ? ' correct-zone' : checked === 'wrong' ? ' wrong-zone' : '') },
+        placed.length === 0
+          ? html('span', { style: { color: 'var(--ink-soft)', fontSize: 13, fontWeight: 700 } }, 'Toca las palabras de abajo...')
+          : placed.map(item => html('button', { key: 'p' + item.i, className: 'word-chip placed', onClick: () => tapPlaced(item) }, item.w))
+      ),
+      checked && html('div', { style: { borderRadius: 16, padding: '16px 20px', textAlign: 'center', fontWeight: 800, marginBottom: 10,
+          background: checked === 'correct' ? 'var(--jade-light)' : '#FDE4DD',
+          color: checked === 'correct' ? 'var(--jade-dark)' : 'var(--lacquer-dark)' } },
+        html('div', { style: { fontSize: 36 } }, checked === 'correct' ? '✓' : '✗'),
+        html('div', { style: { fontSize: 20, margin: '4px 0' } }, checked === 'correct' ? '¡Correcto!' : 'Incorrecto'),
+        html('div', { className: 'hanzi-font', style: { fontSize: 22, marginTop: 8 } }, q.correct),
+        html('div', { style: { fontSize: 14, marginTop: 4, fontWeight: 700 } }, q.pinyin),
+        html('div', { style: { fontSize: 13, marginTop: 2, opacity: 0.8 } }, q.es),
+      ),
+      checked === 'wrong' && html('div', { className: 'orden-numbered' },
+        q.words.map((w, i) => html('div', { key: i, className: 'orden-numbered-item' },
+          html('div', { className: 'orden-num' }, CIRCLE_NUMS[i]),
+          html('div', { className: 'word-chip', style: { cursor: 'default' } }, w)
+        ))
+      ),
+      !checked && html('div', { className: 'orden-words' },
+        available.map(item => html('button', { key: 'a' + item.i, className: 'word-chip', onClick: () => tapAvailable(item) }, item.w))
+      ),
+      !checked
+        ? html('button', { className: 'primary-btn', onClick: handleCheck,
+            style: placed.length < q.words.length ? { opacity: 0.5, pointerEvents: 'none' } : {} }, 'Comprobar')
+        : html('button', { className: 'primary-btn', onClick: handleNext },
+            index + 1 >= questions.length ? 'Ver resultado' : 'Siguiente →'
+          )
+    )
+  );
+}
+
+const root = createRoot(document.getElementById('root'));
+root.render(html(App));
+</script>
+<!-- © 2026 大卫 · dawei.com.ar -->
+</body>
+</html>

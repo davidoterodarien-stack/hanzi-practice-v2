@@ -449,6 +449,13 @@ function AudioGame({ allWords, onBack, onFinish, playerName }) {
 // El alumno ingresa solo su nombre. Se crea una sesión anónima real en Supabase
 // (auth.uid() verificable, RLS funciona igual). El nombre queda en `profiles`.
 // Requiere "Enable anonymous sign-ins" activado en Supabase Auth Settings.
+// Nombre obligatorio: al menos 2 letras y nada genérico como "alumno"
+const GENERIC_NAMES = /^(alumn[oa]s?|estudiante|usuario|user|test|prueba|nombre|x+|a+)$/i;
+function validStudentName(n) {
+  const t = String(n || '').trim();
+  return t.replace(/[^\p{L}]/gu, '').length >= 2 && !GENERIC_NAMES.test(t);
+}
+
 function AuthGate({ onAuthenticated, onBeforeAuth }) {
   const [name, setName] = useState('');
   const [studentCode, setStudentCode] = useState('');
@@ -458,7 +465,7 @@ function AuthGate({ onAuthenticated, onBeforeAuth }) {
   const handleSubmit = async (ev) => {
     ev.preventDefault();
     const code = normalizeCode(studentCode);
-    if (!name.trim() && !code) { setErr('Ingresá tu nombre.'); return; }
+    if (!code && !validStudentName(name)) { setErr('Ingresá tu nombre real (al menos 2 letras).'); return; }
     setLoading(true);
     setErr('');
 
@@ -487,7 +494,7 @@ function AuthGate({ onAuthenticated, onBeforeAuth }) {
       }
     }
 
-    const displayName = name.trim() || (codeInfo && codeInfo.display_name) || 'Alumno';
+    const displayName = name.trim() || (codeInfo && codeInfo.display_name) || '';
     if (onBeforeAuth) onBeforeAuth(displayName, code || null);
     // Intento 1: anonymous auth (requiere estar habilitado en Supabase)
     let sessionData = null;
@@ -1178,7 +1185,7 @@ function App() {
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
       if (!data) {
         // Usuario anónimo nuevo: crear profile con el nombre pendiente
-        const nombre = pendingAuthRef.current.name || pendingName || 'Alumno';
+        const nombre = pendingAuthRef.current.name || pendingName || '';
         pendingAuthRef.current.name = null;
         const newProfile = { id: studentId, name: nombre, streak_days: 1, streak_last_date: today, last_seen: new Date().toISOString() };
         db.from('profiles').upsert(newProfile).then(() => {});
@@ -1462,6 +1469,13 @@ function App() {
     const vals = [lp.match || 0, lp.cards || 0, lp.quiz || 0];
     return acc + vals.filter(v => v >= 80).length;
   }, 0);
+
+  const needsName = !!(studentId && profile && myClasses !== null && !(myClasses && myClasses.length) && !isStaffUser && !validStudentName(profile.name));
+  const saveName = async (n) => {
+    const name = n.trim();
+    await db.from('profiles').update({ name }).eq('id', studentId);
+    setProfile(p => ({ ...(p || {}), name }));
+  };
 
   let content;
   if (screen.name === 'home') {
@@ -1914,7 +1928,7 @@ function App() {
     playerName && html('button', { className: 'sidebar-signout', onClick: handleSignOut }, '🚪 ' + playerName + ' · Salir'),
   );
 
-  return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content));
+  return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content), needsName && html(NameRequired, { onSave: saveName }));
 }
 
 // ----------------- PanelLectura -----------------
@@ -2487,6 +2501,29 @@ function StudentCodeCard({ myClasses, onActivateCode, notice, onDismissNotice })
       html('button', { type: 'button', className: 'secondary-btn', onClick: () => { setOpen(false); setStatus(null); }, style: { margin: 0, padding: '9px 12px', width: 'auto' } }, '✕'),
     ),
     msg,
+  );
+}
+
+function NameRequired({ onSave }) {
+  const [name, setName] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!validStudentName(name)) { setErr('Escribí tu nombre real (al menos 2 letras).'); return; }
+    setBusy(true); await onSave(name); setBusy(false);
+  };
+  return html('div', { className: 'name-modal-overlay' },
+    html('div', { className: 'name-modal' },
+      html('div', { className: 'name-modal-hanzi hanzi-font' }, '你好！'),
+      html('h2', { className: 'name-modal-title' }, '¿Cómo te llamás?'),
+      html('p', { className: 'name-modal-sub' }, 'Para seguir, escribí tu nombre. Así tu lǎoshī sabe quién sos.'),
+      html('form', { onSubmit: submit },
+        html('input', { className: 'name-modal-input', value: name, autoFocus: true, maxLength: 40, placeholder: 'Tu nombre', onChange: e => { setName(e.target.value); setErr(''); } }),
+        err && html('div', { className: 'admin-status err', style: { marginTop: 8 } }, err),
+        html('button', { type: 'submit', className: 'primary-btn', style: { width: '100%', marginTop: 12 }, disabled: busy }, busy ? 'Guardando…' : 'Continuar'),
+      ),
+    ),
   );
 }
 
@@ -6078,7 +6115,7 @@ function ClassStudents({ cls, onCount, flash, onOpen, onChanged }) {
     }
     const list = [
       ...seats.map(x => ({ kind: 'seat', ...x, profile: x.user_id ? profiles[x.user_id] : null })),
-      ...loose.map(id => ({ kind: 'loose', id, user_id: id, display_name: (profiles[id] && profiles[id].name) || 'Alumno', profile: profiles[id] })),
+      ...loose.map(id => ({ kind: 'loose', id, user_id: id, display_name: (profiles[id] && profiles[id].name) || 'Sin nombre', profile: profiles[id] })),
     ];
     setRows(list);
     onCount && onCount(list.length, list.filter(r => r.user_id).length);

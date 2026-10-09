@@ -1211,10 +1211,42 @@ function App() {
   const [classSettings, setClassSettings] = useState(null);
   const isStaffUser = !!(profile && ['laoshi', 'admin', 'superadmin'].includes(profile.role));
   const hsk1Allowed = isStaffUser || !!(classSettings && classSettings.hsk1_enabled);
+  // Vista de alumno para el equipo docente: "Mi aula" de una de sus clases
+  const staffRef = React.useRef(false);
+  staffRef.current = isStaffUser;
+  const [staffClasses, setStaffClasses] = useState([]);
+  useEffect(() => { if (isStaffUser && studentId) loadMyClasses(); }, [isStaffUser, studentId]);
+  const [previewClassId, setPreviewClassId] = useState(() => { try { return localStorage.getItem('npcr-preview-class') || ''; } catch (e) { return ''; } });
   const [classHard, setClassHard] = useState([]);
+  // Equipo docente sin código de alumno: arma "Mi aula" con los datos de su clase
+  const loadStaffPreview = async (wanted) => {
+    const { data } = await db.from('classes').select('id,name,archived,created_at').order('created_at', { ascending: false });
+    const list = (data || []).filter(c => !c.archived);
+    setStaffClasses(list);
+    const c = wanted === 'none' ? null : (list.find(x => x.id === wanted) || list[0]);
+    if (!c) { setMyClasses([]); setAssignments([]); setClassSettings(null); setClassHard([]); return; }
+    const [st, as, hw] = await Promise.all([
+      db.from('npcr_class_settings').select('*').eq('class_id', c.id).maybeSingle(),
+      db.from('assignments').select('id,title,description,due_date,lesson_ids,created_at').eq('class_id', c.id),
+      db.rpc('npcr_class_hard_words', { p_class: c.id }),
+    ]);
+    const minDue = new Date(Date.now() - 7 * DAY_MS).toISOString().slice(0, 10);
+    setMyClasses([{ class_id: c.id, class_name: c.name, display_name: (profile && profile.name) || '', code: null, preview: true }]);
+    setClassSettings(st.data ? { ...st.data, weekly_words: st.data.weekly_words || [] } : { class_id: c.id, max_lesson: null, weekly_title: null, weekly_words: [] });
+    setAssignments((as.data || []).filter(a => !a.due_date || a.due_date >= minDue)
+      .map(a => ({ ...a, class_name: c.name, targets: a.lesson_ids || [], targets_done: [], done: false })));
+    setClassHard(hw.error ? [] : (hw.data || []));
+  };
+  const choosePreviewClass = (id) => {
+    setPreviewClassId(id);
+    try { localStorage.setItem('npcr-preview-class', id); } catch (e) {}
+    loadStaffPreview(id);
+  };
+
   const loadMyClasses = () => Promise.all([db.rpc('npcr_my_classes'), db.rpc('my_assignments'), db.rpc('npcr_my_class_settings'), db.rpc('npcr_my_class_hard_words')])
     .then(([cRes, aRes, sRes, hRes]) => {
       const list = cRes.error ? [] : (cRes.data || []);
+      if (!list.length && staffRef.current) return loadStaffPreview(previewClassId);
       setMyClasses(list);
       setAssignments(aRes.error ? [] : (aRes.data || []));
       setClassSettings(!list.length || sRes.error ? null : ((sRes.data || [])[0] || null));
@@ -1420,7 +1452,7 @@ function App() {
 
   const regularLessons = lessons.filter(id => !String(id).startsWith('mod-'));
   const maxLesson = classSettings && classSettings.max_lesson ? Number(classSettings.max_lesson) : null;
-  const isLocked = (id) => maxLesson != null && !isNaN(parseFloat(id)) && parseFloat(id) > maxLesson;
+  const isLocked = (id) => !isStaffUser && maxLesson != null && !isNaN(parseFloat(id)) && parseFloat(id) > maxLesson;
   const openLessons = regularLessons.filter(id => !isLocked(id));
   const dailyDeckSize = useMemo(() => buildDailyDeck(vocab, openLessons, cardState).length, [vocab, cardState, lessons.length, maxLesson]);
 
@@ -1460,6 +1492,7 @@ function App() {
       onProgress: () => setScreen({ name: 'progreso' }),
       classSettings, hardCount: classHard.length,
       onActivity: (id) => setScreen({ name: id }),
+      staffClasses, onPreviewClass: choosePreviewClass,
     });
   } else if (screen.name === 'hsk1' && hsk1Allowed) {
     content = html(Hsk1Screen, {
@@ -2278,18 +2311,23 @@ function aulaActivities(settings, hardCount) {
   const weekly = (settings && settings.weekly_words) || [];
   return [
     { id: 'refuerzo-clase', icon: 'layers', tone: 'purple', title: 'Refuerzo de clase', sub: hardCount ? hardCount + ' palabras que le cuestan al grupo' : 'Todavía sin datos del grupo', disabled: !hardCount },
-    weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + ' palabras elegidas por tu lǎoshī' },
+    weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + (weekly.length === 1 ? ' palabra elegida' : ' palabras elegidas') + ' por tu lǎoshī' },
     { id: 'tonos', icon: 'music', tone: 'green', title: 'Tonos', sub: 'Escuchá y elegí el tono' },
     { id: 'dictado', icon: 'pencil', tone: 'red', title: 'Dictado 听写', sub: 'Escuchá y escribí en chino' },
     { id: 'progreso', icon: 'chart', tone: 'blue', title: 'Mi progreso', sub: 'Fuertes y a reforzar' },
   ].filter(Boolean);
 }
 
-function ClassBox({ cls, dailyCount, dailyDone, assignments, settings, hardCount, onOpen, onTraining, onProgress, onActivity }) {
+function ClassBox({ cls, dailyCount, dailyDone, assignments, settings, hardCount, onOpen, onTraining, onProgress, onActivity, staffClasses, onPreviewClass }) {
   const tasks = assignments || [];
   const pending = tasks.filter(t => !t.done);
   return html('div', { className: 'class-box' },
     html('div', { className: 'class-box-shine' }),
+    cls.preview && html('div', { className: 'aula-preview-bar' },
+      html('span', null, '👁 Vista de alumno'),
+      html('select', { value: cls.class_id, onChange: e => onPreviewClass(e.target.value) },
+        (staffClasses || []).map(c => html('option', { key: c.id, value: c.id }, c.name))),
+      html('button', { onClick: () => onPreviewClass('none'), title: 'Ocultar' }, 'Ocultar')),
     html('div', { className: 'class-box-head', onClick: onOpen },
       html('div', { className: 'class-box-star' },
         html('svg', { viewBox: '0 0 24 24', width: 26, height: 26, fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' },
@@ -2452,7 +2490,7 @@ function StudentCodeCard({ myClasses, onActivateCode, notice, onDismissNotice })
   );
 }
 
-function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity }) {
+function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass }) {
   const regularCount = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length;
   return html(React.Fragment, null,
     playerName && html('div', { className: 'greeting-bar' },
@@ -2477,7 +2515,8 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
 
       html(PanelLectura, { playerName }),
 
-      myClasses && myClasses.length > 0 && html(ClassBox, { cls: myClasses[0], dailyCount, dailyDone, assignments, settings: classSettings, hardCount, onOpen: onOpenClass, onTraining, onProgress, onActivity }),
+      myClasses && myClasses.length > 0 && html(ClassBox, { cls: myClasses[0], dailyCount, dailyDone, assignments, settings: classSettings, hardCount, onOpen: onOpenClass, onTraining, onProgress, onActivity, staffClasses, onPreviewClass }),
+      (!myClasses || !myClasses.length) && staffClasses && staffClasses.length > 0 && html('button', { className: 'aula-preview-show', onClick: () => onPreviewClass('') }, '👁 Ver "Mi aula" como alumno'),
 
       streak > 0 && html('div', { style: {
         background: 'linear-gradient(135deg,#E09A2B,#C07818)', borderRadius: 14,

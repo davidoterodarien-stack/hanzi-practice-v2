@@ -1327,3 +1327,9 @@
 .hsk-sim.pass { background: var(--jade-light); color: var(--jade-dark); } .hsk-sim.fail { background: #FDE4DD; color: var(--lacquer-dark); }
 .hsk-opt-es { font-size: 15px; font-weight: 700; }
 .hsk-item-audio { white-space: nowrap; }
+
+/* ── Vista de alumno para el equipo docente ── */
+.aula-preview-bar { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: rgba(255,255,255,0.75); border: 1.5px dashed var(--gold-dark); border-radius: 12px; padding: 6px 10px; margin-bottom: 10px; font-size: 12px; font-weight: 800; color: var(--ink-mid); }
+.aula-preview-bar select { flex: 1; min-width: 120px; border: 1.5px solid var(--paper-deep); border-radius: 8px; padding: 4px 6px; font-weight: 700; font-family: inherit; font-size: 12px; }
+.aula-preview-bar button { background: #fff; color: var(--ink-mid); border: 1.5px solid var(--paper-deep); border-radius: 999px; padding: 3px 10px; font-weight: 800; font-size: 11px; cursor: pointer; font-family: inherit; }
+.aula-preview-show { display: block; margin: 0 0 14px; background: none; border: 1.5px dashed var(--paper-deep); border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 12px; color: var(--ink-mid); cursor: pointer; font-family: inherit; }

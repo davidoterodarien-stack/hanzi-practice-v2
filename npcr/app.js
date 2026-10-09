@@ -284,6 +284,8 @@ function getZhVoice() {
 window.speechSynthesis.onvoiceschanged = () => { _zhVoice = null; };
 
 let _npcrAudio = null;
+// Regla de la app: solo audios grabados del material (libro / HSK). Nunca voz sintética.
+const hasRealAudio = (text) => { const k = text && String(text).replace(MEDIA_PUNCT_RE, ''); return !!(k && (NPCR_MEDIA.audio[k] || EXTRA_AUDIO[k])); };
 const EXTRA_AUDIO = {}; // audios de módulos aparte (HSK 1), se llenan con los datos de Supabase
 let _speakToken = 0;
 function speak(text, onEnd) {
@@ -299,17 +301,12 @@ function speak(text, onEnd) {
     _npcrAudio.play().catch(() => { if (onEnd) setTimeout(ended, 300); });
     return;
   }
-  const u = new SpeechSynthesisUtterance(text);
-  u.onend = ended;
-  u.lang = 'zh-CN';
-  u.rate = 0.85;
-  const voice = getZhVoice();
-  if (voice) u.voice = voice;
-  window.speechSynthesis.speak(u);
+  // Sin grabación del libro no se reproduce nada (nunca voz sintética)
+  if (onEnd) setTimeout(ended, 0);
 }
 
 function buildAudioRound(allWords) {
-  const picked = shuffle([...allWords]).slice(0, 6);
+  const picked = shuffle(allWords.filter(w => hasRealAudio(w.hanzi))).slice(0, 6);
   const soundCol = shuffle(picked.map((w, i) => ({ ...w, sid: 's' + i })));
   const hanziCol = shuffle(picked.map((w, i) => ({ ...w, hid: 'h' + i })));
   return { picked, soundCol, hanziCol };
@@ -3131,8 +3128,8 @@ function ClozeStep({ word, sentence, options, onDone }) {
   };
   return html('form', { onSubmit: submit, className: 'flashcard-wrap' },
     html('div', { className: 'listen-card cloze-card' + (checked ? ' ' + checked : '') },
-      html('button', { type: 'button', className: 'listen-mini', title: 'Repetir audio', onClick: () => sayS() }, '🔊'),
-      html('div', { className: 'cloze-title' }, checked ? 'Ahora decila en voz alta 🗣' : 'Escuchá y completá la frase'),
+      hasRealAudio(sentence.hanzi) && html('button', { type: 'button', className: 'listen-mini', title: 'Repetir audio', onClick: () => sayS() }, '🔊'),
+      html('div', { className: 'cloze-title' }, checked ? 'Ahora decila en voz alta 🗣' : hasRealAudio(sentence.hanzi) ? 'Escuchá y completá la frase' : 'Completá la frase'),
       sentence.image && html('img', { className: 'cloze-img', src: sentence.image, alt: '' }),
       html('div', { className: 'cloze-sentence hanzi-font' },
         before,
@@ -3317,7 +3314,7 @@ function FlashcardGame({ words: allWords, sentenceMode, lessonId, cardState = {}
                 html(TonedPinyin, { text: card.pinyin, className: 'back-pinyin' }),
                 html('div', { className: 'back-es' }, card.es),
                 !sentenceMode && html(StrokeOrder, { hanzi: card.hanzi }),
-                html('button', { className: 'replay-btn', onClick: (e) => { e.stopPropagation(); speak(card.hanzi); } }, '🔊 Escuchar'),
+                hasRealAudio(card.hanzi) && html('button', { className: 'replay-btn', onClick: (e) => { e.stopPropagation(); speak(card.hanzi); } }, '🔊 Escuchar'),
               ),
           html('div', { className: 'tap-hint' }, flipped ? '' : 'Toca para ver la respuesta')
         ),
@@ -3628,7 +3625,6 @@ function buildHskSection(kind, bank, wm) {
 }
 
 // HSK 1: solo audios grabados del material (nunca voz sintética)
-const hasRealAudio = (text) => { const k = text && text.replace(MEDIA_PUNCT_RE, ''); return !!(k && (NPCR_MEDIA.audio[k] || EXTRA_AUDIO[k])); };
 function speakReal(text, onEnd) { if (hasRealAudio(text)) speak(text, onEnd); else if (onEnd) onEnd(); }
 // Encadena grabaciones de palabras sueltas (ej. 三 + 点) para números, horas y precios
 function speakChain(tokens, onEnd) {
@@ -4819,18 +4815,7 @@ const DIAL_AVATARES = {
   ],
 };
 
-function hablarChino(texto) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(texto);
-  u.lang = 'zh-CN';
-  u.rate = 0.85;
-  // Intentar usar voz china si existe
-  const voces = window.speechSynthesis.getVoices();
-  const vozCh = voces.find(v => v.lang.startsWith('zh'));
-  if (vozCh) u.voice = vozCh;
-  window.speechSynthesis.speak(u);
-}
+function hablarChino(texto) { speak(texto); }
 
 function AvatarBurbuja({ avatar, nombre, texto, pinyin, es, miTurno, mostrarResp, onMostrar, onSiguiente, onAudio, esUltimo }) {
   const bg = miTurno ? '#EEF2FF' : avatar.color;
@@ -4864,7 +4849,7 @@ function AvatarBurbuja({ avatar, nombre, texto, pinyin, es, miTurno, mostrarResp
               html('div', { style: { fontSize: 13, color: 'var(--ink-mid)', fontWeight: 600, marginBottom: 3 } }, pinyin),
               html('div', { style: { fontSize: 12, color: 'var(--ink-soft)' } }, es),
               // Botón audio
-              !miTurno && html('button', {
+              !miTurno && hasRealAudio(texto) && html('button', {
                 onClick: () => hablarChino(texto),
                 style: { marginTop: 8, background: 'none', border: '1.5px solid ' + avatar.acento, borderRadius: 8, padding: '3px 10px', fontSize: 13, color: avatar.acento, cursor: 'pointer', fontWeight: 700 },
               }, '🔊 Escuchar'),

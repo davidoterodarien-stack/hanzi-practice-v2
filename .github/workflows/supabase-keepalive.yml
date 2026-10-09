@@ -1,0 +1,42 @@
+# Evita que el proyecto gratis de Supabase se pause por inactividad
+# (se pausa tras 1 semana sin uso). Llama a la función npcr_ping cada 3 días.
+# La clave publishable es pública por diseño (ya está en npcr/app.js).
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: '17 9 */3 * *'   # cada 3 días, 09:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping a Supabase
+        run: |
+          code=$(curl -s -o /tmp/ping.json -w '%{http_code}' -X POST \
+            'https://pwqwlfrlaxnybnkdauvk.supabase.co/rest/v1/rpc/npcr_ping' \
+            -H 'apikey: sb_publishable__0T0_tkgiEdgUGtwMoSHjA_xRd8btWE' \
+            -H 'Content-Type: application/json' -d '{}')
+          echo "HTTP $code · $(cat /tmp/ping.json)"
+          test "$code" = "200"
+
+      # GitHub desactiva las tareas programadas de repos públicos sin commits
+      # en 60 días. Si pasaron más de 45, deja un commit vacío para evitarlo.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Mantener activas las tareas programadas
+        run: |
+          last=$(git log -1 --format=%ct)
+          days=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "Último commit hace $days días"
+          if [ "$days" -gt 45 ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "keepalive: mantener tareas programadas activas"
+            git push
+          fi

@@ -1,0 +1,58 @@
+# Backup semanal de la base de datos de Supabase (el plan gratis no trae backups).
+# El volcado se CIFRA antes de guardarse, porque en un repo público los
+# artefactos de Actions los puede descargar cualquiera.
+#
+# Requiere dos secretos (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     → cadena "Session pooler" de Supabase (botón Connect),
+#                         con la contraseña de la base ya puesta.
+#   BACKUP_PASSPHRASE   → una frase larga que elijas vos (guardala bien:
+#                         sin ella el backup no se puede abrir).
+#
+# Para restaurar:  gpg -d backup-AAAA-MM-DD.sql.gpg > backup.sql
+name: Supabase backup
+
+on:
+  schedule:
+    - cron: '41 6 * * 1'   # lunes 06:41 UTC
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar secretos
+        id: check
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$PASS" ]; then
+            echo "::warning::Faltan los secretos SUPABASE_DB_URL y/o BACKUP_PASSPHRASE: no se hace backup."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Volcar y cifrar la base
+        if: steps.check.outputs.ok == 'true'
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          day=$(date -u +%F)
+          docker run --rm postgres:17 pg_dump "$DB_URL" \
+            --schema=public --no-owner --no-privileges > dump.sql
+          echo "Tamaño del volcado: $(du -h dump.sql | cut -f1)"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" \
+            --symmetric --cipher-algo AES256 -o "backup-$day.sql.gpg" dump.sql
+          rm dump.sql
+          echo "DAY=$day" >> "$GITHUB_ENV"
+
+      - name: Guardar backup (90 días)
+        if: steps.check.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ env.DAY }}
+          path: backup-*.sql.gpg
+          retention-days: 90

@@ -1228,3 +1228,102 @@
 .hsk-word-h { font-size: 24px; font-weight: 700; color: var(--ink); min-width: 52px; }
 .hsk-word-txt { display: flex; flex-direction: column; font-size: 13px; font-weight: 800; min-width: 0; }
 .hsk-word-txt small { font-size: 11px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── HSK 1 · prácticas del examen ── */
+.hsk-block-title { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); margin: 18px 2px 8px; }
+.hsk-exam-card { display: flex; align-items: center; gap: 14px; width: 100%; background: #fff; border: 2px solid var(--lacquer); border-radius: 18px; padding: 12px 14px; cursor: pointer; box-shadow: 0 3px 0 var(--lacquer-dark); font-family: inherit; color: var(--ink); }
+.hsk-exam-card:active { transform: translateY(2px); box-shadow: none; }
+.hsk-exam-seal { width: 52px; height: 52px; border-radius: 14px; background: var(--lacquer); color: #fff; font-size: 30px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hsk-exam-sub { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.hsk-exam-last { font-size: 12px; font-weight: 800; color: var(--lacquer-dark); margin-top: 3px; }
+.hsk-secs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.hsk-sec { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; background: #fff; border: 1.5px solid var(--paper-deep); border-radius: 14px; padding: 10px 12px; cursor: pointer; text-align: left; font-family: inherit; color: var(--ink); }
+.hsk-sec.static { cursor: default; }
+.hsk-sec-tag { font-family: 'Noto Sans SC', sans-serif; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+.hsk-sec-tag.listen { background: var(--blue-light); color: var(--blue-dark); }
+.hsk-sec-tag.read { background: var(--jade-light); color: var(--jade-dark); }
+.hsk-sec-title { font-weight: 800; font-size: 14px; }
+.hsk-sec-sub { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+.hsk-sec-pct { position: absolute; top: 8px; right: 10px; font-size: 12px; font-weight: 900; }
+.hsk-sec-pct.ok { color: var(--jade-dark); } .hsk-sec-pct.mid { color: var(--gold-dark); } .hsk-sec-pct.low { color: var(--lacquer); }
+.hsk-instr { text-align: center; font-size: 13px; font-weight: 700; color: var(--ink-mid); margin: -4px 16px 12px; }
+.hsk-q { background: #fff; border: 2px solid var(--paper-deep); border-radius: 18px; padding: 14px; box-shadow: 0 3px 0 var(--paper-deep); }
+.hsk-q-count { text-align: center; font-size: 12px; font-weight: 800; color: var(--ink-soft); margin-bottom: 8px; }
+.hsk-replay { display: block; margin: 0 auto 10px; background: var(--blue-light); color: var(--blue-dark); border: none; border-radius: 999px; padding: 7px 16px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: inherit; }
+.hsk-py { display: block; font-size: 13px; font-weight: 700; }
+.hsk-letter { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--paper-deep); color: var(--ink); font-size: 12px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+.hsk-tf { text-align: center; }
+.hsk-tf-img { width: 100%; max-width: 320px; max-height: 240px; object-fit: cover; border-radius: 14px; }
+.hsk-tf-word { margin: 10px 0 4px; font-size: 34px; font-weight: 700; color: var(--ink); }
+.hsk-tf-btns { display: flex; gap: 12px; justify-content: center; margin-top: 12px; }
+.hsk-tf-btn { width: 88px; height: 64px; border-radius: 16px; font-size: 30px; font-weight: 900; cursor: pointer; border: 2.5px solid var(--paper-deep); background: #fff; }
+.hsk-tf-btn.yes { color: var(--jade-dark); } .hsk-tf-btn.no { color: var(--lacquer); }
+.hsk-tf-btn.right { background: var(--jade-light); border-color: var(--jade); }
+.hsk-tf-btn.wrong { background: #FDE4DD; border-color: var(--lacquer); }
+.hsk-img-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hsk-img-opt { position: relative; padding: 0; border: 3px solid var(--paper-deep); border-radius: 14px; overflow: hidden; cursor: pointer; background: #fff; aspect-ratio: 1; }
+.hsk-img-opt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hsk-img-opt .hsk-letter { position: absolute; top: 6px; left: 6px; background: #fff; }
+.hsk-img-opt.right { border-color: var(--jade); } .hsk-img-opt.wrong { border-color: var(--lacquer); opacity: .7; }
+.hsk-text-opts { display: flex; flex-direction: column; gap: 8px; }
+.hsk-text-opt { display: flex; align-items: center; gap: 12px; text-align: left; background: #fff; border: 2px solid var(--paper-deep); border-radius: 14px; padding: 10px 12px; cursor: pointer; font-family: inherit; color: var(--ink); }
+.hsk-opt-h { font-size: 20px; font-weight: 700; }
+.hsk-text-opt.right { background: var(--jade-light); border-color: var(--jade); }
+.hsk-text-opt.wrong { background: #FDE4DD; border-color: var(--lacquer); }
+.hsk-feedback { margin-top: 12px; border-radius: 14px; padding: 12px; text-align: center; }
+.hsk-feedback.ok { background: #F4FFE9; border: 1.5px solid var(--jade); }
+.hsk-feedback.bad { background: #FFF5F2; border: 1.5px solid #F6B6A8; }
+.hsk-fb-title { font-weight: 900; margin-bottom: 4px; }
+.hsk-feedback.ok .hsk-fb-title { color: var(--jade-dark); } .hsk-feedback.bad .hsk-fb-title { color: var(--lacquer-dark); }
+.hsk-fb-h { font-size: 20px; font-weight: 700; color: var(--ink); }
+.hsk-fb-es { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.hsk-fb-row { text-align: left; padding: 6px 0; border-top: 1px dashed var(--paper-deep); font-size: 14px; }
+.hsk-fb-row.ok b { color: var(--jade-dark); } .hsk-fb-row.bad b { color: var(--lacquer); }
+.hsk-tip { margin-top: 6px; font-size: 13px; font-weight: 700; color: var(--ink-mid); background: var(--gold-light); border-radius: 10px; padding: 6px 10px; text-align: left; }
+.hsk-drill-s { font-size: 28px; font-weight: 700; text-align: center; margin: 4px 0 12px; color: var(--ink); }
+/* Tablero de unir */
+.hsk-board { position: relative; display: grid; grid-template-columns: 1fr 1fr; column-gap: 44px; align-items: start; }
+.hsk-board.photos { grid-template-columns: 1.25fr 1fr; }
+.hsk-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
+.hsk-lines line { stroke: var(--gold-dark); stroke-width: 3; stroke-linecap: round; }
+.hsk-lines line.ok { stroke: var(--jade); } .hsk-lines line.bad { stroke: var(--lacquer); stroke-dasharray: 6 5; }
+.hsk-col { display: flex; flex-direction: column; gap: 8px; }
+.hsk-item { position: relative; display: flex; align-items: center; gap: 8px; min-height: 56px; text-align: left; background: #fff; border: 2px solid var(--paper-deep); border-radius: 12px; padding: 6px 8px; cursor: pointer; font-family: inherit; color: var(--ink); font-size: 16px; }
+.hsk-item .hanzi-font { font-size: 18px; font-weight: 700; }
+.hsk-item.sel { border-color: var(--gold-dark); background: var(--gold-light); box-shadow: 0 0 0 3px rgba(229,167,0,.25); }
+.hsk-item.paired { border-color: var(--gold-dark); }
+.hsk-item.right { border-color: var(--jade); background: #F4FFE9; }
+.hsk-item.wrong { border-color: var(--lacquer); background: #FFF5F2; }
+.hsk-item.photo { padding: 4px; min-height: 0; }
+.hsk-item.photo img { width: 100%; height: 84px; object-fit: cover; border-radius: 8px; display: block; }
+.hsk-item.photo .hsk-letter { position: absolute; top: 8px; left: 8px; background: #fff; }
+.hsk-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 12px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+.hsk-item-txt { display: flex; flex-direction: column; min-width: 0; }
+.hsk-item-txt .hsk-py { font-size: 11px; }
+.hsk-item-audio { font-weight: 800; font-size: 14px; color: var(--blue-dark); }
+.hsk-chosen { margin-left: auto; font-size: 12px; font-weight: 900; color: var(--gold-dark); }
+@media (max-width: 480px) { .hsk-board { column-gap: 26px; } .hsk-item { font-size: 14px; } .hsk-item .hanzi-font { font-size: 16px; } .hsk-item.photo img { height: 70px; } }
+/* Simulacro */
+.hsk-timer { margin-left: auto; font-weight: 900; font-size: 15px; background: var(--paper-deep); border-radius: 999px; padding: 6px 12px; font-variant-numeric: tabular-nums; }
+.hsk-timer.low { background: #FDE4DD; color: var(--lacquer-dark); }
+.hsk-exam-progress { display: flex; gap: 4px; margin-bottom: 10px; }
+.hsk-exam-progress i { flex: 1; height: 6px; border-radius: 99px; background: var(--paper-deep); }
+.hsk-exam-progress i.done { background: var(--jade); } .hsk-exam-progress i.now { background: var(--gold-dark); }
+.hsk-score { text-align: center; border-radius: 20px; padding: 18px; color: #fff; }
+.hsk-score.pass { background: var(--jade-dark); } .hsk-score.fail { background: var(--lacquer); }
+.hsk-score-n { font-size: 52px; font-weight: 900; line-height: 1; }
+.hsk-score-n small { font-size: 18px; opacity: .85; }
+.hsk-score-v { font-size: 17px; font-weight: 800; margin-top: 6px; }
+.hsk-score-parts { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 14px; font-weight: 700; }
+.hsk-miss { padding: 8px 0; border-top: 1px dashed var(--paper-deep); cursor: pointer; font-size: 15px; }
+.hsk-miss .hsk-py { display: inline; }
+.hsk-miss-n { display: inline-block; min-width: 30px; font-size: 12px; font-weight: 900; color: var(--lacquer); }
+/* Reporte del profe */
+.hsk-report th, .hsk-report td { text-align: center; white-space: nowrap; }
+.hsk-report td:first-child, .hsk-report th:first-child { text-align: left; }
+.hsk-cell { font-size: 12px; font-weight: 800; }
+.hsk-cell.ok { color: var(--jade-dark); } .hsk-cell.mid { color: var(--gold-dark); } .hsk-cell.low { color: var(--lacquer); } .hsk-cell.none { color: var(--ink-soft); }
+.hsk-sim { font-weight: 900; padding: 2px 8px; border-radius: 999px; }
+.hsk-sim.pass { background: var(--jade-light); color: var(--jade-dark); } .hsk-sim.fail { background: #FDE4DD; color: var(--lacquer-dark); }
+.hsk-opt-es { font-size: 15px; font-weight: 700; }
+.hsk-item-audio { white-space: nowrap; }

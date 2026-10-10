@@ -1502,7 +1502,7 @@ function App() {
       onTraining: () => setScreen({ name: 'entrenamiento' }),
       onProgress: () => setScreen({ name: 'progreso' }),
       classSettings, hardCount: classHard.length,
-      onActivity: (id) => setScreen({ name: id }),
+      onActivity: (id) => setScreen(AULA_GAMES[id] ? { name: 'prueba', game: AULA_GAMES[id], from: 'clase' } : { name: id }),
       staffClasses, onPreviewClass: choosePreviewClass,
     });
   } else if (screen.name === 'hsk1' && hsk1Allowed) {
@@ -1559,7 +1559,7 @@ function App() {
     content = html(ClassHome, {
       cls: myClasses[0], assignments, dailyCount: dailyDeckSize, dailyDone: dailyDoneDay === todayLocal(),
       settings: classSettings, hardCount: classHard.length,
-      onActivity: (id) => setScreen({ name: id }),
+      onActivity: (id) => setScreen(AULA_GAMES[id] ? { name: 'prueba', game: AULA_GAMES[id], from: 'clase' } : { name: id }),
       onTarget: (l, m) => setScreen({ name: 'play', lessonId: l, mode: m, from: 'clase' }),
       onTraining: () => setScreen({ name: 'entrenamiento' }),
       onProgress: () => setScreen({ name: 'progreso' }),
@@ -1802,9 +1802,9 @@ function App() {
   const streakDays = profile ? (profile.streak_days || 0) : 0;
   const navIsHome = screen.name === 'home';
   const navIsRefuerzo = screen.name === 'refuerzo';
-  const navIsPractica = screen.name === 'practica' || screen.name === 'prueba';
+  const navIsPractica = screen.name === 'practica' || (screen.name === 'prueba' && screen.from !== 'clase');
   const navIsAdmin = screen.name === 'admin' || screen.name === 'reports';
-  const navIsClase = ['clase', 'entrenamiento', 'refuerzo-clase', 'semana', 'tonos', 'dictado'].includes(screen.name);
+  const navIsClase = ['clase', 'entrenamiento', 'refuerzo-clase', 'semana', 'tonos', 'dictado'].includes(screen.name) || (screen.name === 'prueba' && screen.from === 'clase');
   const navIsProgreso = screen.name === 'progreso' || screen.name === 'dificiles';
 
   const sidebar = html('aside', { className: 'sidebar' },
@@ -2302,7 +2302,12 @@ const AULA_ICONS = {
   star:     ['M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z'],
   music:    ['M9 18V5l11-2v13', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M17 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z'],
   pencil:   ['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'],
+  clock:    ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 7v5l3 2'],
+  chat:     ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z', 'M8 12h.01', 'M12 12h.01', 'M16 12h.01'],
+  tag:      ['M3 12V4h8l10 10-8 8L3 12Z', 'M7.5 7.5h.01'],
 };
+// Actividades de "Mi aula" que abren un juego de preguntas (npcr_clasificador_questions por tipo)
+const AULA_GAMES = { 'aula-modal': 'modal', 'aula-tiempo': 'tiempo', 'aula-clas': 'clas' };
 const AULA_TONES = {
   red:    { bg: 'var(--lacquer-light)', fg: 'var(--lacquer)' },
   blue:   { bg: 'var(--blue-light)', fg: 'var(--blue-dark)' },
@@ -2325,6 +2330,9 @@ function aulaActivities(settings, hardCount) {
     weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + (weekly.length === 1 ? ' palabra elegida' : ' palabras elegidas') + ' por tu lǎoshī' },
     { id: 'tonos', icon: 'music', tone: 'green', title: 'Tonos', sub: 'Escuchá y elegí el tono' },
     { id: 'dictado', icon: 'pencil', tone: 'red', title: 'Dictado 听写', sub: 'Escuchá y escribí en chino' },
+    { id: 'aula-modal', icon: 'chat', tone: 'blue', title: 'Verbos modales', sub: 'Distinguí 会, 能, 可以 y 应该' },
+    { id: 'aula-tiempo', icon: 'clock', tone: 'gold', title: 'Expresiones de tiempo', sub: 'La hora: 点, 分, 刻, 差 y 半' },
+    { id: 'aula-clas', icon: 'tag', tone: 'purple', title: 'Clasificadores', sub: 'Elegí 个, 本, 张, 斤 correctamente' },
     { id: 'progreso', icon: 'chart', tone: 'blue', title: 'Mi progreso', sub: 'Fuertes y a reforzar' },
   ].filter(Boolean);
 }

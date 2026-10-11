@@ -2305,6 +2305,7 @@ const AULA_ICONS = {
   clock:    ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 7v5l3 2'],
   chat:     ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z', 'M8 12h.01', 'M12 12h.01', 'M16 12h.01'],
   tag:      ['M3 12V4h8l10 10-8 8L3 12Z', 'M7.5 7.5h.01'],
+  award:    ['M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z', 'M8.2 13.9 7 22l5-3 5 3-1.2-8.1'],
 };
 // Actividades de "Mi aula" que abren un juego de preguntas (npcr_clasificador_questions por tipo)
 const AULA_GAMES = { 'aula-modal': 'modal', 'aula-tiempo': 'tiempo', 'aula-clas': 'clas' };
@@ -2325,7 +2326,10 @@ function AulaIcon({ name, tone = 'gold', size = 40 }) {
 
 function aulaActivities(settings, hardCount) {
   const weekly = (settings && settings.weekly_words) || [];
+  const hskDays = settings && settings.hsk1_enabled && settings.hsk1_exam_date ? hsk1Days(settings.hsk1_exam_date) : null;
   return [
+    settings && settings.hsk1_enabled && { id: 'hsk1', icon: 'award', tone: 'red', title: 'Preparación HSK 1',
+      sub: hskDays !== null && hskDays >= 0 ? (hskDays === 0 ? '¡Hoy es el examen!' : 'Faltan ' + hskDays + ' día' + (hskDays === 1 ? '' : 's') + ' para el examen') : 'Estudio, prácticas y simulacro' },
     { id: 'refuerzo-clase', icon: 'layers', tone: 'purple', title: 'Refuerzo de clase', sub: hardCount ? hardCount + ' palabras que le cuestan al grupo' : 'Todavía sin datos del grupo', disabled: !hardCount },
     weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + (weekly.length === 1 ? ' palabra elegida' : ' palabras elegidas') + ' por tu lǎoshī' },
     { id: 'tonos', icon: 'music', tone: 'green', title: 'Tonos', sub: 'Escuchá y elegí el tono' },

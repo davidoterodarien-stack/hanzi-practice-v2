@@ -1390,13 +1390,7 @@ function App() {
 
   useEffect(() => { saveProgress(progress); }, [progress]);
 
-  const lessons = Object.keys(vocab).sort((a, b) => {
-    const na = parseFloat(a), nb = parseFloat(b);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    if (!isNaN(na)) return -1;
-    if (!isNaN(nb)) return 1;
-    return a.localeCompare(b);
-  });
+  const lessons = Object.keys(vocab).sort(lessonCompare);
 
   // Registro de cada sesión de práctica (base del análisis del laoshi)
   const logActivity = (kind, lesson, mode, percent, total, missedCount) => {
@@ -4661,6 +4655,15 @@ function parseVocabText(text) {
 // Normaliza strings NFD→NFC para que las tildes del pinyin se muestren correctas
 function nfc(s) { return s ? s.normalize('NFC') : s; }
 
+// Orden de lecciones: numérico (1, 2, … 14) y después los módulos con nombre
+function lessonCompare(a, b) {
+  const na = parseFloat(a), nb = parseFloat(b);
+  if (!isNaN(na) && !isNaN(nb)) return na - nb;
+  if (!isNaN(na)) return -1;
+  if (!isNaN(nb)) return 1;
+  return String(a).localeCompare(String(b));
+}
+
 function supabaseRowsToVocab(rows) {
   const vocab = {};
   rows.forEach(r => {
@@ -6512,7 +6515,7 @@ function ContentTrash() {
 
   const loadTrash = async () => {
     const { data: w } = await db.from('npcr_vocabulary').select('id,lesson,hanzi,pinyin,es').eq('hidden', true).order('lesson');
-    setWords(w || []);
+    setWords((w || []).slice().sort((x, y) => lessonCompare(x.lesson, y.lesson) || x.id - y.id));
     const qs = [];
     for (const [t, label] of QUESTION_TABLES) {
       const { data } = await db.from(t).select('*').eq('active', false);
@@ -7074,7 +7077,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
             html('div', null,
               html('label', null, '📚 Lecciones cargadas'),
               html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
-                Object.keys(vocab).sort().filter(id => id !== 'mod-paises' && id !== 'mod-numeros').map(id => {
+                Object.keys(vocab).sort(lessonCompare).filter(id => id !== 'mod-paises' && id !== 'mod-numeros').map(id => {
                   const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
                   const count = vocab[id].length;
                   const isRenaming = renamingLesson === id;

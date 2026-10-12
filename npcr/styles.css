@@ -1452,3 +1452,43 @@ main.mem-main { padding-bottom: 8px !important; }
 .bingo-dot.off { background: #bbb; box-shadow: 0 0 0 3px #eee; }
 .bingo-pname { flex: 1; font-weight: 800; font-size: 14px; color: var(--ink); }
 .bingo-pinfo { font-size: 11px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+
+.bingo-claims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.bingo-claims.two { grid-template-columns: repeat(2, 1fr); }
+.bingo-claim { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 2px solid var(--paper-deep); background: #fff; border-radius: 12px; padding: 8px 4px; cursor: pointer; font-family: inherit; color: var(--ink); }
+.bingo-claim:not(:disabled) { border-color: var(--lacquer); background: var(--lacquer); color: #fff; box-shadow: 0 3px 0 var(--lacquer-dark); }
+.bingo-claim:disabled { opacity: .55; cursor: default; }
+.bingo-claim.done { opacity: 1; border-color: var(--jade); background: var(--jade-light); color: var(--jade-dark); }
+.bingo-claim-t { font-weight: 900; font-size: 14px; }
+.bingo-claim-s { font-size: 10px; font-weight: 700; opacity: .85; }
+.bingo-mypts { text-align: center; margin-top: 10px; font-weight: 800; color: var(--ink-mid); }
+.bingo-mypts b { font-size: 22px; color: var(--lacquer); }
+.bingo-lastprize { background: var(--gold-light); color: #8A5A00; border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 700; margin: 6px 0; text-align: center; }
+.bingo-winner { display: flex; align-items: center; gap: 6px; font-size: 14px; padding: 3px 0; }
+.bingo-winner.me { background: var(--gold-light); border-radius: 8px; padding: 3px 6px; }
+.bingo-rank { width: 26px; text-align: center; }
+.bingo-wname { flex: 1; font-weight: 800; }
+.bingo-badges { display: flex; gap: 3px; }
+.bingo-badge { font-size: 9px; font-weight: 900; border-radius: 999px; padding: 1px 6px; text-transform: uppercase; }
+.bingo-badge.terno { background: var(--blue-light); color: var(--blue-dark); }
+.bingo-badge.linea { background: var(--purple-light); color: var(--purple-dark); }
+.bingo-badge.bingo { background: var(--lacquer); color: #fff; }
+.bingo-pts { font-weight: 900; color: var(--lacquer); white-space: nowrap; }
+.bingo-call-num { font-size: clamp(80px, 16vw, 170px); font-weight: 900; color: var(--lacquer); line-height: 1; font-variant-numeric: tabular-nums; }
+.bingo-call-h.small { font-size: clamp(40px, 7vw, 80px); }
+.bingo-last-num { font-size: 30px; font-weight: 900; color: var(--lacquer); line-height: 1.1; }
+.bingo-cell .len3 { font-size: clamp(15px, 5.2vw, 27px); white-space: nowrap; letter-spacing: -1px; }
+.bingo-cell .len4 { font-size: clamp(13px, 4.2vw, 22px); }
+.bingo-cell.big .len3 { font-size: clamp(20px, 7.5vw, 36px); }
+.bingo-cell.big .len4 { font-size: clamp(16px, 6vw, 30px); }
+
+.bingo-hist { border: 1.5px solid var(--paper-deep); border-radius: 12px; margin-top: 8px; background: #fff; overflow: hidden; }
+.bingo-hist-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; background: none; border: none; padding: 10px 12px; cursor: pointer; text-align: left; font-family: inherit; color: var(--ink); }
+.bingo-hist-date { font-weight: 900; font-size: 13px; text-transform: capitalize; }
+.bingo-hist-meta { flex: 1; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.bingo-hist-win { font-size: 13px; font-weight: 800; color: var(--lacquer-dark); }
+.bingo-hist-arrow { font-size: 10px; color: var(--ink-soft); }
+.bingo-hist-body { padding: 0 12px 12px; border-top: 1px dashed var(--paper-deep); }
+.bingo-hist-sec { font-size: 12px; font-weight: 900; color: var(--ink-mid); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+.bingo-hist-prize { font-size: 13px; padding: 2px 0; }
+.bingo-chip small { font-size: 10px; color: var(--ink-soft); font-family: var(--font-body, inherit); }

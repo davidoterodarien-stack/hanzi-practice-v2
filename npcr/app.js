@@ -1535,6 +1535,7 @@ function App() {
     const t = screen.name;
     content = html(HskScreen, {
       key: t, level: t === 'hsk2' ? 2 : 1, studentId, appConfig,
+      preview: !!(myClasses && myClasses[0] && myClasses[0].preview),
       examDate: (classSettings && classSettings[t + '_exam_date']) || appConfig[t + '_exam_date'] || null,
       onHome: () => setScreen({ name: 'home' }),
     });
@@ -3571,7 +3572,7 @@ function formatLongDate(dateStr) {
 }
 const isToday = (iso) => iso && todayLocal() === (() => { const d = new Date(iso); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
 
-function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
+function HskScreen({ level, studentId, appConfig, examDate, onHome, preview }) {
   const lv = hskLevel(level, appConfig['hsk' + level + '_exam']);
   const T = 'hsk' + level;
   const [words, setWords] = useState(null);
@@ -3633,11 +3634,31 @@ function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
     return { ...prev, [key]: st };
   });
   // Guarda un resultado (práctica, simulacro, tarjetas) y lo suma a la lista local
+  const pendingKey = 'npcr-' + T + '-pending-' + studentId;
+  const [saveErr, setSaveErr] = useState(null);
+  const readPending = () => { try { return JSON.parse(localStorage.getItem(pendingKey)) || []; } catch (e) { return []; } };
+  const writePending = (list) => { try { localStorage.setItem(pendingKey, JSON.stringify(list)); } catch (e) {} };
+  const sendResult = (row) => db.from(T + '_results').insert(row).then(({ error }) => {
+    if (!error) return true;
+    writePending([...readPending().filter(r => JSON.stringify(r) !== JSON.stringify(row)), row]);
+    setSaveErr(error.message);
+    return false;
+  }, (e) => { writePending([...readPending(), row]); setSaveErr(String(e && e.message || e)); return false; });
+  // Reintenta lo que no se pudo guardar antes (sin conexión, sesión vencida…)
+  const flushPending = async () => {
+    const list = readPending();
+    if (!list.length) return;
+    writePending([]);
+    let ok = true;
+    for (const row of list) ok = (await sendResult(row)) && ok;
+    if (ok) setSaveErr(null);
+  };
+  useEffect(() => { flushPending(); }, []);
   const saveResult = (row) => {
     if (!row.total) return;
     const full = { listening: null, reading: null, detail: {}, ...row, created_at: new Date().toISOString() };
     setResults(prev => [full, ...prev]);
-    db.from(T + '_results').insert(row).then(() => {});
+    sendResult(row);
   };
 
   const back = () => setView({ name: 'home' });
@@ -3701,6 +3722,11 @@ function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
       html('h1', null, '🎓 ' + lv.name),
     ),
     html('div', { className: 'hsk-wrap' },
+      saveErr && html('div', { className: 'admin-status err', style: { marginBottom: 10 } },
+        '⚠️ No se pudo guardar tu último resultado (' + saveErr + '). Quedó guardado en este dispositivo y se vuelve a enviar solo. ',
+        html('button', { className: 'mini-btn', onClick: flushPending }, 'Reintentar ahora')),
+      preview && html('p', { className: 'admin-note', style: { margin: '0 0 10px', textAlign: 'center' } },
+        'Vista de profe: lo que hagas acá se guarda en tu cuenta y no aparece en el reporte de la clase.'),
       days !== null && html('div', { className: 'hsk-countdown' + (days <= 7 ? ' soon' : '') },
         html('div', { className: 'hsk-days' }, days > 0 ? days : days === 0 ? '¡Hoy!' : '✓'),
         html('div', null,

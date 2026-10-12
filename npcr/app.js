@@ -997,7 +997,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
         return html('div', { key: n, className: 'report-card' },
           html('div', { className: 'report-h' }, '🎓 Preparación HSK ' + n),
           html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Sección aparte para preparar el examen HSK ' + n + ' (no cambia nada de NPCR). Los alumnos de esta clase la abren desde Mi aula.'
-            + (n === 2 ? ' Incluye las 151 palabras nuevas del HSK 2; los ejercicios también usan las del HSK 1.' : '')),
+            + (n > 1 ? ' Los ejercicios también usan las palabras de los niveles anteriores.' : '')),
           html('label', { className: 'mode-check' + (settings[on] ? ' on' : ''), style: { marginRight: 10 } },
             html('input', { type: 'checkbox', checked: !!settings[on], onChange: e => saveSettings({ [on]: e.target.checked }) }),
             settings[on] ? 'Habilitado para esta clase' : 'Habilitar para esta clase'),
@@ -2335,6 +2335,11 @@ const AULA_ICONS = {
   chat:     ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z', 'M8 12h.01', 'M12 12h.01', 'M16 12h.01'],
   tag:      ['M3 12V4h8l10 10-8 8L3 12Z', 'M7.5 7.5h.01'],
   award:    ['M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z', 'M8.2 13.9 7 22l5-3 5 3-1.2-8.1'],
+  users:    ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M22 21v-2a4 4 0 0 0-3-3.9', 'M16 3.1a4 4 0 0 1 0 7.8'],
+  book:     ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z', 'M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5'],
+  login:    ['M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4', 'M10 17l5-5-5-5', 'M15 12H3'],
+  trash:    ['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14H6L5 6'],
+  gear:     ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z'],
 };
 // Actividades de "Mi aula" que abren un juego de preguntas (npcr_clasificador_questions por tipo)
 const AULA_GAMES = { 'aula-modal': 'modal', 'aula-tiempo': 'tiempo', 'aula-clas': 'clas' };
@@ -3552,7 +3557,7 @@ function FlashcardGame({ words: allWords, sentenceMode, lessonId, cardState = {}
 // Módulo aparte: contenido en hsk<n>_words / hsk<n>_items y progreso en
 // hsk<n>_card_state / hsk<n>_results. Lo ven el equipo docente y las clases
 // con ese nivel habilitado. El mismo motor sirve para los dos niveles; cada
-// nivel define sus 8 partes (formato HSK 2.0) en HSK_LEVELS.
+// nivel define sus 8 partes en npcr_app_config (hsk<n>_exam).
 
 function hsk1Days(dateStr) {
   if (!dateStr) return null;
@@ -3568,8 +3573,8 @@ function formatLongDate(dateStr) {
 const isToday = (iso) => iso && todayLocal() === (() => { const d = new Date(iso); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
 
 function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
-  const lv = HSK_LEVELS[level];
-  const T = lv.t;
+  const lv = hskLevel(level, appConfig['hsk' + level + '_exam']);
+  const T = 'hsk' + level;
   const [words, setWords] = useState(null);
   const [wmAll, setWmAll] = useState({});
   const [bank, setBank] = useState(null);
@@ -3589,7 +3594,7 @@ function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
       db.from(T + '_items').select('kind,data').eq('hidden', false).order('id'),
       db.from(T + '_results').select('kind,score,total,listening,reading,detail,created_at').eq('student_id', studentId).order('created_at', { ascending: false }).limit(300),
       // Los niveles anteriores también entran en el examen: sus palabras dan pinyin y audio a los ejercicios
-      ...lv.includes.map(t => db.from(t + '_words').select('id,hanzi,pinyin,es,audio,sentence,s_pinyin,s_es,s_audio,image').eq('hidden', false)),
+      ...(lv ? lv.includes : []).map(t => db.from(t + '_words').select('id,hanzi,pinyin,es,audio,sentence,s_pinyin,s_es,s_audio,image').eq('hidden', false)),
     ]).then(([w, st, it, rs, ...prev]) => {
       if (w.error) { setError(w.error.message); setWords([]); return; }
       const norm = (rows) => (rows || []).map(r => ({ ...r, hanzi: nfc(r.hanzi), pinyin: nfc(r.pinyin), sentence: nfc(r.sentence), _lesson: T }));
@@ -3637,6 +3642,7 @@ function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
   };
 
   const back = () => setView({ name: 'home' });
+  if (!lv) return html(GameStatusScreen, { onBack: onHome, title: '🎓', msg: 'Falta la configuración del examen (' + T + '_exam en la configuración de la app).' });
   if (!words) return html('main', { style: { paddingTop: 18 } }, html('p', { className: 'admin-note', style: { textAlign: 'center' } }, 'Cargando ' + lv.name + '…'));
   if (error || !words.length) return html(GameStatusScreen, { onBack: onHome, title: '🎓 ' + lv.name, msg: error ? 'No se pudo cargar el ' + lv.name + ': ' + error : 'El ' + lv.name + ' todavía no está habilitado para tu clase.' });
 
@@ -3766,38 +3772,13 @@ function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
 }
 
 // ── Las 8 partes del examen ──
-const HSK_SECTIONS = {
-  L1: { short: '听力 1', title: 'Escuchar 1', sub: 'Palabra y foto: ✓ o ✗', instr: 'Escuchá la palabra y decidí si coincide con la foto.' },
-  L2: { short: '听力 2', title: 'Escuchar 2', sub: 'Frase → elegí la foto', instr: 'Escuchá la frase y elegí la foto que corresponde.' },
-  L3: { short: '听力 3', title: 'Escuchar 3', sub: 'Uní audios con fotos', instr: 'Tocá cada audio para escucharlo y unilo con su foto: tocá el audio y después la foto.' },
-  L4: { short: '听力 4', title: 'Escuchar 4', sub: 'Frase → elegí qué significa', instr: 'Escuchá la frase y elegí qué significa.' },
-  R1: { short: '阅读 1', title: 'Leer 1', sub: 'Palabra y foto: ✓ o ✗', instr: 'Leé la palabra y decidí si coincide con la foto.' },
-  R2: { short: '阅读 2', title: 'Leer 2', sub: 'Uní frases con fotos', instr: 'Uní cada frase con su foto: tocá la frase y después la foto.' },
-  R3: { short: '阅读 3', title: 'Leer 3', sub: 'Uní preguntas y respuestas', instr: 'Uní cada pregunta con su respuesta: tocá la pregunta y después la respuesta.' },
-  R4: { short: '阅读 4', title: 'Leer 4', sub: 'Completá con la palabra', instr: 'Uní cada frase con la palabra que falta en el hueco.' },
-};
-const HSK2_SECTIONS = {
-  L1: { short: '听力 1', title: 'Escuchar 1', sub: 'Frase y foto: ✓ o ✗', instr: 'Escuchá la frase y decidí si coincide con la foto.' },
-  L2: HSK_SECTIONS.L2, L3: HSK_SECTIONS.L3, L4: HSK_SECTIONS.L4,
-  R1: { short: '阅读 1', title: 'Leer 1', sub: 'Uní frases con fotos', instr: HSK_SECTIONS.R2.instr },
-  R2: { short: '阅读 2', title: 'Leer 2', sub: 'Completá con la palabra', instr: HSK_SECTIONS.R4.instr },
-  R3: { short: '阅读 3', title: 'Leer 3', sub: 'Texto y frase ★: ✓ o ✗', instr: 'Leé el texto y decidí si la frase con ★ es verdadera.' },
-  R4: { short: '阅读 4', title: 'Leer 4', sub: 'Uní preguntas y respuestas', instr: HSK_SECTIONS.R3.instr },
-};
 const HSK_ORDER = ['L1', 'L2', 'L3', 'L4', 'R1', 'R2', 'R3', 'R4'];
-// Estructura de cada nivel (formato HSK 2.0). `logic` dice qué ejercicio arma cada parte;
-// `exam` cuántas preguntas tiene cada parte en el simulacro (las de unir siempre son 5).
-const HSK_LEVELS = {
-  1: { n: 1, t: 'hsk1', name: 'HSK 1', includes: [], sections: HSK_SECTIONS, logic: {},
-    exam: { L1: 5, L2: 5, L3: 5, L4: 5, R1: 5, R2: 5, R3: 5, R4: 5 }, time: { L: 15 * 60, R: 17 * 60 }, examTotal: 40,
-    intro: ['20 preguntas · unos 15 minutos. Cada audio suena dos veces.', '20 preguntas · 17 minutos.'],
-    about: '40 preguntas en unos 40 minutos: 20 de comprensión auditiva (cada audio suena dos veces) y 20 de lectura. Son 200 puntos y se aprueba con 120. Todo el texto viene con pinyin.' },
-  2: { n: 2, t: 'hsk2', name: 'HSK 2', includes: ['hsk1'], sections: HSK2_SECTIONS,
-    logic: { L1: 'L1frase', R1: 'R2', R2: 'R4', R3: 'juicio', R4: 'R3' },
-    exam: { L1: 10, L2: 10, L3: 5, L4: 10, R1: 5, R2: 5, R3: 10, R4: 5 }, time: { L: 25 * 60, R: 22 * 60 }, examTotal: 60,
-    intro: ['35 preguntas · unos 25 minutos. Cada audio suena dos veces.', '25 preguntas · 22 minutos.'],
-    about: '60 preguntas en unos 50 minutos: 35 de comprensión auditiva (cada audio suena dos veces) y 25 de lectura. Son 200 puntos y se aprueba con 120. Entran las 300 palabras del HSK 1 y 2, todo con pinyin.' },
-};
+// La estructura de cada nivel (partes, títulos, cantidad de preguntas, tiempos y textos)
+// está en npcr_app_config, clave hsk<n>_exam. Acá solo queda el motor que arma los ejercicios.
+function hskLevel(n, cfg) {
+  if (!cfg || !cfg.sections || !cfg.count || !cfg.time_sec) return null;
+  return { includes: [], logic: {}, ...cfg, n, t: 'hsk' + n, exam: cfg.count, time: cfg.time_sec, examTotal: cfg.total };
+}
 const hskImg = (f) => f.src;
 const LETTERS = 'ABCDEF';
 
@@ -3906,7 +3887,7 @@ function speakChain(tokens, onEnd) {
 function speakTwice(text) { speakReal(text, () => setTimeout(() => speakReal(text), 900)); }
 
 function HskSectionHead({ kind, lv, onBack, right, exam }) {
-  const meta = (lv || HSK_LEVELS[1]).sections[kind];
+  const meta = lv.sections[kind];
   return html(React.Fragment, null,
     html('div', { className: 'header-row' },
       onBack ? html('button', { className: 'back-btn', onClick: onBack }, '←') : null,
@@ -4357,17 +4338,22 @@ function Hsk1WordList({ words, cardState, keyOf, onBack }) {
 
 // Reporte HSK de la clase (para el profe)
 function HskClassReport({ classId, level }) {
-  const lv = HSK_LEVELS[level];
+  const T = 'hsk' + level;
+  const [lv, setLv] = useState(null);
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
   const [nWords, setNWords] = useState(null);
   useEffect(() => {
     setRows(null);
-    db.rpc(lv.t + '_class_report', { p_class: classId }).then(({ data, error }) => { if (error) setErr(error.message); setRows(data || []); });
-    db.from(lv.t + '_words').select('id', { count: 'exact', head: true }).eq('hidden', false).then(({ count }) => setNWords(count || null));
+    db.rpc(T + '_class_report', { p_class: classId }).then(({ data, error }) => { if (error) setErr(error.message); setRows(data || []); });
+    db.from(T + '_words').select('id', { count: 'exact', head: true }).eq('hidden', false).then(({ count }) => setNWords(count || null));
+    db.from('npcr_app_config').select('value').eq('key', T + '_exam').maybeSingle().then(({ data }) => {
+      const l = hskLevel(level, data && data.value);
+      if (l) setLv(l); else setErr('Falta la configuración ' + T + '_exam');
+    });
   }, [classId]);
-  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + ' (¿ejecutaste npcr_' + lv.t + '.sql?)');
-  if (!rows) return html('p', { className: 'admin-note' }, 'Cargando…');
+  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + ' (¿ejecutaste npcr_' + T + '.sql?)');
+  if (!rows || !lv) return html('p', { className: 'admin-note' }, 'Cargando…');
   const active = rows.filter(r => r.user_id);
   const withSim = active.filter(r => r.last_sim !== null);
   const passing = withSim.filter(r => r.last_sim >= 120).length;
@@ -7283,6 +7269,20 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   const isSuper = role === 'superadmin';
   const isAdmin = isSuper || role === 'admin';
   const isLaoshi = isAdmin || role === 'laoshi';
+  // Consola por secciones: accesos directos arriba y una sola sección a la vez
+  const [adminTab, setAdminTabRaw] = useState(() => { try { return localStorage.getItem('npcr-admin-tab') || 'aulas'; } catch (e) { return 'aulas'; } });
+  const setAdminTab = (t) => { setAdminTabRaw(t); try { localStorage.setItem('npcr-admin-tab', t); } catch (e) {} };
+  const adminTabs = [
+    { id: 'aulas', icon: 'cap', tone: 'red', title: 'Aulas', sub: 'Clases, alumnos y reportes' },
+    isAdmin && { id: 'equipo', icon: 'users', tone: 'blue', title: 'Equipo', sub: 'Equipo docente: lǎoshī y administradores' },
+    isAdmin && { id: 'alumnos', icon: 'chart', tone: 'green', title: 'Alumnos', sub: 'Registro y estadísticas' },
+    isAdmin && { id: 'ingresos', icon: 'login', tone: 'gold', title: 'Ingresos', sub: 'Accesos a la consola' },
+    isAdmin && { id: 'contenido', icon: 'book', tone: 'purple', title: 'Contenido', sub: 'Lecciones y módulos' },
+    isSuper && { id: 'papelera', icon: 'trash', tone: 'red', title: 'Papelera', sub: 'E historial de cambios' },
+    isAdmin && { id: 'config', icon: 'gear', tone: 'blue', title: 'Configuración', sub: 'Textos y módulos de la app' },
+  ].filter(Boolean);
+  const tab = adminTabs.some(t => t.id === adminTab) ? adminTab : 'aulas';
+  const showTab = (t) => tab === t;
 
 
   // texto manual (modo legacy)
@@ -7370,6 +7370,12 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   const [activityError, setActivityError] = useState(null);
   const [regFilter, setRegFilter] = useState('todos'); // todos | codigo | libre
   const [regSearch, setRegSearch] = useState('');
+  // Al entrar a Alumnos o Ingresos, el registro se carga solo
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (tab === 'alumnos' && !showActivityLog) loadActivityLog();
+    if (tab === 'ingresos' && !showLoginLog) loadLoginLog();
+  }, [tab, isAdmin]);
 
   const handleRenameLesson = (id) => {
     const theme = LESSON_THEMES[id] || { name: 'Lección ' + id };
@@ -7669,14 +7675,6 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
     ),
     html('div', { className: 'admin-panel' },
 
-      // ── Info vocab actual ──
-      html('div', null,
-        html('label', null, 'Vocabulario actual'),
-        html('p', { className: 'admin-note', style: { marginTop: 6 } },
-          totalWords + ' palabras en ' + Object.keys(vocab).filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length + ' lecciones + 2 módulos especiales.'
-        )
-      ),
-
       // ── Panel admin/laoshi (según rol del perfil, no solo "hay sesión") ──
       isLaoshi
         ? html(React.Fragment, null,
@@ -7685,26 +7683,31 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
               html('button', { className: 'secondary-btn', style: { margin: 0, padding: '6px 14px', fontSize: 13 }, onClick: handleLogout }, 'Cerrar sesión'),
             ),
 
+            // ── Accesos directos ──
+            adminTabs.length > 1 && html('nav', { className: 'admin-nav' }, adminTabs.map(t => html('button', { key: t.id, type: 'button',
+              className: 'admin-nav-btn' + (tab === t.id ? ' on' : ''), title: t.sub, onClick: () => setAdminTab(t.id) },
+              html(AulaIcon, { name: t.icon, tone: t.tone, size: 34 }),
+              html('span', { className: 'admin-nav-txt' }, t.title)))),
+
             ENABLE_CUI_EXAM && html('button', {
               className: 'secondary-btn',
               style: { marginTop: 8, width: '100%', borderColor: 'var(--lacquer)', color: 'var(--lacquer)', fontWeight: 700 },
               onClick: () => setShowSimulacro(true),
             }, '模拟考试 · Simulacro de Examen Nivel III'),
 
-            // ── Mis clases ──
-            html(ClassManager, { session, isAdmin, isSuper, onReports }),
+            // ── Aulas ──
+            showTab('aulas') && html(ClassManager, { session, isAdmin, isSuper, onReports }),
 
             // ── Equipo docente (admin y superadmin) ──
-            isAdmin && html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
-            isAdmin && html(StaffManager, { session, isSuper }),
+            isAdmin && showTab('equipo') && html(StaffManager, { session, isSuper }),
 
             // ── Papelera e historial de cambios (solo superadmin) ──
-            isSuper && html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
-            isSuper && html(ContentTrash, null),
+            isSuper && showTab('papelera') && html(ContentTrash, null),
 
-            isAdmin && html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
-
-            isAdmin && html(React.Fragment, null,
+            // ── Contenido: lecciones, módulos especiales y módulos de práctica ──
+            isAdmin && showTab('contenido') && html(React.Fragment, null,
+            html('p', { className: 'admin-note', style: { margin: 0 } },
+              totalWords + ' palabras en ' + Object.keys(vocab).filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length + ' lecciones.'),
             html('div', null,
               html('label', null, '➕ Cargar lecciones desde CSV'),
               html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
@@ -7876,10 +7879,10 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
               ),
             ),
 
-            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
+            ), // cierre contenido
 
-            // ── Log de inicios de sesión ──
-            html('div', null,
+            // ── Registro de ingresos a la consola ──
+            isAdmin && showTab('ingresos') && html('div', null,
               html('label', null, '🕒 Registro de inicios de sesión'),
               html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Últimos 50 accesos al panel de administrador.'),
               !showLoginLog
@@ -7897,10 +7900,9 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                   ),
             ),
 
-            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
 
             // ── Registro de alumnos (con y sin código) ──
-            html('div', null,
+            isAdmin && showTab('alumnos') && html('div', null,
               html('label', null, '👥 Registro de alumnos'),
               html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Todos los que entraron a la app, con código de aula o solo con su nombre: primera y última vez, visitas, sesiones de práctica y hasta qué lección llegaron.'),
               !showActivityLog
@@ -7940,16 +7942,13 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                     );
                   })(),
             ),
-            html('hr', { style: { border: 'none', borderTop: '1px solid var(--paper-deep)', margin: '8px 0' } }),
 
             // ── Configuración del app ──
-            html('div', null,
+            isAdmin && showTab('config') && html('div', null,
               html('label', null, '⚙️ Configuración del app'),
               html('p', { className: 'admin-note', style: { margin: '6px 0 12px' } }, 'Editá los textos y módulos de la app sin tocar código.'),
               html(AppConfigEditor, { appConfig: appConfig || {}, onAppConfigChange }),
             ),
-
-            ), // cierre isAdmin &&
           )
 
         // ── Login ──

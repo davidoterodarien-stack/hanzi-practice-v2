@@ -1519,3 +1519,10 @@ main.mem-main { padding-bottom: 8px !important; }
 .hsk-passage { background: var(--paper); border: 1.5px solid var(--paper-deep); border-radius: 14px; padding: 12px 14px; text-align: left; font-size: 20px; line-height: 1.5; }
 .hsk-stmt { margin-top: 10px; padding: 10px 14px; border-left: 4px solid var(--gold, #d4a017); background: #fff; border-radius: 10px; text-align: left; font-size: 20px; font-weight: 700; }
 .hsk-passage .hsk-py, .hsk-stmt .hsk-py { display: block; font-size: 13px; margin-bottom: 2px; }
+/* Consola: accesos directos a cada sección — una sola fila pareja (en celular se desliza) */
+.admin-nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.admin-nav::-webkit-scrollbar { display: none; }
+.admin-nav-btn { flex: 1 0 78px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; background: #fff; border: 2px solid var(--paper-deep); border-radius: 14px; cursor: pointer; font-family: inherit; color: var(--ink); transition: border-color .15s, background .15s; }
+.admin-nav-btn:hover { border-color: var(--ink-soft); }
+.admin-nav-btn.on { border-color: var(--lacquer); background: var(--lacquer-light); }
+.admin-nav-txt { font-size: 12px; font-weight: 800; text-align: center; line-height: 1.15; }

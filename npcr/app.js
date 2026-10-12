@@ -773,15 +773,17 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     setTasks(t.data || []);
     const m = {}; (pr.data || []).forEach(r => { m[r.assignment_id] = r; }); setTaskProgress(m);
   });
-  const loadSettings = () => db.from('npcr_class_settings').select('max_lesson,weekly_title,weekly_words,hsk1_enabled,hsk1_exam_date').eq('class_id', classId).maybeSingle()
+  const loadSettings = () => db.from('npcr_class_settings').select('max_lesson,weekly_title,weekly_words,hsk1_enabled,hsk1_exam_date,hsk2_enabled,hsk2_exam_date').eq('class_id', classId).maybeSingle()
     .then(({ data }) => setSettings({ max_lesson: data && data.max_lesson ? String(data.max_lesson) : '', weekly_title: (data && data.weekly_title) || '', weekly_words: (data && data.weekly_words) || [],
-      hsk1_enabled: !!(data && data.hsk1_enabled), hsk1_exam_date: (data && data.hsk1_exam_date) || '' }));
+      hsk1_enabled: !!(data && data.hsk1_enabled), hsk1_exam_date: (data && data.hsk1_exam_date) || '',
+      hsk2_enabled: !!(data && data.hsk2_enabled), hsk2_exam_date: (data && data.hsk2_exam_date) || '' }));
   const saveSettings = async (patch) => {
     const next = { ...settings, ...patch };
     setSettings(next);
     const { error } = await db.from('npcr_class_settings').upsert({ class_id: classId, max_lesson: next.max_lesson ? Number(next.max_lesson) : null,
       weekly_title: next.weekly_title || null, weekly_words: next.weekly_words,
-      hsk1_enabled: !!next.hsk1_enabled, hsk1_exam_date: next.hsk1_exam_date || null, updated_at: new Date().toISOString() });
+      hsk1_enabled: !!next.hsk1_enabled, hsk1_exam_date: next.hsk1_exam_date || null,
+      hsk2_enabled: !!next.hsk2_enabled, hsk2_exam_date: next.hsk2_exam_date || null, updated_at: new Date().toISOString() });
     setSavedMsg(error ? '❌ ' + error.message : '✅ Guardado');
     setTimeout(() => setSavedMsg(null), 2000);
   };
@@ -842,7 +844,8 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     label + (sort.key === key ? (sort.dir < 0 ? ' ▼' : ' ▲') : ''));
 
   const tabs = [['alumnos', '👥 Alumnos'], ['resumen', '📊 Resumen'], ['ranking', '🏆 Ranking'], ['mapa', '🗺️ Mapa'], ['palabras', '🧩 Palabras difíciles'], ['tareas', '📋 Tareas'],
-    ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ['bingo', '🎱 Bingo'], ['config', '⚙️ Configurar']];
+    ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ...(settings && settings.hsk2_enabled ? [['hsk2', '🎓 HSK 2']] : []),
+    ['bingo', '🎱 Bingo'], ['config', '⚙️ Configurar']];
 
   let body = null;
   if (err) body = html('div', { className: 'admin-status err' }, '❌ ' + err + (/function|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_fase2.sql en Supabase?' : ''));
@@ -972,7 +975,8 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     );
   }
 
-  if (!err && rows !== null && !student && tab === 'hsk') body = html(Hsk1ClassReport, { classId });
+  if (!err && rows !== null && !student && tab === 'hsk') body = html(HskClassReport, { key: 'hsk1', classId, level: 1 });
+  if (!err && rows !== null && !student && tab === 'hsk2') body = html(HskClassReport, { key: 'hsk2', classId, level: 2 });
   if (!err && rows !== null && !student && tab === 'bingo') body = html(BingoHost, { key: classId, classId, className: cls ? cls.name : 'Clase', lessons, maxLesson: settings && settings.max_lesson ? Number(settings.max_lesson) : null });
 
   if (!err && rows !== null && !student && tab === 'config') {
@@ -988,16 +992,20 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
           html('option', { value: '' }, 'Todas las lecciones habilitadas'),
           lessons.map(l => html('option', { key: l, value: l }, 'Habilitado hasta la lección ' + l))),
       ),
-      html('div', { className: 'report-card' },
-        html('div', { className: 'report-h' }, '🎓 Preparación HSK 1'),
-        html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Sección aparte para preparar el examen (no cambia nada de NPCR). Los alumnos de esta clase la abren tocando 5 veces el logo 说.'),
-        html('label', { className: 'mode-check' + (settings.hsk1_enabled ? ' on' : ''), style: { marginRight: 10 } },
-          html('input', { type: 'checkbox', checked: !!settings.hsk1_enabled, onChange: e => saveSettings({ hsk1_enabled: e.target.checked }) }),
-          settings.hsk1_enabled ? 'Habilitado para esta clase' : 'Habilitar para esta clase'),
-        settings.hsk1_enabled && html('label', { style: { fontSize: 12, fontWeight: 700, color: 'var(--ink-mid)', display: 'inline-flex', gap: 6, alignItems: 'center', marginTop: 8 } },
-          'Fecha del examen',
-          html('input', { type: 'date', value: settings.hsk1_exam_date || '', onChange: e => saveSettings({ hsk1_exam_date: e.target.value }), style: { ...cmInput, width: 'auto' } })),
-      ),
+      [1, 2].map(n => {
+        const on = 'hsk' + n + '_enabled', date = 'hsk' + n + '_exam_date';
+        return html('div', { key: n, className: 'report-card' },
+          html('div', { className: 'report-h' }, '🎓 Preparación HSK ' + n),
+          html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Sección aparte para preparar el examen HSK ' + n + ' (no cambia nada de NPCR). Los alumnos de esta clase la abren desde Mi aula.'
+            + (n === 2 ? ' Incluye las 151 palabras nuevas del HSK 2; los ejercicios también usan las del HSK 1.' : '')),
+          html('label', { className: 'mode-check' + (settings[on] ? ' on' : ''), style: { marginRight: 10 } },
+            html('input', { type: 'checkbox', checked: !!settings[on], onChange: e => saveSettings({ [on]: e.target.checked }) }),
+            settings[on] ? 'Habilitado para esta clase' : 'Habilitar para esta clase'),
+          settings[on] && html('label', { style: { fontSize: 12, fontWeight: 700, color: 'var(--ink-mid)', display: 'inline-flex', gap: 6, alignItems: 'center', marginTop: 8 } },
+            'Fecha del examen',
+            html('input', { type: 'date', value: settings[date] || '', onChange: e => saveSettings({ [date]: e.target.value }), style: { ...cmInput, width: 'auto' } })),
+        );
+      }),
       html('div', { className: 'report-card' },
         html('div', { className: 'report-h' }, '⭐ Palabras de la semana'),
         html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Aparece como actividad en el aula de tus alumnos. Tocá palabras para agregarlas o quitarlas.'),
@@ -1099,6 +1107,7 @@ function App() {
     setSecretTaps(0);
     clearTimeout(secretTimer.current);
     if (hsk1Allowed) setScreen({ name: 'hsk1' });
+    else if (hsk2Allowed) setScreen({ name: 'hsk2' });
     else if (ENABLE_CUI_EXAM) setShowSecretExam(true);
   }, [secretTaps]);
   const [lastResults, setLastResults] = useState({});
@@ -1235,6 +1244,7 @@ function App() {
   useLiveRefresh('bingo_games', myClassId ? 'class_id=eq.' + myClassId : null, refreshBingo, 15000);
   useEffect(() => { if (screen.name === 'home' || screen.name === 'clase') refreshBingo(); }, [screen.name]);
   const hsk1Allowed = isStaffUser || !!(classSettings && classSettings.hsk1_enabled);
+  const hsk2Allowed = isStaffUser || !!(classSettings && classSettings.hsk2_enabled);
   // Vista de alumno para el equipo docente: "Mi aula" de una de sus clases
   const staffRef = React.useRef(false);
   staffRef.current = isStaffUser;
@@ -1522,10 +1532,11 @@ function App() {
     });
   } else if (screen.name === 'bingo' && screen.gameId) {
     content = html(BingoPlayer, { key: screen.gameId, gameId: screen.gameId, onBack: () => setScreen({ name: myClasses && myClasses.length ? 'clase' : 'home' }) });
-  } else if (screen.name === 'hsk1' && hsk1Allowed) {
-    content = html(Hsk1Screen, {
-      studentId, appConfig,
-      examDate: (classSettings && classSettings.hsk1_exam_date) || appConfig.hsk1_exam_date || null,
+  } else if ((screen.name === 'hsk1' && hsk1Allowed) || (screen.name === 'hsk2' && hsk2Allowed)) {
+    const t = screen.name;
+    content = html(HskScreen, {
+      key: t, level: t === 'hsk2' ? 2 : 1, studentId, appConfig,
+      examDate: (classSettings && classSettings[t + '_exam_date']) || appConfig[t + '_exam_date'] || null,
       onHome: () => setScreen({ name: 'home' }),
     });
   } else if (screen.name === 'lesson') {
@@ -2344,10 +2355,14 @@ function AulaIcon({ name, tone = 'gold', size = 40 }) {
 
 function aulaActivities(settings, hardCount) {
   const weekly = (settings && settings.weekly_words) || [];
-  const hskDays = settings && settings.hsk1_enabled && settings.hsk1_exam_date ? hsk1Days(settings.hsk1_exam_date) : null;
+  const hskAct = (n) => {
+    if (!settings || !settings['hsk' + n + '_enabled']) return null;
+    const d = settings['hsk' + n + '_exam_date'] ? hsk1Days(settings['hsk' + n + '_exam_date']) : null;
+    return { id: 'hsk' + n, icon: 'award', tone: n === 1 ? 'red' : 'gold', title: 'Preparación HSK ' + n,
+      sub: d !== null && d >= 0 ? (d === 0 ? '¡Hoy es el examen!' : 'Faltan ' + d + ' día' + (d === 1 ? '' : 's') + ' para el examen') : 'Estudio, prácticas y simulacro' };
+  };
   return [
-    settings && settings.hsk1_enabled && { id: 'hsk1', icon: 'award', tone: 'red', title: 'Preparación HSK 1',
-      sub: hskDays !== null && hskDays >= 0 ? (hskDays === 0 ? '¡Hoy es el examen!' : 'Faltan ' + hskDays + ' día' + (hskDays === 1 ? '' : 's') + ' para el examen') : 'Estudio, prácticas y simulacro' },
+    hskAct(1), hskAct(2),
     { id: 'refuerzo-clase', icon: 'layers', tone: 'purple', title: 'Refuerzo de clase', sub: hardCount ? hardCount + ' palabras que le cuestan al grupo' : 'Todavía sin datos del grupo', disabled: !hardCount },
     weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + (weekly.length === 1 ? ' palabra elegida' : ' palabras elegidas') + ' por tu lǎoshī' },
     { id: 'tonos', icon: 'music', tone: 'green', title: 'Tonos', sub: 'Escuchá y elegí el tono' },
@@ -2919,12 +2934,13 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
     // Proporción flexible: de cuadrada (1) a alargada (1.45), para llenar ancho y alto
     let best = { cw: 0, ch: 0, cols: 4, score: 0 };
     for (let cols = 2; cols <= n; cols++) {
-      const rows = Math.ceil(n / cols);
+      if (n % cols) continue;                     // siempre filas completas: el tablero queda parejo
+      const rows = n / cols;
       const wMax = Math.min((W - gap * (cols - 1)) / cols, 200);
       const hMax = Math.min((H - gap * (rows - 1)) / rows, 270);
       const cw = Math.min(wMax, hMax);            // no más ancha que alta
       const ch = Math.min(hMax, cw * 1.45);       // ni más alargada que 1.45
-      const score = cw * ch * (n % cols === 0 ? 1 : 0.85);   // preferir filas completas
+      const score = cw * ch;
       if (score > best.score) best = { cw, ch, cols, score };
     }
     setFit({ cw: Math.floor(best.cw), ch: Math.floor(best.ch), cols: best.cols, gap });
@@ -3532,10 +3548,11 @@ function FlashcardGame({ words: allWords, sentenceMode, lessonId, cardState = {}
   );
 }
 
-// ═════════════════ HSK 1 (preparación del examen) ═════════════════
-// Módulo aparte: contenido en hsk1_words y progreso en hsk1_card_state /
-// hsk1_results. Lo ven el equipo docente y las clases con el HSK 1 habilitado.
-const HSK1_LESSON = 'hsk1';
+// ═════════════════ HSK 1 y HSK 2 (preparación del examen) ═════════════════
+// Módulo aparte: contenido en hsk<n>_words / hsk<n>_items y progreso en
+// hsk<n>_card_state / hsk<n>_results. Lo ven el equipo docente y las clases
+// con ese nivel habilitado. El mismo motor sirve para los dos niveles; cada
+// nivel define sus 8 partes (formato HSK 2.0) en HSK_LEVELS.
 
 function hsk1Days(dateStr) {
   if (!dateStr) return null;
@@ -3550,35 +3567,47 @@ function formatLongDate(dateStr) {
 }
 const isToday = (iso) => iso && todayLocal() === (() => { const d = new Date(iso); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
 
-function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
+function HskScreen({ level, studentId, appConfig, examDate, onHome }) {
+  const lv = HSK_LEVELS[level];
+  const T = lv.t;
   const [words, setWords] = useState(null);
+  const [wmAll, setWmAll] = useState({});
   const [bank, setBank] = useState(null);
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [view, setView] = useState({ name: 'home' });   // home | study | extra | all | list | section | exam | numeros | preguntas | pares | cuaderno
   const [cardState, setCardState] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('npcr-hsk1-' + studentId)) || {}; } catch (e) { return {}; }
+    try { return JSON.parse(localStorage.getItem('npcr-' + T + '-' + studentId)) || {}; } catch (e) { return {}; }
   });
-  const dailyNew = Number(appConfig.hsk1_daily_new) || 10;
+  const dailyNew = Number(appConfig[T + '_daily_new']) || 10;
 
-  useEffect(() => { try { localStorage.setItem('npcr-hsk1-' + studentId, JSON.stringify(cardState)); } catch (e) {} }, [cardState]);
+  useEffect(() => { try { localStorage.setItem('npcr-' + T + '-' + studentId, JSON.stringify(cardState)); } catch (e) {} }, [cardState]);
   useEffect(() => {
     Promise.all([
-      db.from('hsk1_words').select('id,hanzi,pinyin,es,audio,sentence,s_pinyin,s_es,s_audio,image').eq('hidden', false).order('id'),
-      db.from('hsk1_card_state').select('card_key,box,due_at,reviews,lapses,updated_at,first_seen').eq('student_id', studentId),
-      db.from('hsk1_items').select('kind,data').eq('hidden', false).order('id'),
-      db.from('hsk1_results').select('kind,score,total,listening,reading,detail,created_at').eq('student_id', studentId).order('created_at', { ascending: false }).limit(300),
-    ]).then(([w, st, it, rs]) => {
+      db.from(T + '_words').select('id,hanzi,pinyin,es,audio,sentence,s_pinyin,s_es,s_audio,image').eq('hidden', false).order('id'),
+      db.from(T + '_card_state').select('card_key,box,due_at,reviews,lapses,updated_at,first_seen').eq('student_id', studentId),
+      db.from(T + '_items').select('kind,data').eq('hidden', false).order('id'),
+      db.from(T + '_results').select('kind,score,total,listening,reading,detail,created_at').eq('student_id', studentId).order('created_at', { ascending: false }).limit(300),
+      // Los niveles anteriores también entran en el examen: sus palabras dan pinyin y audio a los ejercicios
+      ...lv.includes.map(t => db.from(t + '_words').select('id,hanzi,pinyin,es,audio,sentence,s_pinyin,s_es,s_audio,image').eq('hidden', false)),
+    ]).then(([w, st, it, rs, ...prev]) => {
       if (w.error) { setError(w.error.message); setWords([]); return; }
-      const list = (w.data || []).map(r => ({ ...r, hanzi: nfc(r.hanzi), pinyin: nfc(r.pinyin), sentence: nfc(r.sentence), _lesson: HSK1_LESSON }));
-      list.forEach(r => {
+      const norm = (rows) => (rows || []).map(r => ({ ...r, hanzi: nfc(r.hanzi), pinyin: nfc(r.pinyin), sentence: nfc(r.sentence), _lesson: T }));
+      const list = norm(w.data);
+      const older = prev.flatMap(r => r.error ? [] : norm(r.data));
+      [...older, ...list].forEach(r => {
         const k = r.hanzi.replace(MEDIA_PUNCT_RE, '');
         if (r.audio) EXTRA_AUDIO[k] = r.audio;
         if (r.s_audio) EXTRA_AUDIO[r.sentence.replace(MEDIA_PUNCT_RE, '')] = r.s_audio;
       });
+      const all = {}; [...older, ...list].forEach(r => { all[r.hanzi] = r; });
+      setWmAll(all);
       setWords(list);
-      const b = { foto: [], escucha4: [], qa: [], leer4: [], par: [] };
-      (it.data || []).forEach(r => { if (b[r.kind]) b[r.kind].push(r.data); });
+      // Cada foto muestra la imagen de su palabra (la ruta viene de la base)
+      const imgOf = {}; list.forEach(r => { if (r.image) imgOf[r.id] = r.image; });
+      const b = { foto: [], escucha4: [], qa: [], leer4: [], par: [], juicio: [] };
+      (it.data || []).forEach(r => { if (b[r.kind]) b[r.kind].push(r.kind === 'foto' ? { ...r.data, src: imgOf[r.data.img] } : r.data); });
+      b.foto = b.foto.filter(f => f.src);
       setBank(b);
       setResults(rs.data || []);
       if (!st.error && st.data) setCardState(prev => {
@@ -3592,11 +3621,11 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
     });
   }, []);
 
-  const keyOf = (w) => cardKey(HSK1_LESSON, false, w.hanzi);
+  const keyOf = (w) => cardKey(T, false, w.hanzi);
   const recordCard = (key, kind) => setCardState(prev => {
     const st = { ...srsNext(prev[key], kind, Date.now()), first_seen: (prev[key] && prev[key].first_seen) || new Date().toISOString() };
     const { first_seen, ...row } = st;
-    db.from('hsk1_card_state').upsert({ student_id: studentId, card_key: key, ...row }).then(() => {});
+    db.from(T + '_card_state').upsert({ student_id: studentId, card_key: key, ...row }).then(() => {});
     return { ...prev, [key]: st };
   });
   // Guarda un resultado (práctica, simulacro, tarjetas) y lo suma a la lista local
@@ -3604,14 +3633,14 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
     if (!row.total) return;
     const full = { listening: null, reading: null, detail: {}, ...row, created_at: new Date().toISOString() };
     setResults(prev => [full, ...prev]);
-    db.from('hsk1_results').insert(row).then(() => {});
+    db.from(T + '_results').insert(row).then(() => {});
   };
 
   const back = () => setView({ name: 'home' });
-  if (!words) return html('main', { style: { paddingTop: 18 } }, html('p', { className: 'admin-note', style: { textAlign: 'center' } }, 'Cargando HSK 1…'));
-  if (error || !words.length) return html(GameStatusScreen, { onBack: onHome, title: '🎓 HSK 1', msg: error ? 'No se pudo cargar el HSK 1: ' + error : 'El HSK 1 todavía no está habilitado para tu clase.' });
+  if (!words) return html('main', { style: { paddingTop: 18 } }, html('p', { className: 'admin-note', style: { textAlign: 'center' } }, 'Cargando ' + lv.name + '…'));
+  if (error || !words.length) return html(GameStatusScreen, { onBack: onHome, title: '🎓 ' + lv.name, msg: error ? 'No se pudo cargar el ' + lv.name + ': ' + error : 'El ' + lv.name + ' todavía no está habilitado para tu clase.' });
 
-  const wm = {}; words.forEach(w => { wm[w.hanzi] = w; });
+  const wm = { ...wmAll }; words.forEach(w => { wm[w.hanzi] = w; });
   const now = Date.now();
   const seen = words.filter(w => cardState[keyOf(w)]);
   const fresh = words.filter(w => !cardState[keyOf(w)]);
@@ -3626,33 +3655,33 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
   const byBox = (list) => list.slice().sort((a, b) => cardState[keyOf(a)].box - cardState[keyOf(b)].box);
   const clozeFor = (card) => card.sentence ? { hanzi: card.sentence, pinyin: card.s_pinyin, es: card.s_es, image: card.image, realOnly: true } : null;
   const game = (title, deckBuilder, emptySub) => html(FlashcardGame, {
-    words, sentenceMode: false, lessonId: HSK1_LESSON, cardState, onRecordCard: recordCard,
+    words, sentenceMode: false, lessonId: T, cardState, onRecordCard: recordCard,
     onBack: back, onHome: back, nextAction: null, savedResult: null, onSaveResult: () => {}, onClearResult: () => {},
     onFinish: (percent, reviewWords, total) => saveResult({ kind: 'tarjetas', score: Math.round(percent * total / 100), total,
       detail: { missed: (reviewWords || []).map(w => ({ t: w.hanzi, py: w.pinyin, es: w.es })) } }),
     deckBuilder, title, emptyTitle: '¡Listo por hoy!', emptySub, clozeFor,
   });
-  const ctx = { bank, wm, onBack: back, onSave: saveResult };
+  const ctx = { bank, wm, lv, onBack: back, onSave: saveResult };
 
-  if (view.name === 'study') return game('🎓 HSK 1 · Hoy', () => [...shuffle(byBox(due).slice(0, 40)), ...fresh.slice(0, newLeft)],
+  if (view.name === 'study') return game('🎓 ' + lv.name + ' · Hoy', () => [...shuffle(byBox(due).slice(0, 40)), ...fresh.slice(0, newLeft)],
     'Ya hiciste el estudio de hoy. Mañana te esperan las palabras para repasar y ' + dailyNew + ' nuevas.');
-  if (view.name === 'extra') return game('🎓 HSK 1 · Adelantar', () => fresh.slice(0, dailyNew), 'Ya viste las 150 palabras. ¡Ahora a repasar!');
-  if (view.name === 'all') return game('🎓 HSK 1 · Repaso general', () => shuffle(seen), 'Todavía no estudiaste ninguna palabra.');
-  if (view.name === 'errores') return game('🎓 HSK 1 · Mis errores', () => shuffle(view.words), 'No hay palabras para repasar.');
+  if (view.name === 'extra') return game('🎓 ' + lv.name + ' · Adelantar', () => fresh.slice(0, dailyNew), 'Ya viste las ' + words.length + ' palabras. ¡Ahora a repasar!');
+  if (view.name === 'all') return game('🎓 ' + lv.name + ' · Repaso general', () => shuffle(seen), 'Todavía no estudiaste ninguna palabra.');
+  if (view.name === 'errores') return game('🎓 ' + lv.name + ' · Mis errores', () => shuffle(view.words.filter(w => words.includes(w))), 'No hay palabras para repasar.');
   if (view.name === 'list') return html(Hsk1WordList, { words, cardState, keyOf, onBack: back });
   if (view.name === 'section') return html(HskSectionPractice, { ...ctx, kind: view.kind, key: view.kind + (view.n || 0), onAgain: () => setView({ name: 'section', kind: view.kind, n: (view.n || 0) + 1 }) });
   if (view.name === 'exam') return html(HskExam, { ...ctx, key: 'exam' + (view.n || 0), onAgain: () => setView({ name: 'exam', n: (view.n || 0) + 1 }) });
   if (view.name === 'numeros') return html(HskDrill, { ...ctx, kind: 'numeros', key: 'n' + (view.n || 0), onAgain: () => setView({ name: 'numeros', n: (view.n || 0) + 1 }) });
   if (view.name === 'preguntas') return html(HskDrill, { ...ctx, kind: 'preguntas', key: 'p' + (view.n || 0), onAgain: () => setView({ name: 'preguntas', n: (view.n || 0) + 1 }) });
   if (view.name === 'pares') return html(HskDrill, { ...ctx, kind: 'pares', key: 'c' + (view.n || 0), onAgain: () => setView({ name: 'pares', n: (view.n || 0) + 1 }) });
-  if (view.name === 'cuaderno') return html(HskNotebook, { results, wm, onBack: back, onReview: (list) => setView({ name: 'errores', words: list }) });
+  if (view.name === 'cuaderno') return html(HskNotebook, { results, wm: Object.fromEntries(words.map(w => [w.hanzi, w])), onBack: back, onReview: (list) => setView({ name: 'errores', words: list }) });
 
   const pct = Math.round(seen.length / words.length * 100);
   const lastOf = (kind) => results.find(r => r.kind === kind);
   const sims = results.filter(r => r.kind === 'simulacro');
   const bestSim = sims.reduce((m, r) => Math.max(m, r.score), 0);
   const sectionCard = (k) => {
-    const meta = HSK_SECTIONS[k]; const last = lastOf(k);
+    const meta = lv.sections[k]; const last = lastOf(k);
     const p = last ? Math.round(last.score / last.total * 100) : null;
     return html('button', { key: k, className: 'hsk-sec', onClick: () => setView({ name: 'section', kind: k }) },
       html('span', { className: 'hsk-sec-tag ' + (k[0] === 'L' ? 'listen' : 'read') }, meta.short),
@@ -3664,7 +3693,7 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onHome }, '←'),
-      html('h1', null, '🎓 HSK 1'),
+      html('h1', null, '🎓 ' + lv.name),
     ),
     html('div', { className: 'hsk-wrap' },
       days !== null && html('div', { className: 'hsk-countdown' + (days <= 7 ? ' soon' : '') },
@@ -3681,7 +3710,7 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
       ),
       html('div', { className: 'hsk-bar' }, html('i', { style: { width: pct + '%' } })),
       html('p', { className: 'hsk-plan' },
-        fresh.length === 0 ? '¡Ya viste las 150 palabras! Ahora repasá todos los días y hacé simulacros.'
+        fresh.length === 0 ? '¡Ya viste las ' + words.length + ' palabras! Ahora repasá todos los días y hacé simulacros.'
           : 'Plan: ' + dailyNew + ' palabras nuevas por día → terminás las ' + fresh.length + ' que faltan en ' + daysNeeded + ' día' + (daysNeeded === 1 ? '' : 's') +
             (days !== null && days > 0 ? (daysNeeded <= days ? ' y te quedan ' + (days - daysNeeded) + ' para repasar y hacer simulacros.' : '. ¡Adelantá palabras para llegar!') : '.')),
       html('button', { className: 'hsk-main' + (todayCount ? '' : ' done'), onClick: () => setView({ name: 'study' }), disabled: !todayCount },
@@ -3697,7 +3726,7 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
         seen.length > 0 && html('button', { className: 'hsk-action', onClick: () => setView({ name: 'all' }) },
           html(AulaIcon, { name: 'clipboard', tone: 'blue', size: 36 }), html('span', null, 'Repasar todas las vistas')),
         html('button', { className: 'hsk-action', onClick: () => setView({ name: 'list' }) },
-          html(AulaIcon, { name: 'chart', tone: 'purple', size: 36 }), html('span', null, 'Las 150 palabras')),
+          html(AulaIcon, { name: 'chart', tone: 'purple', size: 36 }), html('span', null, 'Las ' + words.length + ' palabras')),
       ),
 
       html('div', { className: 'hsk-block-title' }, 'Simulacro del examen'),
@@ -3705,7 +3734,7 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
         html('div', { className: 'hsk-exam-seal hanzi-font' }, '考'),
         html('div', { style: { flex: 1, textAlign: 'left' } },
           html('div', { className: 'hsk-main-title' }, 'Simulacro completo'),
-          html('div', { className: 'hsk-exam-sub' }, '40 preguntas · con reloj · nota sobre 200 (se aprueba con 120)'),
+          html('div', { className: 'hsk-exam-sub' }, lv.examTotal + ' preguntas · con reloj · nota sobre 200 (se aprueba con 120)'),
           sims.length > 0 && html('div', { className: 'hsk-exam-last' },
             'Último: ' + sims[0].score + ' · Mejor: ' + bestSim + ' · ' + sims.length + ' hecho' + (sims.length === 1 ? '' : 's')),
         ),
@@ -3730,7 +3759,7 @@ function Hsk1Screen({ studentId, appConfig, examDate, onHome }) {
 
       html('div', { className: 'hsk-exam-info' },
         html('div', { className: 'report-h' }, 'Cómo es el examen'),
-        html('p', null, '40 preguntas en unos 40 minutos: 20 de comprensión auditiva (cada audio suena dos veces) y 20 de lectura. Son 200 puntos y se aprueba con 120. Todo el texto viene con pinyin.'),
+        html('p', null, lv.about),
       ),
     ),
   );
@@ -3747,8 +3776,29 @@ const HSK_SECTIONS = {
   R3: { short: '阅读 3', title: 'Leer 3', sub: 'Uní preguntas y respuestas', instr: 'Uní cada pregunta con su respuesta: tocá la pregunta y después la respuesta.' },
   R4: { short: '阅读 4', title: 'Leer 4', sub: 'Completá con la palabra', instr: 'Uní cada frase con la palabra que falta en el hueco.' },
 };
+const HSK2_SECTIONS = {
+  L1: { short: '听力 1', title: 'Escuchar 1', sub: 'Frase y foto: ✓ o ✗', instr: 'Escuchá la frase y decidí si coincide con la foto.' },
+  L2: HSK_SECTIONS.L2, L3: HSK_SECTIONS.L3, L4: HSK_SECTIONS.L4,
+  R1: { short: '阅读 1', title: 'Leer 1', sub: 'Uní frases con fotos', instr: HSK_SECTIONS.R2.instr },
+  R2: { short: '阅读 2', title: 'Leer 2', sub: 'Completá con la palabra', instr: HSK_SECTIONS.R4.instr },
+  R3: { short: '阅读 3', title: 'Leer 3', sub: 'Texto y frase ★: ✓ o ✗', instr: 'Leé el texto y decidí si la frase con ★ es verdadera.' },
+  R4: { short: '阅读 4', title: 'Leer 4', sub: 'Uní preguntas y respuestas', instr: HSK_SECTIONS.R3.instr },
+};
 const HSK_ORDER = ['L1', 'L2', 'L3', 'L4', 'R1', 'R2', 'R3', 'R4'];
-const hskImg = (f) => 'hsk1/img/' + f.img + '.jpg';
+// Estructura de cada nivel (formato HSK 2.0). `logic` dice qué ejercicio arma cada parte;
+// `exam` cuántas preguntas tiene cada parte en el simulacro (las de unir siempre son 5).
+const HSK_LEVELS = {
+  1: { n: 1, t: 'hsk1', name: 'HSK 1', includes: [], sections: HSK_SECTIONS, logic: {},
+    exam: { L1: 5, L2: 5, L3: 5, L4: 5, R1: 5, R2: 5, R3: 5, R4: 5 }, time: { L: 15 * 60, R: 17 * 60 }, examTotal: 40,
+    intro: ['20 preguntas · unos 15 minutos. Cada audio suena dos veces.', '20 preguntas · 17 minutos.'],
+    about: '40 preguntas en unos 40 minutos: 20 de comprensión auditiva (cada audio suena dos veces) y 20 de lectura. Son 200 puntos y se aprueba con 120. Todo el texto viene con pinyin.' },
+  2: { n: 2, t: 'hsk2', name: 'HSK 2', includes: ['hsk1'], sections: HSK2_SECTIONS,
+    logic: { L1: 'L1frase', R1: 'R2', R2: 'R4', R3: 'juicio', R4: 'R3' },
+    exam: { L1: 10, L2: 10, L3: 5, L4: 10, R1: 5, R2: 5, R3: 10, R4: 5 }, time: { L: 25 * 60, R: 22 * 60 }, examTotal: 60,
+    intro: ['35 preguntas · unos 25 minutos. Cada audio suena dos veces.', '25 preguntas · 22 minutos.'],
+    about: '60 preguntas en unos 50 minutos: 35 de comprensión auditiva (cada audio suena dos veces) y 25 de lectura. Son 200 puntos y se aprueba con 120. Entran las 300 palabras del HSK 1 y 2, todo con pinyin.' },
+};
+const hskImg = (f) => f.src;
 const LETTERS = 'ABCDEF';
 
 // Fotos de temas distintos (así ninguna foto "distractora" también es correcta)
@@ -3759,7 +3809,7 @@ function hskPickFotos(fotos, n, excludeScenes) {
 }
 // Tipo de pregunta de una frase (para no ofrecer dos respuestas que sirvan)
 function hskQGroup(q) {
-  const keys = [['几点', 'hora'], ['什么时候', 'hora'], ['星期几', 'dia'], ['几月', 'fecha'], ['几号', 'fecha'], ['多大', 'edad'], ['几岁', 'edad'],
+  const keys = [['为什么', 'porque'], ['多长时间', 'duracion'], ['还是', 'eleccion'], ['几点', 'hora'], ['什么时候', 'hora'], ['星期几', 'dia'], ['几月', 'fecha'], ['几号', 'fecha'], ['多大', 'edad'], ['几岁', 'edad'],
     ['几口', 'cuantos'], ['多少钱', 'precio'], ['多少', 'cuantos'], ['哪国', 'pais'], ['哪儿', 'lugar'], ['谁', 'quien'], ['怎么样', 'como'], ['怎么', 'modo'], ['什么', 'que'], ['吗', 'sino']];
   const k = keys.find(([w]) => q.includes(w));
   return k ? k[1] : q;
@@ -3772,14 +3822,30 @@ function hskPickDistinct(list, n, groupOf) {
 const wordInfo = (wm, h) => { const w = wm[h]; return { t: h, py: w ? w.pinyin : '', es: w ? w.es : '' }; };
 
 // Arma una sección: preguntas sueltas (tf / img / text) o un tablero de unir
-function buildHskSection(kind, bank, wm) {
+function buildHskSection(kind, bank, wm, lv, count) {
+  const n = count || 5;
   const fotos = bank.foto;
+  kind = (lv && lv.logic[kind]) || kind;
   // Frase grabada del material para cada foto (la foto de esa palabra ilustra esa frase)
   const byId = {}; Object.values(wm).forEach(w => { byId[w.id] = w; });
   const voiced = fotos.filter(f => byId[f.img] && byId[f.img].s_audio && hasRealAudio(byId[f.img].sentence));
   const sent = (f) => { const w = byId[f.img]; return { t: w.sentence, py: w.s_pinyin, es: w.s_es }; };
+  if (kind === 'L1frase') {
+    return { type: 'single', items: hskPickFotos(voiced, n).map(f => {
+      const truth = Math.random() < 0.5;
+      const shown = truth ? f : hskPickFotos(voiced, 1, [f.scene])[0];
+      return { q: 'tf', img: hskImg(f), say: sent(shown).t, answer: truth,
+        reveal: { ...sent(shown), note: truth ? null : 'En la foto: ' + f.text + ' (' + f.es + ')' }, missed: sent(shown) };
+    }) };
+  }
+  if (kind === 'juicio') {
+    return { type: 'single', items: shuffle(bank.juicio).slice(0, n).map(it => ({
+      q: 'tf', passage: { t: it.t, py: it.py }, stmt: { t: it.st, py: it.spy }, answer: it.ans,
+      reveal: { t: '★ ' + it.st, py: it.spy, es: it.ses + (it.ans ? ' ✓' : ' ✗'), note: it.es }, missed: { t: it.t, py: it.py, es: it.es },
+    })) };
+  }
   if (kind === 'L1' || kind === 'R1') {
-    return { type: 'single', items: hskPickFotos(fotos, 5).map(f => {
+    return { type: 'single', items: hskPickFotos(fotos, n).map(f => {
       const truth = Math.random() < 0.5;
       const shown = truth ? f.word : hskPickFotos(fotos, 1, [f.scene])[0].word;
       const info = wordInfo(wm, shown);
@@ -3788,14 +3854,14 @@ function buildHskSection(kind, bank, wm) {
     }) };
   }
   if (kind === 'L2') {
-    return { type: 'single', items: hskPickFotos(voiced, 5).map(f => ({
+    return { type: 'single', items: hskPickFotos(voiced, n).map(f => ({
       q: 'img', say: sent(f).t, options: shuffle([f, ...hskPickFotos(fotos, 2, [f.scene])]).map(o => ({ img: hskImg(o), ok: o === f })),
       reveal: sent(f), missed: sent(f),
     })) };
   }
   if (kind === 'L4') {
     const pool = Object.values(wm).filter(w => w.s_audio && hasRealAudio(w.sentence));
-    return { type: 'single', items: shuffle(pool).slice(0, 5).map(w => {
+    return { type: 'single', items: shuffle(pool).slice(0, n).map(w => {
       const others = shuffle(pool.filter(o => o !== w && o.s_es !== w.s_es)).slice(0, 2);
       const s0 = { t: w.sentence, py: w.s_pinyin, es: w.s_es };
       return { q: 'text', say: w.sentence, options: shuffle([w, ...others]).map(o => ({ h: o.s_es, es: true, ok: o === w })), reveal: s0, missed: s0 };
@@ -3839,8 +3905,8 @@ function speakChain(tokens, onEnd) {
 // Audio "como en el examen": suena dos veces
 function speakTwice(text) { speakReal(text, () => setTimeout(() => speakReal(text), 900)); }
 
-function HskSectionHead({ kind, onBack, right, exam }) {
-  const meta = HSK_SECTIONS[kind];
+function HskSectionHead({ kind, lv, onBack, right, exam }) {
+  const meta = (lv || HSK_LEVELS[1]).sections[kind];
   return html(React.Fragment, null,
     html('div', { className: 'header-row' },
       onBack ? html('button', { className: 'back-btn', onClick: onBack }, '←') : null,
@@ -3880,7 +3946,9 @@ function HskSingles({ items, mode, onProgress, onDone }) {
     html('div', { className: 'hsk-q-count' }, (i + 1) + ' / ' + items.length),
     it.say && html('button', { className: 'hsk-replay', onClick: () => speakTwice(it.say) }, '🔊 Escuchar otra vez'),
     it.q === 'tf' && html('div', { className: 'hsk-tf' },
-      html('img', { className: 'hsk-tf-img', src: it.img, alt: '' }),
+      it.img && html('img', { className: 'hsk-tf-img', src: it.img, alt: '' }),
+      it.passage && html('div', { className: 'hsk-passage' }, html(TonedPinyin, { text: it.passage.py, className: 'hsk-py' }), html('div', { className: 'hanzi-font' }, it.passage.t)),
+      it.stmt && html('div', { className: 'hsk-stmt' }, html(TonedPinyin, { text: it.stmt.py, className: 'hsk-py' }), html('div', { className: 'hanzi-font' }, '★ ' + it.stmt.t)),
       it.show && html('div', { className: 'hsk-tf-word' }, html(TonedPinyin, { text: it.show.py, className: 'hsk-py' }), html('div', { className: 'hanzi-font' }, it.show.t)),
       html('div', { className: 'hsk-tf-btns' },
         [true, false].map(v => html('button', { key: String(v), onClick: () => pick(v),
@@ -3999,14 +4067,16 @@ function HskSectionBody({ kind, section, mode, onProgress, onDone }) {
 }
 
 // Práctica de una parte del examen
-function HskSectionPractice({ kind, bank, wm, onBack, onSave, onAgain }) {
-  const [section] = useState(() => buildHskSection(kind, bank, wm));
+const hskSectionSize = (sec) => sec ? (sec.type === 'single' ? sec.items.length : sec.left.length) : 0;
+function HskSectionPractice({ kind, bank, wm, lv, onBack, onSave, onAgain }) {
+  const [section] = useState(() => buildHskSection(kind, bank, wm, lv));
   const [res, setRes] = useState(null);
-  if (!section) return html(GameStatusScreen, { onBack, title: HSK_SECTIONS[kind].title, msg: 'Falta contenido para esta parte.' });
-  const done = (r) => { setRes(r); onSave({ kind, score: r.ok, total: 5, detail: { missed: r.missed } }); };
-  if (res) return html(HskResult, { title: HSK_SECTIONS[kind].title, ok: res.ok, total: 5, missed: res.missed, onAgain, onBack });
+  const total = hskSectionSize(section);
+  if (!total) return html(GameStatusScreen, { onBack, title: lv.sections[kind].title, msg: 'Falta contenido para esta parte.' });
+  const done = (r) => { setRes(r); onSave({ kind, score: r.ok, total, detail: { missed: r.missed } }); };
+  if (res) return html(HskResult, { title: lv.sections[kind].title, ok: res.ok, total, missed: res.missed, onAgain, onBack });
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
-    html(HskSectionHead, { kind, onBack }),
+    html(HskSectionHead, { kind, lv, onBack }),
     html('div', { className: 'hsk-wrap' }, html(HskSectionBody, { kind, section, mode: 'practice', onDone: done })),
   );
 }
@@ -4031,9 +4101,14 @@ function HskResult({ title, ok, total, missed, onAgain, onBack, children }) {
 }
 
 // ── Simulacro: las 8 partes en orden, con reloj, sin corrección hasta el final ──
-const HSK_TIME = { L: 15 * 60, R: 17 * 60 };
-function HskExam({ bank, wm, onBack, onSave, onAgain }) {
-  const [sections] = useState(() => { const o = {}; HSK_ORDER.forEach(k => { o[k] = buildHskSection(k, bank, wm); }); return o; });
+function HskExam({ bank, wm, lv, onBack, onSave, onAgain }) {
+  const HSK_TIME = lv.time;
+  const [sections] = useState(() => { const o = {}; HSK_ORDER.forEach(k => { o[k] = buildHskSection(k, bank, wm, lv, lv.exam[k]); }); return o; });
+  const size = (k) => hskSectionSize(sections[k]);
+  const nL = ['L1', 'L2', 'L3', 'L4'].reduce((s, k) => s + size(k), 0);
+  const nR = ['R1', 'R2', 'R3', 'R4'].reduce((s, k) => s + size(k), 0);
+  // Cada fase vale 100 puntos (como en el examen real)
+  const pts = (all, keys, n) => n ? Math.round(keys.reduce((s, k) => s + ((all[k] || {}).ok || 0), 0) * 100 / n) : 0;
   const [stage, setStage] = useState('intro');          // intro | run | result
   const [idx, setIdx] = useState(0);
   const [scores, setScores] = useState({});             // kind → { ok, missed }
@@ -4053,8 +4128,8 @@ function HskExam({ bank, wm, onBack, onSave, onAgain }) {
     setIdx(n);
   };
   const finishExam = (all) => {
-    const L = ['L1', 'L2', 'L3', 'L4'].reduce((s, k) => s + ((all[k] || {}).ok || 0), 0) * 5;
-    const R = ['R1', 'R2', 'R3', 'R4'].reduce((s, k) => s + ((all[k] || {}).ok || 0), 0) * 5;
+    const L = pts(all, ['L1', 'L2', 'L3', 'L4'], nL);
+    const R = pts(all, ['R1', 'R2', 'R3', 'R4'], nR);
     const missed = HSK_ORDER.flatMap(k => (all[k] || {}).missed || []);
     const secs = {}; HSK_ORDER.forEach(k => { secs[k] = (all[k] || {}).ok || 0; });
     onSave({ kind: 'simulacro', score: L + R, total: 200, listening: L, reading: R, detail: { sections: secs, missed } });
@@ -4076,20 +4151,20 @@ function HskExam({ bank, wm, onBack, onSave, onAgain }) {
   }, [stage, left]);
 
   if (stage === 'intro') return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
-    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '考 Simulacro HSK 1')),
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '考 Simulacro ' + lv.name)),
     html('div', { className: 'hsk-wrap' },
       html('div', { className: 'hsk-exam-info' },
-        html('p', null, html('b', null, '听力 Comprensión auditiva'), ' · 20 preguntas · unos 15 minutos. Cada audio suena dos veces.'),
-        html('p', null, html('b', null, '阅读 Lectura'), ' · 20 preguntas · 17 minutos.'),
-        html('p', null, 'No hay corrección hasta el final y no se puede volver atrás. Cada respuesta correcta vale 5 puntos: 200 en total, se aprueba con 120.'),
+        html('p', null, html('b', null, '听力 Comprensión auditiva'), ' · ' + lv.intro[0]),
+        html('p', null, html('b', null, '阅读 Lectura'), ' · ' + lv.intro[1]),
+        html('p', null, 'No hay corrección hasta el final y no se puede volver atrás. Comprensión auditiva y lectura valen 100 puntos cada una: 200 en total, se aprueba con 120.'),
         html('p', { style: { color: 'var(--ink-soft)' } }, 'Buscá un lugar tranquilo y usá auriculares.'),
       ),
       html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 14 }, onClick: () => { setStage('run'); setLeft(HSK_TIME.L); } }, 'Empezar'),
     ));
 
   if (stage === 'result') {
-    const L = ['L1', 'L2', 'L3', 'L4'].reduce((s, k) => s + ((scores[k] || {}).ok || 0), 0) * 5;
-    const R = ['R1', 'R2', 'R3', 'R4'].reduce((s, k) => s + ((scores[k] || {}).ok || 0), 0) * 5;
+    const L = pts(scores, ['L1', 'L2', 'L3', 'L4'], nL);
+    const R = pts(scores, ['R1', 'R2', 'R3', 'R4'], nR);
     const total = L + R, pass = total >= 120;
     const missed = HSK_ORDER.flatMap(k => (scores[k] || {}).missed || []);
     return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
@@ -4102,11 +4177,11 @@ function HskExam({ bank, wm, onBack, onSave, onAgain }) {
             html('span', null, '听力 Escuchar: ', html('b', null, L), ' / 100'),
             html('span', null, '阅读 Leer: ', html('b', null, R), ' / 100'))),
         html('div', { className: 'hsk-secs', style: { marginTop: 12 } }, HSK_ORDER.map(k => {
-          const ok = (scores[k] || {}).ok || 0;
+          const ok = (scores[k] || {}).ok || 0; const p = size(k) ? ok / size(k) : 0;
           return html('div', { key: k, className: 'hsk-sec static' },
-            html('span', { className: 'hsk-sec-tag ' + (k[0] === 'L' ? 'listen' : 'read') }, HSK_SECTIONS[k].short),
-            html('span', { className: 'hsk-sec-title' }, HSK_SECTIONS[k].title),
-            html('span', { className: 'hsk-sec-pct ' + (ok >= 4 ? 'ok' : ok >= 3 ? 'mid' : 'low') }, ok + '/5'));
+            html('span', { className: 'hsk-sec-tag ' + (k[0] === 'L' ? 'listen' : 'read') }, lv.sections[k].short),
+            html('span', { className: 'hsk-sec-title' }, lv.sections[k].title),
+            html('span', { className: 'hsk-sec-pct ' + (p >= 0.8 ? 'ok' : p >= 0.6 ? 'mid' : 'low') }, ok + '/' + size(k)));
         })),
         missed.length > 0 && html('div', { className: 'hsk-exam-info', style: { marginTop: 12 } },
           html('div', { className: 'report-h' }, 'Para repasar (' + missed.length + ')'),
@@ -4120,7 +4195,7 @@ function HskExam({ bank, wm, onBack, onSave, onAgain }) {
 
   const mm = String(Math.floor(Math.max(left, 0) / 60)).padStart(2, '0') + ':' + String(Math.max(left, 0) % 60).padStart(2, '0');
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
-    html(HskSectionHead, { kind, exam: true, right: html('div', { className: 'hsk-timer' + (left <= 60 ? ' low' : '') }, '⏱ ' + mm) }),
+    html(HskSectionHead, { kind, lv, exam: true, right: html('div', { className: 'hsk-timer' + (left <= 60 ? ' low' : '') }, '⏱ ' + mm) }),
     html('div', { className: 'hsk-wrap' },
       html('div', { className: 'hsk-exam-progress' }, HSK_ORDER.map((k, n) => html('i', { key: k, className: n < idx ? 'done' : n === idx ? 'now' : '' }))),
       html(HskSectionBody, { key: kind, kind, section: sections[kind], mode: 'exam',
@@ -4178,7 +4253,7 @@ function buildNumberQ() {
   return mk(['我', ...numTokens(n), '岁'], 'Tengo ' + n + ' años.', '¿Cuántos años tiene?', opts(n, 99, x => x + ' años'));
 }
 
-function HskDrill({ kind, bank, wm, onBack, onSave, onAgain }) {
+function HskDrill({ kind, bank, wm, lv, onBack, onSave, onAgain }) {
   const TITLES = { numeros: 'Números, horas y precios', preguntas: 'Palabras para preguntar', pares: 'Palabras que se confunden' };
   const INSTR = { numeros: 'Escuchá y elegí lo que oíste. Ojo con 四 sì (4) y 十 shí (10).', preguntas: 'Leé la pregunta y elegí la respuesta que tiene sentido.', pares: 'Elegí la palabra que va en el hueco.' };
   const [qs] = useState(() => {
@@ -4187,7 +4262,7 @@ function HskDrill({ kind, bank, wm, onBack, onSave, onAgain }) {
       const others = hskPickDistinct(bank.qa.filter(x => hskQGroup(x.q) !== hskQGroup(it.q)), 2, x => hskQGroup(x.q));
       return { zh: it.q, py: it.qpy, es: it.es, options: shuffle([it, ...others]).map(x => ({ h: x.a, py: x.apy, ok: x === it })) };
     });
-    return shuffle(bank.par).slice(0, 10).map(it => ({ zh: it.s, py: it.py, es: it.es, tip: it.tip, full: it.s.replace('＿', it.ans), options: it.opts.map(o => ({ h: o, py: wordInfo(wm, o).py, ok: o === it.ans })) }));
+    return shuffle(bank.par).slice(0, 10).map(it => ({ zh: it.s, py: it.py, es: it.es, tip: it.tip, full: it.s.replace('＿', it.ans), options: it.opts.map((o, k) => ({ h: o, py: (it.opy && it.opy[k]) || wordInfo(wm, o).py, ok: o === it.ans })) }));
   });
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState(null);
@@ -4266,7 +4341,7 @@ function Hsk1WordList({ words, cardState, keyOf, onBack }) {
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
-      html('h1', null, 'Las 150 palabras'),
+      html('h1', null, 'Las ' + words.length + ' palabras'),
     ),
     html('div', { className: 'hsk-wrap' },
       html('div', { className: 'report-tabs' }, Object.keys(LABEL).map(k => html('button', { key: k, className: 'report-tab' + (filter === k ? ' active' : ''), onClick: () => setFilter(k) },
@@ -4280,15 +4355,18 @@ function Hsk1WordList({ words, cardState, keyOf, onBack }) {
   );
 }
 
-// Reporte HSK 1 de la clase (para el profe)
-function Hsk1ClassReport({ classId }) {
+// Reporte HSK de la clase (para el profe)
+function HskClassReport({ classId, level }) {
+  const lv = HSK_LEVELS[level];
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
+  const [nWords, setNWords] = useState(null);
   useEffect(() => {
     setRows(null);
-    db.rpc('hsk1_class_report', { p_class: classId }).then(({ data, error }) => { if (error) setErr(error.message); setRows(data || []); });
+    db.rpc(lv.t + '_class_report', { p_class: classId }).then(({ data, error }) => { if (error) setErr(error.message); setRows(data || []); });
+    db.from(lv.t + '_words').select('id', { count: 'exact', head: true }).eq('hidden', false).then(({ count }) => setNWords(count || null));
   }, [classId]);
-  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + ' (¿ejecutaste npcr_hsk1.sql?)');
+  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + ' (¿ejecutaste npcr_' + lv.t + '.sql?)');
   if (!rows) return html('p', { className: 'admin-note' }, 'Cargando…');
   const active = rows.filter(r => r.user_id);
   const withSim = active.filter(r => r.last_sim !== null);
@@ -4297,7 +4375,7 @@ function Hsk1ClassReport({ classId }) {
     : html('td', { className: 'hsk-cell ' + (v >= 80 ? 'ok' : v >= 60 ? 'mid' : 'low') }, v + '%');
   return html('div', null,
     html('div', { className: 'report-card' },
-      html('div', { className: 'report-h' }, '🎓 Preparación HSK 1'),
+      html('div', { className: 'report-h' }, '🎓 Preparación ' + lv.name),
       html('p', { className: 'admin-note', style: { margin: 0 } },
         withSim.length ? passing + ' de ' + withSim.length + ' alumnos aprobarían según su último simulacro (120/200).' : 'Todavía nadie hizo un simulacro.'),
     ),
@@ -4305,10 +4383,10 @@ function Hsk1ClassReport({ classId }) {
       html('table', { className: 'rank-table hsk-report' },
         html('thead', null, html('tr', null,
           html('th', null, 'Alumno'), html('th', null, 'Palabras'), html('th', null, 'Último simulacro'), html('th', null, 'Mejor'),
-          HSK_ORDER.map(k => html('th', { key: k, title: HSK_SECTIONS[k].title }, HSK_SECTIONS[k].short)), html('th', null, 'Prácticas'))),
+          HSK_ORDER.map(k => html('th', { key: k, title: lv.sections[k].title + ' · ' + lv.sections[k].sub }, lv.sections[k].short)), html('th', null, 'Prácticas'))),
         html('tbody', null, rows.map((r, k) => html('tr', { key: k, style: r.user_id ? null : { opacity: 0.45 } },
           html('td', { style: { fontWeight: 700 } }, r.display_name),
-          html('td', null, r.words_seen + '/150', html('div', { style: { fontSize: 11, color: 'var(--ink-soft)' } }, r.words_learned + ' aprendidas')),
+          html('td', null, r.words_seen + (nWords ? '/' + nWords : ''), html('div', { style: { fontSize: 11, color: 'var(--ink-soft)' } }, r.words_learned + ' aprendidas')),
           html('td', null, r.last_sim === null ? '—' : html('span', { className: 'hsk-sim ' + (r.last_sim >= 120 ? 'pass' : 'fail') }, r.last_sim),
             r.last_sim !== null && html('div', { style: { fontSize: 11, color: 'var(--ink-soft)' } }, 'E ' + (r.last_listening || 0) + ' · L ' + (r.last_reading || 0))),
           html('td', null, r.best_sim === null ? '—' : r.best_sim),

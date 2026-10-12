@@ -1510,3 +1510,12 @@ main.mem-main { padding-bottom: 8px !important; }
 .mem-learn.empty { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 48px; font-size: 12px; }
 @media (max-height: 560px) { .mem-learn { height: 48px; min-height: 48px; } }
 .mem-front .mem-frame { overflow: hidden; }
+/* Fotos del HSK: siempre enteras (sin recortar), con fondo neutro alrededor */
+.hsk-tf-img { width: auto; max-width: 100%; height: auto; max-height: 280px; object-fit: contain; background: var(--paper-deep); }
+.hsk-img-opt { background: var(--paper-deep); }
+.hsk-img-opt img { object-fit: contain; }
+.hsk-item.photo img { height: 128px; object-fit: contain; background: var(--paper-deep); }
+@media (max-width: 480px) { .hsk-item.photo img { height: 96px; } }
+.hsk-passage { background: var(--paper); border: 1.5px solid var(--paper-deep); border-radius: 14px; padding: 12px 14px; text-align: left; font-size: 20px; line-height: 1.5; }
+.hsk-stmt { margin-top: 10px; padding: 10px 14px; border-left: 4px solid var(--gold, #d4a017); background: #fff; border-radius: 10px; text-align: left; font-size: 20px; font-weight: 700; }
+.hsk-passage .hsk-py, .hsk-stmt .hsk-py { display: block; font-size: 13px; margin-bottom: 2px; }

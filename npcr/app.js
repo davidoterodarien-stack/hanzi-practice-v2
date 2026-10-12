@@ -1106,9 +1106,8 @@ function App() {
     if (secretTaps < 5) return;
     setSecretTaps(0);
     clearTimeout(secretTimer.current);
-    if (hsk1Allowed) setScreen({ name: 'hsk1' });
-    else if (hsk2Allowed) setScreen({ name: 'hsk2' });
-    else if (ENABLE_CUI_EXAM) setShowSecretExam(true);
+    // El HSK se abre solo desde Mi aula (ya no con los 5 toques)
+    if (ENABLE_CUI_EXAM) setShowSecretExam(true);
   }, [secretTaps]);
   const [lastResults, setLastResults] = useState({});
   const [contentLoading, setContentLoading] = useState(true);

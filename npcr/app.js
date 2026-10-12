@@ -842,7 +842,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     label + (sort.key === key ? (sort.dir < 0 ? ' ▼' : ' ▲') : ''));
 
   const tabs = [['alumnos', '👥 Alumnos'], ['resumen', '📊 Resumen'], ['ranking', '🏆 Ranking'], ['mapa', '🗺️ Mapa'], ['palabras', '🧩 Palabras difíciles'], ['tareas', '📋 Tareas'],
-    ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ['config', '⚙️ Configurar']];
+    ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ['bingo', '🎱 Bingo'], ['config', '⚙️ Configurar']];
 
   let body = null;
   if (err) body = html('div', { className: 'admin-status err' }, '❌ ' + err + (/function|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_fase2.sql en Supabase?' : ''));
@@ -973,6 +973,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   }
 
   if (!err && rows !== null && !student && tab === 'hsk') body = html(Hsk1ClassReport, { classId });
+  if (!err && rows !== null && !student && tab === 'bingo') body = html(BingoHost, { key: classId, classId, className: cls ? cls.name : 'Clase', lessons, maxLesson: settings && settings.max_lesson ? Number(settings.max_lesson) : null });
 
   if (!err && rows !== null && !student && tab === 'config') {
     const ww = settings.weekly_words || [];
@@ -1219,10 +1220,20 @@ function App() {
   // ── Estado extra ──
   const [assignments,  setAssignments]  = useState([]);
   const [myClasses,    setMyClasses]    = useState(null); // null = cargando
+  const [bingoGame, setBingoGame] = useState(null);
   const [codeNotice, setCodeNotice] = useState(null); // { type: 'ok'|'err', msg }
 
   const [classSettings, setClassSettings] = useState(null);
   const isStaffUser = !!(profile && ['laoshi', 'admin', 'superadmin'].includes(profile.role));
+  // Bingo en vivo: partida abierta en la clase del alumno (tiempo real + consulta de respaldo)
+  const myClassId = myClasses && myClasses.length ? myClasses[0].class_id : null;
+  const refreshBingo = () => {
+    if (!myClassId) return;
+    db.from('bingo_games').select('id,status,created_at').eq('class_id', myClassId).order('created_at', { ascending: false }).limit(5)
+      .then(({ data, error }) => setBingoGame((!error && (data || []).find(g => g.status !== 'finished')) || null));
+  };
+  useLiveRefresh('bingo_games', myClassId ? 'class_id=eq.' + myClassId : null, refreshBingo, 15000);
+  useEffect(() => { if (screen.name === 'home' || screen.name === 'clase') refreshBingo(); }, [screen.name]);
   const hsk1Allowed = isStaffUser || !!(classSettings && classSettings.hsk1_enabled);
   // Vista de alumno para el equipo docente: "Mi aula" de una de sus clases
   const staffRef = React.useRef(false);
@@ -1507,7 +1518,10 @@ function App() {
       classSettings, hardCount: classHard.length,
       onActivity: (id) => setScreen(AULA_GAMES[id] ? { name: 'prueba', game: AULA_GAMES[id], from: 'clase' } : { name: id }),
       staffClasses, onPreviewClass: choosePreviewClass,
+      bingoGame, onBingo: () => bingoGame && setScreen({ name: 'bingo', gameId: bingoGame.id }),
     });
+  } else if (screen.name === 'bingo' && screen.gameId) {
+    content = html(BingoPlayer, { key: screen.gameId, gameId: screen.gameId, onBack: () => setScreen({ name: myClasses && myClasses.length ? 'clase' : 'home' }) });
   } else if (screen.name === 'hsk1' && hsk1Allowed) {
     content = html(Hsk1Screen, {
       studentId, appConfig,
@@ -1564,6 +1578,7 @@ function App() {
       settings: classSettings, hardCount: classHard.length,
       onActivity: (id) => setScreen(AULA_GAMES[id] ? { name: 'prueba', game: AULA_GAMES[id], from: 'clase' } : { name: id }),
       onTarget: (l, m) => setScreen({ name: 'play', lessonId: l, mode: m, from: 'clase' }),
+      bingoGame, onBingo: () => bingoGame && setScreen({ name: 'bingo', gameId: bingoGame.id }),
       onTraining: () => setScreen({ name: 'entrenamiento' }),
       onProgress: () => setScreen({ name: 'progreso' }),
       onBack: () => setScreen({ name: 'home' }),
@@ -1807,7 +1822,7 @@ function App() {
   const navIsRefuerzo = screen.name === 'refuerzo';
   const navIsPractica = screen.name === 'practica' || (screen.name === 'prueba' && screen.from !== 'clase');
   const navIsAdmin = screen.name === 'admin' || screen.name === 'reports';
-  const navIsClase = ['clase', 'entrenamiento', 'refuerzo-clase', 'semana', 'tonos', 'dictado'].includes(screen.name) || (screen.name === 'prueba' && screen.from === 'clase');
+  const navIsClase = ['clase', 'entrenamiento', 'refuerzo-clase', 'semana', 'tonos', 'dictado', 'bingo'].includes(screen.name) || (screen.name === 'prueba' && screen.from === 'clase');
   const navIsProgreso = screen.name === 'progreso' || screen.name === 'dificiles';
 
   const sidebar = html('aside', { className: 'sidebar' },
@@ -2398,7 +2413,7 @@ function ClassBox({ cls, dailyCount, dailyDone, assignments, settings, hardCount
 
 const MODE_LABELS = { match: 'Emparejar', cards: 'Tarjetas', quiz: 'Opción múltiple', frases: 'Frases clave' };
 
-function ClassHome({ cls, dailyCount, dailyDone, assignments, settings, hardCount, onTraining, onProgress, onActivity, onTarget, onBack }) {
+function ClassHome({ cls, dailyCount, dailyDone, assignments, settings, hardCount, onTraining, onProgress, onActivity, onTarget, onBack, bingoGame, onBingo }) {
   const tasks = assignments || [];
   const activities = aulaActivities(settings, hardCount);
 
@@ -2412,6 +2427,7 @@ function ClassHome({ cls, dailyCount, dailyDone, assignments, settings, hardCoun
       ),
     ),
     html('div', { style: { padding: '0 16px' } },
+      html(BingoInvite, { game: bingoGame, onJoin: onBingo }),
       html('h2', { className: 'section-title' }, 'Hoy'),
       html('button', { className: 'class-training-card' + (dailyDone ? ' done' : ''), onClick: onTraining },
         html(AulaIcon, { name: dailyDone ? 'check' : 'target', tone: 'white', size: 52 }),
@@ -2539,7 +2555,7 @@ function NameRequired({ onSave }) {
   );
 }
 
-function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass }) {
+function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass, bingoGame, onBingo }) {
   const regularCount = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length;
   return html(React.Fragment, null,
     playerName && html('div', { className: 'greeting-bar' },
@@ -2564,6 +2580,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
 
       html(PanelLectura, { playerName }),
 
+      myClasses && myClasses.length > 0 && html(BingoInvite, { game: bingoGame, onJoin: onBingo }),
       myClasses && myClasses.length > 0 && html(ClassBox, { cls: myClasses[0], dailyCount, dailyDone, assignments, settings: classSettings, hardCount, onOpen: onOpenClass, onTraining, onProgress, onActivity, staffClasses, onPreviewClass }),
       (!myClasses || !myClasses.length) && staffClasses && staffClasses.length > 0 && html('button', { className: 'aula-preview-show', onClick: () => onPreviewClass('') }, '👁 Ver "Mi aula" como alumno'),
 
@@ -4294,6 +4311,228 @@ function Hsk1ClassReport({ classId }) {
           html('td', null, r.practices)))),
       )),
   );
+}
+
+// ═════════════════ Bingo de hanzi 宾果 (juego en vivo de la clase) ═════════════════
+// Partida en bingo_games, cartones en bingo_cards; todo se valida en el servidor
+// (npcr_bingo.sql). Tiempo real con Supabase Realtime + consulta periódica de respaldo.
+function useLiveRefresh(table, filter, refresh, everyMs) {
+  useEffect(() => {
+    if (!filter) return;
+    refresh();
+    const t = setInterval(refresh, everyMs);
+    let ch = null;
+    if (db.channel) {
+      try {
+        ch = db.channel('live-' + table + '-' + filter + '-' + Math.random().toString(36).slice(2))
+          .on('postgres_changes', { event: '*', schema: 'public', table, filter }, () => refresh())
+          .subscribe();
+      } catch (e) { ch = null; }
+    }
+    return () => { clearInterval(t); if (ch && db.removeChannel) db.removeChannel(ch); };
+  }, [filter]);
+}
+const bingoItem = (game, h) => (game.pool || []).find(x => x.h === h) || { h, p: '', e: '' };
+function bingoLines(n) {
+  const L = [];
+  for (let i = 0; i < n; i++) { L.push([...Array(n)].map((_, j) => i * n + j)); L.push([...Array(n)].map((_, j) => j * n + i)); }
+  L.push([...Array(n)].map((_, j) => j * n + j)); L.push([...Array(n)].map((_, j) => j * n + (n - 1 - j)));
+  return L;
+}
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+function BingoWinners({ winners }) {
+  if (!winners || !winners.length) return null;
+  return html('div', { className: 'bingo-winners' },
+    winners.map((w, k) => html('div', { key: k, className: 'bingo-winner' }, html('span', null, MEDALS[k] || (k + 1) + '°'), ' ', w.name)));
+}
+
+// ── Pantalla del lǎoshī: crear, sala de espera, cantar fichas ──
+function BingoHost({ classId, className, lessons, maxLesson }) {
+  const [game, setGame] = useState(undefined);   // undefined = cargando, null = no hay partida activa
+  const [players, setPlayers] = useState([]);
+  const [pick, setPick] = useState(() => lessons.filter(l => !isNaN(parseFloat(l)) && (!maxLesson || parseFloat(l) <= maxLesson)));
+  const [size, setSize] = useState(4);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [reveal, setReveal] = useState(false);
+  const boxRef = React.useRef(null);
+  const lastCalled = React.useRef(null);
+
+  const loadGame = () => db.from('bingo_games').select('*').eq('class_id', classId).order('created_at', { ascending: false }).limit(5)
+    .then(({ data, error }) => {
+      if (error) { setErr(error.message + (/relation|does not exist/.test(error.message) ? ' — ¿ejecutaste npcr_bingo.sql?' : '')); setGame(null); return; }
+      const g = (data || []).find(x => x.status !== 'finished') || (data || [])[0] || null;
+      setGame(g);
+    });
+  const loadPlayers = (gid) => db.from('bingo_cards').select('student_id,name,marks,joined_at').eq('game_id', gid).then(({ data }) => setPlayers(data || []));
+  useLiveRefresh('bingo_games', 'class_id=eq.' + classId, loadGame, 5000);
+  const gid = game && game.status !== 'finished' ? game.id : null;
+  useLiveRefresh('bingo_cards', gid ? 'game_id=eq.' + gid : null, () => gid && loadPlayers(gid), 4000);
+
+  // Al salir una ficha nueva: suena el audio original (si existe) y se oculta el hanzi
+  const called = (game && game.called) || [];
+  const current = called.length ? bingoItem(game, called[called.length - 1]) : null;
+  useEffect(() => {
+    if (!current || current.h === lastCalled.current) return;
+    lastCalled.current = current.h; setReveal(false);
+    if (hasRealAudio(current.h)) speak(current.h);
+  }, [current && current.h]);
+
+  const run = async (fn, args) => {
+    setBusy(true); setErr(null);
+    const { data, error } = await db.rpc(fn, args);
+    setBusy(false);
+    if (error) { setErr(error.message); return null; }
+    loadGame();
+    return data;
+  };
+  const create = () => run('bingo_create', { p_class: classId, p_lessons: pick, p_size: size });
+  const toggleLesson = (l) => setPick(p => p.includes(l) ? p.filter(x => x !== l) : [...p, l].sort(lessonCompare));
+  const fullscreen = () => { const el = boxRef.current; if (!el) return; if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); };
+
+  if (game === undefined) return html('p', { className: 'admin-note' }, 'Cargando…');
+  const active = game && game.status !== 'finished';
+
+  if (!active) return html('div', null,
+    err && html('div', { className: 'admin-status err', style: { marginBottom: 10 } }, '❌ ' + err),
+    game && game.status === 'finished' && (game.winners || []).length > 0 && html('div', { className: 'report-card' },
+      html('div', { className: 'report-h' }, '🏆 Última partida'), html(BingoWinners, { winners: game.winners })),
+    html('div', { className: 'report-card' },
+      html('div', { className: 'report-h' }, '🎱 Nueva partida de Bingo 宾果'),
+      html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Cada alumno recibe un cartón distinto con hanzi de las lecciones que elijas. Vos sacás las fichas: suena el audio del libro y se ve el pinyin y el significado; ellos buscan el hanzi en su cartón. Se unen desde "Mi aula".'),
+      html('div', { className: 'admin-note', style: { fontWeight: 800, marginBottom: 6 } }, 'Lecciones'),
+      html('div', { className: 'bingo-lessons' }, lessons.filter(l => !isNaN(parseFloat(l))).map(l => html('button', { key: l, type: 'button',
+        className: 'mode-check' + (pick.includes(l) ? ' on' : ''), onClick: () => toggleLesson(l) }, 'L' + l))),
+      html('div', { className: 'admin-note', style: { fontWeight: 800, margin: '12px 0 6px' } }, 'Cartón'),
+      html('div', { className: 'bingo-lessons' },
+        [[3, '3 × 3 · rápido'], [4, '4 × 4 · clásico']].map(([n, t]) => html('button', { key: n, type: 'button', className: 'mode-check' + (size === n ? ' on' : ''), onClick: () => setSize(n) }, t))),
+      html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 14 }, disabled: busy || !pick.length, onClick: create }, busy ? 'Creando…' : 'Crear partida'),
+    ));
+
+  const winners = game.winners || [];
+  return html('div', { ref: boxRef, className: 'bingo-host' },
+    err && html('div', { className: 'admin-status err', style: { marginBottom: 10 } }, '❌ ' + err),
+    html('div', { className: 'bingo-host-head' },
+      html('div', null,
+        html('div', { className: 'bingo-title' }, '🎱 Bingo 宾果 · ' + className),
+        html('div', { className: 'bingo-sub' }, game.status === 'lobby' ? 'Sala de espera' : 'Ficha ' + called.length + ' de ' + game.pool.length + ' · cartón ' + game.size + '×' + game.size)),
+      html('div', { style: { display: 'flex', gap: 6 } },
+        html('button', { className: 'mini-btn', onClick: fullscreen }, '⛶ Pantalla grande'),
+        html('button', { className: 'mini-btn', onClick: () => { if (window.confirm('¿Terminar la partida?')) run('bingo_end', { p_game: game.id }); } }, 'Terminar'))),
+
+    game.status === 'lobby' && html('div', { className: 'bingo-lobby' },
+      html('div', { className: 'bingo-big-n' }, players.length),
+      html('div', { className: 'bingo-sub' }, players.length === 1 ? 'alumno conectado' : 'alumnos conectados'),
+      html('div', { className: 'bingo-players' }, players.map(p => html('span', { key: p.student_id, className: 'bingo-player' }, p.name))),
+      html('p', { className: 'admin-note' }, 'Los alumnos entran desde "Mi aula" → 🎱 Unirme al Bingo.'),
+      html('button', { className: 'primary-btn', style: { minWidth: 220 }, disabled: busy, onClick: () => run('bingo_start', { p_game: game.id }) }, '▶ Empezar')),
+
+    game.status === 'playing' && html('div', { className: 'bingo-stage' },
+      html('div', { className: 'bingo-call' },
+        current ? html(React.Fragment, null,
+          html('div', { className: 'bingo-call-n' }, 'Ficha ' + called.length),
+          html('div', { className: 'bingo-call-h hanzi-font' + (reveal ? '' : ' hidden') }, reveal ? current.h : '？'),
+          html(TonedPinyin, { text: current.p, className: 'bingo-call-py' }),
+          html('div', { className: 'bingo-call-es' }, current.e),
+          html('div', { className: 'bingo-call-btns' },
+            hasRealAudio(current.h) && html('button', { className: 'mini-btn', onClick: () => speak(current.h) }, '🔊 Repetir'),
+            html('button', { className: 'mini-btn', onClick: () => setReveal(r => !r) }, reveal ? 'Ocultar hanzi' : 'Mostrar hanzi')))
+          : html('div', { className: 'bingo-sub', style: { padding: 30 } }, 'Sacá la primera ficha'),
+        html('button', { className: 'primary-btn bingo-next', disabled: busy || called.length >= game.pool.length, onClick: () => run('bingo_call', { p_game: game.id }) },
+          called.length >= game.pool.length ? 'Ya salieron todas' : busy ? '…' : 'Sacar ficha →')),
+      html('div', { className: 'bingo-side' },
+        html('div', { className: 'report-h' }, '🏆 Bingos'),
+        winners.length ? html(BingoWinners, { winners }) : html('div', { className: 'bingo-sub' }, 'Todavía nadie cantó bingo'),
+        html('div', { className: 'report-h', style: { marginTop: 12 } }, '👥 ' + players.length + ' jugando'),
+        html('div', { className: 'report-h', style: { marginTop: 12 } }, 'Ya salieron'),
+        html('div', { className: 'bingo-called' }, called.slice(0, -1).reverse().map(h => html('span', { key: h, className: 'bingo-chip hanzi-font', title: bingoItem(game, h).p + ' · ' + bingoItem(game, h).e }, h))))),
+  );
+}
+
+// ── Pantalla del alumno: cartón, marcar y cantar bingo ──
+function BingoPlayer({ gameId, onBack }) {
+  const [game, setGame] = useState(null);
+  const [card, setCard] = useState(null);
+  const [marks, setMarks] = useState([]);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+  const lastWin = React.useRef(0);
+
+  useEffect(() => {
+    db.rpc('bingo_join', { p_game: gameId }).then(({ data, error }) => {
+      if (error) { setErr(error.message); return; }
+      const c = Array.isArray(data) ? data[0] : data;
+      setCard(c); setMarks((c && c.marks) || []);
+    });
+  }, [gameId]);
+  const loadGame = () => db.from('bingo_games').select('id,status,size,pool,called,winners').eq('id', gameId).maybeSingle()
+    .then(({ data }) => { if (data) setGame(data); });
+  useLiveRefresh('bingo_games', 'id=eq.' + gameId, loadGame, 3000);
+
+  // Aviso cuando alguien canta bingo
+  const winners = (game && game.winners) || [];
+  useEffect(() => { if (winners.length > lastWin.current) { if (lastWin.current) playLevelChime(); lastWin.current = winners.length; } }, [winners.length]);
+
+  if (err) return html(GameStatusScreen, { onBack, title: '🎱 Bingo', msg: err });
+  if (!game || !card) return html('main', { style: { paddingTop: 18 } }, html('p', { className: 'admin-note', style: { textAlign: 'center' } }, 'Entrando al Bingo…'));
+
+  const n = game.size;
+  const cells = card.cells || [];
+  const called = game.called || [];
+  const current = called.length ? bingoItem(game, called[called.length - 1]) : null;
+  const lineReady = bingoLines(n).some(L => L.every(i => marks.includes(i)));
+  const myPlace = winners.findIndex(w => w.user_id === card.student_id);
+
+  const toggle = (i) => {
+    if (game.status !== 'playing') return;
+    const next = marks.includes(i) ? marks.filter(x => x !== i) : [...marks, i];
+    setMarks(next); setMsg(null);
+    db.rpc('bingo_mark', { p_game: gameId, p_marks: next }).then(() => {});
+  };
+  const claim = async () => {
+    const { data, error } = await db.rpc('bingo_claim', { p_game: gameId });
+    if (error) { setMsg({ type: 'err', text: error.message }); return; }
+    if (data.ok) { playLevelChime(); setMsg({ type: 'ok', text: '¡宾果! Cantaste bingo · ' + (MEDALS[data.place - 1] || data.place + '°') + ' puesto' }); loadGame(); }
+    else { playWrong(); setMsg({ type: 'err', text: (data.wrong && data.wrong.length) ? 'Falso bingo: ' + data.wrong.join('、') + ' todavía no ' + (data.wrong.length === 1 ? 'salió' : 'salieron') + '.' : data.msg }); }
+  };
+
+  return html('main', { className: 'bingo-main', style: { paddingTop: 12 } },
+    html('div', { className: 'header-row' },
+      html('button', { className: 'back-btn', onClick: onBack }, '←'),
+      html('h1', null, '🎱 Bingo 宾果'),
+    ),
+    html('div', { className: 'bingo-wrap' },
+      game.status === 'lobby' && html('div', { className: 'bingo-banner' }, '⏳ Esperando que tu lǎoshī empiece… Mientras, mirá tu cartón.'),
+      game.status === 'playing' && html('div', { className: 'bingo-last' },
+        current ? html(React.Fragment, null,
+          html('span', { className: 'bingo-last-n' }, 'Ficha ' + called.length),
+          html('span', { className: 'bingo-last-txt' }, html(TonedPinyin, { text: current.p, className: 'bingo-last-py' }), html('span', { className: 'bingo-last-es' }, current.e)),
+          hasRealAudio(current.h) && html('button', { className: 'mini-btn', onClick: () => speak(current.h) }, '🔊'))
+          : html('span', { className: 'bingo-sub' }, 'Todavía no salió ninguna ficha')),
+      game.status === 'finished' && html('div', { className: 'bingo-banner' }, '🏁 La partida terminó.'),
+      html('div', { className: 'bingo-card', style: { gridTemplateColumns: 'repeat(' + n + ', 1fr)' } },
+        cells.map((h, i) => html('button', { key: i, type: 'button', onClick: () => toggle(i),
+          className: 'bingo-cell' + (marks.includes(i) ? ' marked' : '') + (n === 3 ? ' big' : '') },
+          html('span', { className: 'hanzi-font' }, h),
+          marks.includes(i) && html('span', { className: 'bingo-stamp' })))),
+      msg && !(msg.type === 'ok' && myPlace >= 0) && html('div', { className: 'admin-status ' + (msg.type === 'ok' ? 'ok' : 'err'), style: { marginTop: 10, textAlign: 'center' } }, msg.text),
+      game.status === 'playing' && myPlace < 0 && html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 10 }, disabled: !lineReady, onClick: claim },
+        lineReady ? '¡宾果! Cantar bingo' : 'Completá una línea para cantar bingo'),
+      myPlace >= 0 && html('div', { className: 'admin-status ok', style: { marginTop: 10, textAlign: 'center' } }, '🎉 Cantaste bingo · ' + (MEDALS[myPlace] || (myPlace + 1) + '°') + ' puesto'),
+      winners.length > 0 && html('div', { className: 'report-card', style: { marginTop: 12 } }, html('div', { className: 'report-h' }, '🏆 Bingos'), html(BingoWinners, { winners })),
+    ));
+}
+
+// Aviso en "Mi aula" cuando hay una partida abierta
+function BingoInvite({ game, onJoin }) {
+  if (!game || game.status === 'finished') return null;
+  return html('button', { className: 'bingo-invite', onClick: onJoin },
+    html('span', { className: 'bingo-invite-icon' }, '🎱'),
+    html('span', { style: { flex: 1, textAlign: 'left' } },
+      html('div', { className: 'bingo-invite-title' }, game.status === 'lobby' ? '¡Tu lǎoshī abrió un Bingo!' : '¡Bingo en juego!'),
+      html('div', { className: 'bingo-invite-sub' }, 'Tocá para unirte con tu cartón')),
+    html('span', { className: 'bingo-invite-go' }, 'Unirme →'));
 }
 
 // ----------------- Quiz -----------------

@@ -1344,7 +1344,7 @@ main.mem-main { padding-bottom: 8px !important; }
 .mem-pill.level b { color: #fff; }
 .mem-stage { width: 100%; display: flex; justify-content: center; }
 .mem-board { display: grid; perspective: 1000px; justify-content: center; }
-.mem-card { position: relative; width: var(--cw, 80px); height: calc(var(--cw, 80px) * 1.35); border: 0; padding: 0; background: none; border-radius: 12px; cursor: pointer; container-type: inline-size; font-family: inherit; }
+.mem-card { position: relative; width: var(--cw, 80px); height: var(--ch, 108px); border: 0; padding: 0; background: none; border-radius: 12px; cursor: pointer; container-type: inline-size; font-family: inherit; }
 .mem-inner { position: absolute; inset: 0; border-radius: inherit; transform-style: preserve-3d; transition: transform .45s cubic-bezier(.3,.7,.3,1); }
 .mem-card.up .mem-inner { transform: rotateY(180deg); }
 .mem-face { position: absolute; inset: 0; border-radius: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 2px 0 var(--paper-deep), 0 4px 10px rgba(0,0,0,.08); overflow: hidden; padding: 6cqw; }
@@ -1503,3 +1503,10 @@ main.mem-main { padding-bottom: 8px !important; }
 .bingo-toast-x { background: none; border: none; font-size: 16px; color: var(--ink-soft); cursor: pointer; }
 @keyframes bingotoast { 0% { opacity: 0; transform: translateY(-20px) scale(.9); } 100% { opacity: 1; transform: none; } }
 .bingo-claim.taken { opacity: .7; background: var(--paper-deep); border-color: var(--paper-deep); color: var(--ink-soft); }
+/* Memoria: franja de abajo de alto fijo (no empuja ni reacomoda el tablero) */
+.mem-learn { height: 48px; min-height: 48px; max-height: 48px; padding: 0 12px; white-space: nowrap; }
+.mem-learn > * { flex-shrink: 0; }
+.mem-learn .mem-learn-es { flex-shrink: 1; min-width: 0; }
+.mem-learn.empty { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 48px; font-size: 12px; }
+@media (max-height: 560px) { .mem-learn { height: 48px; min-height: 48px; } }
+.mem-front .mem-frame { overflow: hidden; }

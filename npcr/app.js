@@ -2870,6 +2870,7 @@ function PlayScreen({ vocab, sentences, lessonId, mode, cardState, onRecordCard,
 // Tarjetas boca abajo: hay que encontrar cada hanzi con su tarjeta de pinyin y significado.
 // 3 niveles por lección (4, 6 y 8 parejas, o las que tenga la lección). Estrellas según intentos.
 const MEMORY_LEVELS = [4, 6, 8];
+const MEM_STRIP_H = 48;   // alto fijo de la franja de abajo (px)
 function memoryStars(tries, pairs) {
   if (tries <= Math.ceil(pairs * 1.5)) return 3;
   if (tries <= Math.ceil(pairs * 2.2)) return 2;
@@ -2897,6 +2898,7 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
   const lock = React.useRef(false);
   const stageRef = React.useRef(null);
   const learnRef = React.useRef(null);
+  const lastDims = React.useRef(null);
   const [fit, setFit] = useState(null);   // { cw, cols, gap }: carta más grande que entra sin deslizar
   const pairs = round.words.length;
 
@@ -2907,37 +2909,40 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
     const W = el.clientWidth;
     const rect = el.getBoundingClientRect();
     const top = rect.top + window.scrollY;
-    // Lo que hay debajo del tablero: la franja de aprendizaje (medida de verdad) + margen
-    const strip = learnRef.current;
-    const below = (strip ? strip.getBoundingClientRect().bottom - rect.bottom : 56) + 14;
-    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    // Debajo del tablero va la franja de aprendizaje, de alto FIJO (no depende del texto)
+    const below = MEM_STRIP_H + 22;
+    const vh = window.innerHeight;
+    lastDims.current = { w: window.innerWidth, h: vh };
     const H = Math.max(150, vh - top - below - 4);
-    const n = round.cards.length, R = 1.35;
+    const n = round.cards.length;
     const gap = Math.max(5, Math.min(10, Math.round(Math.min(W, H) / 60)));
-    let best = { cw: 0, cols: 4, score: 0 };
+    // Proporción flexible: de cuadrada (1) a alargada (1.45), para llenar ancho y alto
+    let best = { cw: 0, ch: 0, cols: 4, score: 0 };
     for (let cols = 2; cols <= n; cols++) {
       const rows = Math.ceil(n / cols);
-      const cw = Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows / R);
-      const score = cw * (n % cols === 0 ? 1 : 0.92);   // preferir filas completas
-      if (score > best.score + 0.5 || !best.score) best = { cw, cols, score };
+      const wMax = Math.min((W - gap * (cols - 1)) / cols, 200);
+      const hMax = Math.min((H - gap * (rows - 1)) / rows, 270);
+      const cw = Math.min(wMax, hMax);            // no más ancha que alta
+      const ch = Math.min(hMax, cw * 1.45);       // ni más alargada que 1.45
+      const score = cw * ch * (n % cols === 0 ? 1 : 0.85);   // preferir filas completas
+      if (score > best.score) best = { cw, ch, cols, score };
     }
-    setFit({ cw: Math.floor(Math.min(best.cw, 190)), cols: best.cols, gap });
+    setFit({ cw: Math.floor(best.cw), ch: Math.floor(best.ch), cols: best.cols, gap });
   };
+  // Marca la página mientras se juega (en celulares se esconde la barra superior).
+  // Va ANTES de medir, para que el cálculo use el espacio real.
+  React.useLayoutEffect(() => { document.body.classList.add('mem-playing'); return () => document.body.classList.remove('mem-playing'); }, []);
+  // El tablero se calcula una vez por nivel y queda fijo: no se mueve con el contenido
+  // ni con la barra del navegador del celular; solo si cambia de verdad la pantalla.
   React.useLayoutEffect(fitBoard, [round]);
-  // Marca la página mientras se juega (en pantallas bajas se compacta el encabezado)
-  useEffect(() => { document.body.classList.add('mem-playing'); return () => document.body.classList.remove('mem-playing'); }, []);
   useEffect(() => {
-    const vv = window.visualViewport;
-    window.addEventListener('resize', fitBoard);
-    window.addEventListener('orientationchange', fitBoard);
-    if (vv) vv.addEventListener('resize', fitBoard);
-    const ro = window.ResizeObserver ? new ResizeObserver(() => fitBoard()) : null;
-    if (ro && stageRef.current) ro.observe(stageRef.current);
-    return () => {
-      window.removeEventListener('resize', fitBoard); window.removeEventListener('orientationchange', fitBoard);
-      if (vv) vv.removeEventListener('resize', fitBoard);
-      if (ro) ro.disconnect();
+    const onResize = () => {
+      const d = lastDims.current || { w: 0, h: 0 };
+      if (Math.abs(window.innerWidth - d.w) > 2 || Math.abs(window.innerHeight - d.h) > 160) fitBoard();
     };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); };
   });
   const maxLevel = MEMORY_LEVELS.filter((n, i) => i === 0 || MEMORY_LEVELS[i - 1] < words.length).length;
 
@@ -2993,7 +2998,7 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
         html('span', { className: 'mem-pill' }, '⏱ ', html('b', null, time)),
       ),
       html('div', { className: 'mem-stage', ref: stageRef }, html('div', { className: 'mem-board', style: fit
-        ? { gridTemplateColumns: 'repeat(' + fit.cols + ', ' + fit.cw + 'px)', gap: fit.gap, '--cw': fit.cw + 'px' }
+        ? { gridTemplateColumns: 'repeat(' + fit.cols + ', ' + fit.cw + 'px)', gap: fit.gap, '--cw': fit.cw + 'px', '--ch': fit.ch + 'px' }
         : { visibility: 'hidden' } },
         round.cards.map((c, i) => {
           const w = round.words[c.p];
@@ -3014,7 +3019,7 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
         }))),
       html('div', { className: 'mem-learn' + (lw ? '' : ' empty'), ref: learnRef },
         lw ? html(React.Fragment, null, html('span', { className: 'hanzi-font mem-learn-h' }, lw.hanzi), html(TonedPinyin, { text: lw.pinyin, className: 'mem-learn-py' }), html('span', { className: 'mem-learn-es' }, lw.es))
-          : 'Da vuelta dos tarjetas: un hanzi y su pinyin con significado.'),
+          : 'Encontrá cada hanzi con su significado'),
     ),
     end && html('div', { className: 'mem-panel' },
       html('div', { className: 'mem-panel-box' },

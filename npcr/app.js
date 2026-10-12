@@ -107,6 +107,15 @@ function softTone(freq, start, dur, vol) {
 
 // Sin sonido de acierto (pedido del usuario); solo suena el error.
 function playCorrect() {}
+// Memoria: campanita suave al encontrar una pareja (pedido del usuario solo para este juego)
+function playMatchChime() {
+  if (!_soundOn) return;
+  try { softTone(880, 0, 0.45, 0.045); softTone(1318.5, 0.09, 0.6, 0.04); softTone(2637, 0.09, 0.3, 0.008); } catch (e) {}
+}
+function playLevelChime() {
+  if (!_soundOn) return;
+  try { [[784, 0], [988, 0.12], [1175, 0.24], [1568, 0.38]].forEach(([f, t]) => softTone(f, t, 0.7, 0.04)); } catch (e) {}
+}
 
 function playWrong() {
   if (!_soundOn) return;
@@ -2869,7 +2878,50 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
   const [now, setNow] = useState(Date.now());
   const [end, setEnd] = useState(null);
   const lock = React.useRef(false);
+  const stageRef = React.useRef(null);
+  const learnRef = React.useRef(null);
+  const [fit, setFit] = useState(null);   // { cw, cols, gap }: carta más grande que entra sin deslizar
   const pairs = round.words.length;
+
+  // Elige columnas y tamaño de carta para que el tablero entre entero en la pantalla
+  const fitBoard = () => {
+    const el = stageRef.current;
+    if (!el) return;
+    const W = el.clientWidth;
+    const rect = el.getBoundingClientRect();
+    const top = rect.top + window.scrollY;
+    // Lo que hay debajo del tablero: la franja de aprendizaje (medida de verdad) + margen
+    const strip = learnRef.current;
+    const below = (strip ? strip.getBoundingClientRect().bottom - rect.bottom : 56) + 14;
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const H = Math.max(150, vh - top - below - 4);
+    const n = round.cards.length, R = 1.35;
+    const gap = Math.max(5, Math.min(10, Math.round(Math.min(W, H) / 60)));
+    let best = { cw: 0, cols: 4, score: 0 };
+    for (let cols = 2; cols <= n; cols++) {
+      const rows = Math.ceil(n / cols);
+      const cw = Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows / R);
+      const score = cw * (n % cols === 0 ? 1 : 0.92);   // preferir filas completas
+      if (score > best.score + 0.5 || !best.score) best = { cw, cols, score };
+    }
+    setFit({ cw: Math.floor(Math.min(best.cw, 190)), cols: best.cols, gap });
+  };
+  React.useLayoutEffect(fitBoard, [round]);
+  // Marca la página mientras se juega (en pantallas bajas se compacta el encabezado)
+  useEffect(() => { document.body.classList.add('mem-playing'); return () => document.body.classList.remove('mem-playing'); }, []);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    window.addEventListener('resize', fitBoard);
+    window.addEventListener('orientationchange', fitBoard);
+    if (vv) vv.addEventListener('resize', fitBoard);
+    const ro = window.ResizeObserver ? new ResizeObserver(() => fitBoard()) : null;
+    if (ro && stageRef.current) ro.observe(stageRef.current);
+    return () => {
+      window.removeEventListener('resize', fitBoard); window.removeEventListener('orientationchange', fitBoard);
+      if (vv) vv.removeEventListener('resize', fitBoard);
+      if (ro) ro.disconnect();
+    };
+  });
   const maxLevel = MEMORY_LEVELS.filter((n, i) => i === 0 || MEMORY_LEVELS[i - 1] < words.length).length;
 
   useEffect(() => { if (!start || end) return; const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, [start, end]);
@@ -2891,7 +2943,9 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
     if (a.p === b.p) {
       const nd = [...done, a.p];
       setDone(nd); setLast(a.p); setUp([]);
+      playMatchChime();
       if (nd.length === pairs) {
+        setTimeout(playLevelChime, 450);
         const fin = Date.now(); setEnd(fin); setNow(fin);
         const stars = memoryStars(t, pairs);
         onFinish && onFinish(Math.round(stars / 3 * 100), [], pairs);
@@ -2906,10 +2960,9 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
   const time = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   const stars = end ? memoryStars(tries, pairs) : 0;
   const lw = last !== null ? round.words[last] : null;
-  const cols = round.cards.length <= 8 ? 4 : round.cards.length <= 12 ? 4 : 4;
   const STAR = 'M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z';
 
-  return html('main', { style: { paddingTop: 18, paddingBottom: 30 } },
+  return html('main', { className: 'mem-main', style: { paddingTop: 12 } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
       html('h1', null, '🃏 Memoria'),
@@ -2922,7 +2975,9 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
         html('span', { className: 'mem-pill' }, 'Intentos ', html('b', null, tries)),
         html('span', { className: 'mem-pill' }, '⏱ ', html('b', null, time)),
       ),
-      html('div', { className: 'mem-board', style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } },
+      html('div', { className: 'mem-stage', ref: stageRef }, html('div', { className: 'mem-board', style: fit
+        ? { gridTemplateColumns: 'repeat(' + fit.cols + ', ' + fit.cw + 'px)', gap: fit.gap, '--cw': fit.cw + 'px' }
+        : { visibility: 'hidden' } },
         round.cards.map((c, i) => {
           const w = round.words[c.p];
           const isDone = done.includes(c.p), isUp = up.includes(i);
@@ -2939,8 +2994,8 @@ function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
                 c.k === 'han'
                   ? html('span', { className: 'mem-han hanzi-font n' + n }, w.hanzi)
                   : html(React.Fragment, null, html(TonedPinyin, { text: w.pinyin, className: 'mem-py' }), html('span', { className: 'mem-es' }, w.es))))));
-        })),
-      html('div', { className: 'mem-learn' + (lw ? '' : ' empty') },
+        }))),
+      html('div', { className: 'mem-learn' + (lw ? '' : ' empty'), ref: learnRef },
         lw ? html(React.Fragment, null, html('span', { className: 'hanzi-font mem-learn-h' }, lw.hanzi), html(TonedPinyin, { text: lw.pinyin, className: 'mem-learn-py' }), html('span', { className: 'mem-learn-es' }, lw.es))
           : 'Da vuelta dos tarjetas: un hanzi y su pinyin con significado.'),
     ),

@@ -1335,14 +1335,16 @@
 .aula-preview-show { display: block; margin: 0 0 14px; background: none; border: 1.5px dashed var(--paper-deep); border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 12px; color: var(--ink-mid); cursor: pointer; font-family: inherit; }
 
 /* ── Memoria ── */
-.mem-wrap { padding: 0 16px; max-width: 640px; margin: 0 auto; }
-.mem-hud { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
+main.mem-main { padding-bottom: 8px !important; }
+.mem-wrap { padding: 0 12px; max-width: 1000px; margin: 0 auto; }
+.mem-hud { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 8px; }
 .mem-pill { background: #fff; border: 1.5px solid var(--paper-deep); border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 700; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .mem-pill b { color: var(--ink); }
 .mem-pill.level { background: var(--jade-dark); border-color: var(--jade-dark); color: rgba(255,255,255,.85); }
 .mem-pill.level b { color: #fff; }
-.mem-board { display: grid; gap: 8px; perspective: 1000px; }
-.mem-card { position: relative; aspect-ratio: 1 / 1.35; border: 0; padding: 0; background: none; border-radius: 12px; cursor: pointer; container-type: inline-size; font-family: inherit; }
+.mem-stage { width: 100%; display: flex; justify-content: center; }
+.mem-board { display: grid; perspective: 1000px; justify-content: center; }
+.mem-card { position: relative; width: var(--cw, 80px); height: calc(var(--cw, 80px) * 1.35); border: 0; padding: 0; background: none; border-radius: 12px; cursor: pointer; container-type: inline-size; font-family: inherit; }
 .mem-inner { position: absolute; inset: 0; border-radius: inherit; transform-style: preserve-3d; transition: transform .45s cubic-bezier(.3,.7,.3,1); }
 .mem-card.up .mem-inner { transform: rotateY(180deg); }
 .mem-face { position: absolute; inset: 0; border-radius: inherit; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 2px 0 var(--paper-deep), 0 4px 10px rgba(0,0,0,.08); overflow: hidden; padding: 6cqw; }
@@ -1363,7 +1365,7 @@
 .mem-card.done .mem-front { background: var(--jade-light); border-color: var(--jade); }
 .mem-card.miss .mem-front { box-shadow: 0 0 0 2.5px var(--lacquer); animation: memshake .32s; }
 @keyframes memshake { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
-.mem-learn { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 12px; background: #fff; border: 1.5px solid var(--paper-deep); border-radius: 12px; padding: 6px 12px; overflow: hidden; }
+.mem-learn { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 8px; max-width: 640px; margin-left: auto; margin-right: auto; background: #fff; border: 1.5px solid var(--paper-deep); border-radius: 12px; padding: 6px 12px; overflow: hidden; }
 .mem-learn.empty { color: var(--ink-soft); font-size: 13px; font-weight: 700; justify-content: center; text-align: center; }
 .mem-learn-h { font-size: 24px; font-weight: 700; }
 .mem-learn-py { font-weight: 800; }
@@ -1377,5 +1379,20 @@
 .mem-stars .on { fill: var(--gold); animation: mempop .5s both; } .mem-stars .off { fill: var(--paper-deep); }
 .mem-stars svg:nth-child(2) { animation-delay: .15s; } .mem-stars svg:nth-child(3) { animation-delay: .3s; }
 @keyframes mempop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
-@media (min-width: 700px) { .mem-board { gap: 10px; } }
 @media (prefers-reduced-motion: reduce) { .mem-inner { transition: none; } .mem-card.miss .mem-front, .mem-stars .on { animation: none; } }
+@media (max-height: 560px) {
+  body.mem-playing .topbar { display: none; }
+  .mem-main { padding-top: 6px !important; }
+  .mem-main .header-row { margin-bottom: 4px; }
+  .mem-hud { margin-bottom: 4px; }
+  .mem-pill { padding: 2px 9px; }
+  .mem-learn { min-height: 34px; margin-top: 4px; padding: 3px 10px; }
+  .mem-learn-h { font-size: 18px; }
+}
+@media (max-width: 700px) {
+  body.mem-playing .topbar { display: none; }
+  .mem-main { padding-top: 8px !important; }
+  .mem-main .header-row { margin-bottom: 6px; }
+  .mem-hud { flex-wrap: nowrap; gap: 4px; margin-bottom: 6px; }
+  .mem-pill { padding: 3px 8px; font-size: 11px; white-space: nowrap; }
+}

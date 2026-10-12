@@ -4435,7 +4435,8 @@ function bingoLines(n) {
 }
 const MEDALS = ['🥇', '🥈', '🥉'];
 const bingoHasAudio = (game, h) => game && game.mode === 'numeros' ? [...h].every(hasRealAudio) : hasRealAudio(h);
-const bingoSay = (game, h) => { if (game && game.mode === 'numeros') speakChain([...h]); else if (hasRealAudio(h)) speak(h); };
+// Números: suena solo si están TODAS las grabaciones de sus dígitos (nunca un número a medias)
+const bingoSay = (game, h) => { if (!bingoHasAudio(game, h)) return; if (game && game.mode === 'numeros') speakChain([...h]); else speak(h); };
 // Grabaciones originales de 一…十 (material HSK 1) para decir los números
 let _digitAudioLoaded = false;
 function loadDigitAudio() {
@@ -4568,11 +4569,15 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
   // Al salir una ficha nueva: suena el audio original (si existe) y se oculta el hanzi
   const called = (game && game.called) || [];
   const current = called.length ? bingoItem(game, called[called.length - 1]) : null;
+  // Solo suena una ficha NUEVA de la partida en curso: al abrir la pestaña (o con una
+  // partida ya terminada) no se repite la última ficha.
   useEffect(() => {
-    if (!current || current.h === lastCalled.current) return;
-    lastCalled.current = current.h;
+    if (!game) return;
+    const prev = lastCalled.current;
+    lastCalled.current = { id: game.id, n: called.length };
+    if (!prev || prev.id !== game.id || called.length <= prev.n || game.status === 'finished' || !current) return;
     bingoSay(game, current.h);
-  }, [current && current.h]);
+  }, [game && game.id, called.length]);
   useEffect(() => { if (game && game.mode === 'numeros') loadDigitAudio(); }, [game && game.mode]);
   const prizeCount = game && game.winners ? game.winners.length : 0;
   useEffect(() => {
@@ -4615,7 +4620,9 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
         [['hanzi', '汉字 Hanzi de las lecciones'], ['numeros', '一二三 Números en chino']].map(([m, t]) => html('button', { key: m, type: 'button',
           className: 'mode-check' + (mode === m ? ' on' : ''), onClick: () => setMode(m) }, t))),
       mode === 'hanzi' ? html(React.Fragment, null,
-        html('div', { className: 'admin-note', style: { fontWeight: 800, margin: '12px 0 6px' } }, 'Lecciones'),
+        html('div', { className: 'admin-note', style: { fontWeight: 800, margin: '12px 0 6px', display: 'flex', alignItems: 'center', gap: 8 } }, 'Lecciones',
+          html('button', { type: 'button', className: 'mini-btn', onClick: () => setPick(lessons.filter(l => !isNaN(parseFloat(l))).sort(lessonCompare)) }, 'Todas'),
+          html('button', { type: 'button', className: 'mini-btn', onClick: () => setPick([]) }, 'Ninguna')),
         html('div', { className: 'bingo-lessons' }, lessons.filter(l => !isNaN(parseFloat(l))).map(l => html('button', { key: l, type: 'button',
           className: 'mode-check' + (pick.includes(l) ? ' on' : ''), onClick: () => toggleLesson(l) }, 'L' + l))))
       : html(React.Fragment, null,

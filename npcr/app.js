@@ -4347,6 +4347,16 @@ function BingoWinners({ winners }) {
     winners.map((w, k) => html('div', { key: k, className: 'bingo-winner' }, html('span', null, MEDALS[k] || (k + 1) + '°'), ' ', w.name)));
 }
 
+// Lista de jugadores con su estado: 🟢 conectado · ⚪ salió (hace cuánto)
+function BingoPlayerList({ players, compact }) {
+  if (!players.length) return html('div', { className: 'bingo-sub' }, 'Todavía no se unió nadie');
+  const ago = (s) => s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : 'hace ' + Math.round(s / 3600) + ' h';
+  return html('div', { className: 'bingo-plist' + (compact ? ' compact' : '') }, players.map(p => html('div', { key: p.student_id, className: 'bingo-prow' + (p.online === false ? ' away' : '') },
+    html('span', { className: 'bingo-dot' + (p.online === false ? ' off' : '') }),
+    html('span', { className: 'bingo-pname' }, p.name),
+    html('span', { className: 'bingo-pinfo' }, p.online === false ? 'salió ' + ago(p.seconds_away || 0) : (p.marked || 0) + ' marcada' + (p.marked === 1 ? '' : 's')))));
+}
+
 // ── Pantalla del lǎoshī: crear, sala de espera, cantar fichas ──
 function BingoHost({ classId, className, lessons, maxLesson }) {
   const [game, setGame] = useState(undefined);   // undefined = cargando, null = no hay partida activa
@@ -4355,7 +4365,9 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
   const [size, setSize] = useState(4);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [reveal, setReveal] = useState(false);
+  const readReveal = () => { try { return localStorage.getItem('npcr-bingo-reveal') !== '0'; } catch (e) { return true; } };
+  const [reveal, setRevealState] = useState(readReveal);
+  const setReveal = (v) => { setRevealState(v); try { localStorage.setItem('npcr-bingo-reveal', v ? '1' : '0'); } catch (e) {} };
   const boxRef = React.useRef(null);
   const lastCalled = React.useRef(null);
 
@@ -4365,7 +4377,12 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
       const g = (data || []).find(x => x.status !== 'finished') || (data || [])[0] || null;
       setGame(g);
     });
-  const loadPlayers = (gid) => db.from('bingo_cards').select('student_id,name,marks,joined_at').eq('game_id', gid).then(({ data }) => setPlayers(data || []));
+  const loadPlayers = (gid) => db.rpc('bingo_players', { p_game: gid }).then(({ data, error }) => {
+    if (!error) { setPlayers(data || []); return; }
+    // Sin la versión nueva del SQL: lista simple (sin estado de conexión)
+    db.from('bingo_cards').select('student_id,name,marks,joined_at').eq('game_id', gid)
+      .then(({ data: d }) => setPlayers((d || []).map(c => ({ ...c, marked: (c.marks || []).length, online: null }))));
+  });
   useLiveRefresh('bingo_games', 'class_id=eq.' + classId, loadGame, 5000);
   const gid = game && game.status !== 'finished' ? game.id : null;
   useLiveRefresh('bingo_cards', gid ? 'game_id=eq.' + gid : null, () => gid && loadPlayers(gid), 4000);
@@ -4375,7 +4392,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
   const current = called.length ? bingoItem(game, called[called.length - 1]) : null;
   useEffect(() => {
     if (!current || current.h === lastCalled.current) return;
-    lastCalled.current = current.h; setReveal(false);
+    lastCalled.current = current.h;
     if (hasRealAudio(current.h)) speak(current.h);
   }, [current && current.h]);
 
@@ -4422,9 +4439,9 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
         html('button', { className: 'mini-btn', onClick: () => { if (window.confirm('¿Terminar la partida?')) run('bingo_end', { p_game: game.id }); } }, 'Terminar'))),
 
     game.status === 'lobby' && html('div', { className: 'bingo-lobby' },
-      html('div', { className: 'bingo-big-n' }, players.length),
-      html('div', { className: 'bingo-sub' }, players.length === 1 ? 'alumno conectado' : 'alumnos conectados'),
-      html('div', { className: 'bingo-players' }, players.map(p => html('span', { key: p.student_id, className: 'bingo-player' }, p.name))),
+      html('div', { className: 'bingo-big-n' }, players.filter(p => p.online !== false).length),
+      html('div', { className: 'bingo-sub' }, players.filter(p => p.online !== false).length === 1 ? 'alumno conectado' : 'alumnos conectados'),
+      html(BingoPlayerList, { players }),
       html('p', { className: 'admin-note' }, 'Los alumnos entran desde "Mi aula" → 🎱 Unirme al Bingo.'),
       html('button', { className: 'primary-btn', style: { minWidth: 220 }, disabled: busy, onClick: () => run('bingo_start', { p_game: game.id }) }, '▶ Empezar')),
 
@@ -4437,14 +4454,15 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
           html('div', { className: 'bingo-call-es' }, current.e),
           html('div', { className: 'bingo-call-btns' },
             hasRealAudio(current.h) && html('button', { className: 'mini-btn', onClick: () => speak(current.h) }, '🔊 Repetir'),
-            html('button', { className: 'mini-btn', onClick: () => setReveal(r => !r) }, reveal ? 'Ocultar hanzi' : 'Mostrar hanzi')))
+            html('button', { className: 'mini-btn', onClick: () => setReveal(!reveal) }, reveal ? 'Ocultar hanzi (para proyectar)' : 'Mostrar hanzi')))
           : html('div', { className: 'bingo-sub', style: { padding: 30 } }, 'Sacá la primera ficha'),
         html('button', { className: 'primary-btn bingo-next', disabled: busy || called.length >= game.pool.length, onClick: () => run('bingo_call', { p_game: game.id }) },
           called.length >= game.pool.length ? 'Ya salieron todas' : busy ? '…' : 'Sacar ficha →')),
       html('div', { className: 'bingo-side' },
         html('div', { className: 'report-h' }, '🏆 Bingos'),
         winners.length ? html(BingoWinners, { winners }) : html('div', { className: 'bingo-sub' }, 'Todavía nadie cantó bingo'),
-        html('div', { className: 'report-h', style: { marginTop: 12 } }, '👥 ' + players.length + ' jugando'),
+        html('div', { className: 'report-h', style: { marginTop: 12 } }, '👥 Jugadores · ' + players.filter(p => p.online !== false).length + ' conectados de ' + players.length),
+        html(BingoPlayerList, { players, compact: true }),
         html('div', { className: 'report-h', style: { marginTop: 12 } }, 'Ya salieron'),
         html('div', { className: 'bingo-called' }, called.slice(0, -1).reverse().map(h => html('span', { key: h, className: 'bingo-chip hanzi-font', title: bingoItem(game, h).p + ' · ' + bingoItem(game, h).e }, h))))),
   );
@@ -4468,6 +4486,14 @@ function BingoPlayer({ gameId, onBack }) {
   }, [gameId]);
   const loadGame = () => db.from('bingo_games').select('id,status,size,pool,called,winners').eq('id', gameId).maybeSingle()
     .then(({ data }) => { if (data) setGame(data); });
+  // Señal de "sigo conectado" para que el lǎoshī vea quién está jugando
+  useEffect(() => {
+    const ping = (leaving) => db.rpc('bingo_ping', { p_game: gameId, p_leaving: !!leaving }).then(() => {});
+    const t = setInterval(() => { if (!document.hidden) ping(false); }, 10000);
+    const onVis = () => ping(document.hidden);
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); ping(true); };
+  }, [gameId]);
   useLiveRefresh('bingo_games', 'id=eq.' + gameId, loadGame, 3000);
 
   // Aviso cuando alguien canta bingo

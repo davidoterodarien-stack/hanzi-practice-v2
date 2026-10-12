@@ -1492,3 +1492,13 @@ main.mem-main { padding-bottom: 8px !important; }
 .bingo-hist-sec { font-size: 12px; font-weight: 900; color: var(--ink-mid); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
 .bingo-hist-prize { font-size: 13px; padding: 2px 0; }
 .bingo-chip small { font-size: 10px; color: var(--ink-soft); font-family: var(--font-body, inherit); }
+
+.bingo-toasts { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: 8px; width: min(92vw, 520px); pointer-events: none; }
+.bingo-toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; background: #fff; border: 3px solid var(--gold-dark); border-radius: 16px; padding: 12px 14px; box-shadow: 0 8px 28px rgba(0,0,0,.18); animation: bingotoast .45s cubic-bezier(.2,1.3,.4,1) both; }
+.bingo-toast.linea { border-color: var(--purple-dark, #7c3aed); }
+.bingo-toast.bingo { border-color: var(--lacquer); background: #FFF5F2; }
+.bingo-toast-icon { font-size: 34px; }
+.bingo-toast-txt { flex: 1; font-size: 18px; color: var(--ink); line-height: 1.25; }
+.bingo-toast-txt small { display: block; font-size: 13px; font-weight: 800; color: var(--lacquer-dark); }
+.bingo-toast-x { background: none; border: none; font-size: 16px; color: var(--ink-soft); cursor: pointer; }
+@keyframes bingotoast { 0% { opacity: 0; transform: translateY(-20px) scale(.9); } 100% { opacity: 1; transform: none; } }

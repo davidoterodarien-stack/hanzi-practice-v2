@@ -4451,6 +4451,9 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
   const setReveal = (v) => { setRevealState(v); try { localStorage.setItem('npcr-bingo-reveal', v ? '1' : '0'); } catch (e) {} };
   const boxRef = React.useRef(null);
   const lastCalled = React.useRef(null);
+  // Avisos de premios cantados (terno, línea, bingo) para quien dirige
+  const [toasts, setToasts] = useState([]);
+  const seenPrizes = React.useRef({ game: null, count: 0 });
 
   const loadGame = () => db.from('bingo_games').select('*').eq('class_id', classId).order('created_at', { ascending: false }).limit(5)
     .then(({ data, error }) => {
@@ -4477,6 +4480,19 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
     bingoSay(game, current.h);
   }, [current && current.h]);
   useEffect(() => { if (game && game.mode === 'numeros') loadDigitAudio(); }, [game && game.mode]);
+  const prizeCount = game && game.winners ? game.winners.length : 0;
+  useEffect(() => {
+    if (!game) return;
+    const seen = seenPrizes.current;
+    if (seen.game !== game.id) { seenPrizes.current = { game: game.id, count: prizeCount }; return; }   // al abrir: no repetir avisos viejos
+    if (prizeCount > seen.count) {
+      const nuevos = game.winners.slice(seen.count).map((w, k) => ({ ...w, id: game.id + ':' + (seen.count + k) }));
+      seen.count = prizeCount;
+      playLevelChime();
+      setToasts(ts => [...ts, ...nuevos]);
+      nuevos.forEach(t => setTimeout(() => setToasts(ts => ts.filter(x => x.id !== t.id)), 9000));
+    }
+  }, [game && game.id, prizeCount]);
 
   const run = async (fn, args) => {
     setBusy(true); setErr(null);
@@ -4522,6 +4538,11 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
 
   const winners = game.winners || [];
   return html('div', { ref: boxRef, className: 'bingo-host' },
+    toasts.length > 0 && html('div', { className: 'bingo-toasts' }, toasts.map(t => html('div', { key: t.id, className: 'bingo-toast ' + (t.kind || 'bingo') },
+      html('span', { className: 'bingo-toast-icon' }, t.kind === 'bingo' ? '🏆' : '🎉'),
+      html('span', { className: 'bingo-toast-txt' }, html('b', null, t.name), ' cantó ', html('b', null, PRIZE_NAMES[t.kind || 'bingo']),
+        html('small', null, (t.place || 1) + '° puesto · +' + (t.points || 0) + ' pts')),
+      html('button', { className: 'bingo-toast-x', onClick: () => setToasts(ts => ts.filter(x => x.id !== t.id)), title: 'Cerrar' }, '✕')))),
     err && html('div', { className: 'admin-status err', style: { marginBottom: 10 } }, '❌ ' + err),
     html('div', { className: 'bingo-host-head' },
       html('div', null,

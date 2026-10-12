@@ -7986,7 +7986,8 @@ function getTone(syllable) {
   if (/[àèìòùǜ]/.test(syllable)) return 4;
   return 0;
 }
-const TONE_COLORS = { 1: '#3B82F6', 2: '#16A34A', 3: '#EA580C', 4: '#C1432B', 0: '#888' };
+// Colores pedidos por el lǎoshī: 1° rojo · 2° verde · 3° azul · 4° violeta · neutro gris
+const TONE_COLORS = { 1: '#D62828', 2: '#16A34A', 3: '#2563EB', 4: '#8B3FD9', 0: '#8A8A8A' };
 
 // mono: sin colores de tono (para fondos de color, donde se pierden)
 function TonedPinyin({ text, style, className, mono }) {

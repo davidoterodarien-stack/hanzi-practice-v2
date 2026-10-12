@@ -632,7 +632,7 @@ function StudentFile({ row, vocab, lessons, tasks, onBack }) {
   const doneDays = new Set(daily.map(d => d.day));
   const modeName = { match: 'Emparejar', cards: 'Tarjetas', quiz: 'Opción múltiple', frases: 'Frases clave', frase: 'Completá la frase', orden: 'Ordená la oración', audio: 'Audio', escritura: 'Escritura',
     tonos: 'Tonos', dictado: 'Dictado', semana: 'Palabras de la semana', 'refuerzo-clase': 'Refuerzo de clase', dificiles: 'Sus palabras difíciles' };
-  const modeIcon = { match: '🔗', cards: '🀄', quiz: '✅', frases: '💬', frase: '🧩', orden: '🔀', audio: '🔊', escritura: '✍️', tonos: '🎵', dictado: '✍️', semana: '⭐', 'refuerzo-clase': '🧩', dificiles: '💪' };
+  const modeIcon = { memoria: '🃏', match: '🔗', cards: '🀄', quiz: '✅', frases: '💬', frase: '🧩', orden: '🔀', audio: '🔊', escritura: '✍️', tonos: '🎵', dictado: '✍️', semana: '⭐', 'refuerzo-clase': '🧩', dificiles: '💪' };
   // Rendimiento por tipo de ejercicio (todo el historial)
   const byMode = {};
   acts.forEach(a => {
@@ -2771,6 +2771,7 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
     { id: 'cards', emoji: '🀄', title: 'Tarjetas', sub: srsSub(vocab[lessonId] || [], lessonId, false, cardState, 'Repasá carácter por carácter'), cls: 'cards', best: lp.cards },
     { id: 'quiz', emoji: '✅', title: 'Opción múltiple', sub: 'Elegí el significado correcto', cls: 'quiz', best: lp.quiz },
   ];
+  if ((vocab[lessonId] || []).length >= 4) modes.push({ id: 'memoria', emoji: '🃏', title: 'Memoria', sub: 'Encontrá las parejas: hanzi y su significado', cls: 'match', best: lp.memoria });
   const sentenceCount = ((sentences || {})[lessonId] || []).length;
   if (sentenceCount) modes.push({ id: 'frases', emoji: '💬', title: 'Frases clave', sub: srsSub(sentences[lessonId], lessonId, true, cardState, sentenceCount + ' frases del libro con audio'), cls: 'cards', best: lp.frases });
 
@@ -2835,7 +2836,127 @@ function PlayScreen({ vocab, sentences, lessonId, mode, cardState, onRecordCard,
   if (mode === 'match') return html(MatchGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
   if (mode === 'cards') return html(FlashcardGame, { words, lessonId, cardState, onRecordCard, onBack, onHome, onFinish, nextAction, ...fresh });
   if (mode === 'quiz') return html(QuizGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
+  if (mode === 'memoria') return html(MemoryGame, { words, lessonId, onBack, onHome, onFinish });
   return null;
+}
+
+// ----------------- Memoria -----------------
+// Tarjetas boca abajo: hay que encontrar cada hanzi con su tarjeta de pinyin y significado.
+// 3 niveles por lección (4, 6 y 8 parejas, o las que tenga la lección). Estrellas según intentos.
+const MEMORY_LEVELS = [4, 6, 8];
+function memoryStars(tries, pairs) {
+  if (tries <= Math.ceil(pairs * 1.5)) return 3;
+  if (tries <= Math.ceil(pairs * 2.2)) return 2;
+  return 1;
+}
+function buildMemoryRound(words, level) {
+  const pairs = Math.min(MEMORY_LEVELS[level - 1], words.length);
+  const picked = shuffle(words.slice()).slice(0, pairs);
+  const cards = [];
+  picked.forEach((w, i) => cards.push({ p: i, k: 'han' }, { p: i, k: 'def' }));
+  return { words: picked, cards: shuffle(cards) };
+}
+
+function MemoryGame({ words, lessonId, onBack, onHome, onFinish }) {
+  const [level, setLevel] = useState(1);
+  const [round, setRound] = useState(() => buildMemoryRound(words, 1));
+  const [up, setUp] = useState([]);        // índices boca arriba (máx. 2)
+  const [done, setDone] = useState([]);    // parejas encontradas
+  const [miss, setMiss] = useState([]);
+  const [tries, setTries] = useState(0);
+  const [last, setLast] = useState(null);
+  const [start, setStart] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  const [end, setEnd] = useState(null);
+  const lock = React.useRef(false);
+  const pairs = round.words.length;
+  const maxLevel = MEMORY_LEVELS.filter((n, i) => i === 0 || MEMORY_LEVELS[i - 1] < words.length).length;
+
+  useEffect(() => { if (!start || end) return; const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, [start, end]);
+
+  const newRound = (lv) => {
+    setLevel(lv); setRound(buildMemoryRound(words, lv));
+    setUp([]); setDone([]); setMiss([]); setTries(0); setLast(null); setStart(null); setEnd(null); lock.current = false;
+  };
+  const tap = (i) => {
+    const c = round.cards[i];
+    if (lock.current || end || done.includes(c.p) || up.includes(i)) return;
+    if (!start) setStart(Date.now());
+    if (c.k === 'han') { const h = round.words[c.p].hanzi; if (hasRealAudio(h)) speak(h); }
+    const nu = [...up, i];
+    setUp(nu);
+    if (nu.length < 2) return;
+    const t = tries + 1; setTries(t);
+    const [a, b] = nu.map(j => round.cards[j]);
+    if (a.p === b.p) {
+      const nd = [...done, a.p];
+      setDone(nd); setLast(a.p); setUp([]);
+      if (nd.length === pairs) {
+        const fin = Date.now(); setEnd(fin); setNow(fin);
+        const stars = memoryStars(t, pairs);
+        onFinish && onFinish(Math.round(stars / 3 * 100), [], pairs);
+      }
+    } else {
+      lock.current = true; setMiss(nu); playWrong();
+      setTimeout(() => { setMiss([]); setUp([]); lock.current = false; }, 1000);
+    }
+  };
+
+  const secs = Math.floor(((end || now) - (start || now)) / 1000);
+  const time = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  const stars = end ? memoryStars(tries, pairs) : 0;
+  const lw = last !== null ? round.words[last] : null;
+  const cols = round.cards.length <= 8 ? 4 : round.cards.length <= 12 ? 4 : 4;
+  const STAR = 'M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z';
+
+  return html('main', { style: { paddingTop: 18, paddingBottom: 30 } },
+    html('div', { className: 'header-row' },
+      html('button', { className: 'back-btn', onClick: onBack }, '←'),
+      html('h1', null, '🃏 Memoria'),
+      html('button', { className: 'back-btn', onClick: onHome, title: 'Ir al inicio' }, '⌂'),
+    ),
+    html('div', { className: 'mem-wrap' },
+      html('div', { className: 'mem-hud' },
+        html('span', { className: 'mem-pill level' }, 'Nivel ', html('b', null, level), ' / ' + maxLevel),
+        html('span', { className: 'mem-pill' }, 'Parejas ', html('b', null, done.length + '/' + pairs)),
+        html('span', { className: 'mem-pill' }, 'Intentos ', html('b', null, tries)),
+        html('span', { className: 'mem-pill' }, '⏱ ', html('b', null, time)),
+      ),
+      html('div', { className: 'mem-board', style: { gridTemplateColumns: 'repeat(' + cols + ', 1fr)' } },
+        round.cards.map((c, i) => {
+          const w = round.words[c.p];
+          const isDone = done.includes(c.p), isUp = up.includes(i);
+          const n = Math.min([...w.hanzi].length, 3);
+          return html('button', { key: i, type: 'button', onClick: () => tap(i), disabled: isDone,
+            className: 'mem-card' + (isUp || isDone ? ' up' : '') + (isDone ? ' done' : '') + (miss.includes(i) ? ' miss' : ''),
+            'aria-label': isUp || isDone ? (c.k === 'han' ? w.hanzi : w.pinyin + ', ' + w.es) : 'Tarjeta ' + (i + 1) + ', boca abajo' },
+            html('span', { className: 'mem-inner' },
+              html('span', { className: 'mem-face mem-back' }, html('span', { className: 'mem-frame' },
+                html('span', { className: 'mem-corner tl hanzi-font' }, '说'),
+                html('span', { className: 'mem-medal hanzi-font' }, '说'),
+                html('span', { className: 'mem-corner br hanzi-font' }, '说'))),
+              html('span', { className: 'mem-face mem-front' }, html('span', { className: 'mem-frame' },
+                c.k === 'han'
+                  ? html('span', { className: 'mem-han hanzi-font n' + n }, w.hanzi)
+                  : html(React.Fragment, null, html(TonedPinyin, { text: w.pinyin, className: 'mem-py' }), html('span', { className: 'mem-es' }, w.es))))));
+        })),
+      html('div', { className: 'mem-learn' + (lw ? '' : ' empty') },
+        lw ? html(React.Fragment, null, html('span', { className: 'hanzi-font mem-learn-h' }, lw.hanzi), html(TonedPinyin, { text: lw.pinyin, className: 'mem-learn-py' }), html('span', { className: 'mem-learn-es' }, lw.es))
+          : 'Da vuelta dos tarjetas: un hanzi y su pinyin con significado.'),
+    ),
+    end && html('div', { className: 'mem-panel' },
+      html('div', { className: 'mem-panel-box' },
+        html('div', { className: 'mem-panel-title hanzi-font' }, stars === 3 ? '太好了！' : stars === 2 ? '很好！' : '不错！'),
+        html('div', { className: 'mem-stars' }, [1, 2, 3].map(k => html('svg', { key: k, viewBox: '0 0 24 24', className: k <= stars ? 'on' : 'off' }, html('path', { d: STAR })))),
+        html('p', null, 'Nivel ' + level + ' completado · ' + tries + ' intentos · ' + time),
+        html('div', { className: 'result-actions' },
+          level < maxLevel && html('button', { className: 'primary-btn', onClick: () => newRound(level + 1) }, 'Siguiente nivel'),
+          html('button', { className: level < maxLevel ? 'secondary-btn' : 'primary-btn', onClick: () => newRound(level) }, 'Repetir nivel'),
+          level >= maxLevel && html('button', { className: 'secondary-btn', onClick: onBack }, 'Volver a la lección'),
+        ),
+      ),
+    ),
+  );
 }
 
 // ----------------- Matching game -----------------

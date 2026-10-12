@@ -4376,7 +4376,7 @@ function BingoLastPrize({ winners }) {
   const w = (winners || [])[(winners || []).length - 1];
   if (!w) return null;
   return html('div', { className: 'bingo-lastprize' }, '🎉 ', html('b', null, w.name), ' cantó ', html('b', null, PRIZE_NAMES[w.kind || 'bingo']),
-    ' · ' + (w.place || 1) + '° · +' + (w.points || 0) + ' pts');
+    ' · +' + (w.points || 0) + ' pts');
 }
 
 // Lista de jugadores con su estado: 🟢 conectado · ⚪ salió (hace cuánto)
@@ -4423,7 +4423,7 @@ function BingoHistory({ classId, refreshKey }) {
           (g.winners || []).length > 0 && html(React.Fragment, null,
             html('div', { className: 'bingo-hist-sec' }, '🎉 Premios en orden'),
             (g.winners || []).map((w, k) => html('div', { key: k, className: 'bingo-hist-prize' },
-              html('b', null, w.name), ' · ' + PRIZE_NAMES[w.kind || 'bingo'] + ' ' + (w.place || 1) + '° · +' + (w.points || 0) + ' pts',
+              html('b', null, w.name), ' · ' + PRIZE_NAMES[w.kind || 'bingo'] + ' · +' + (w.points || 0) + ' pts',
               w.at && html('span', { className: 'bingo-sub' }, ' · ' + new Date(w.at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))))),
           html('div', { className: 'bingo-hist-sec' }, '👥 Jugaron' + (ps ? ' (' + ps.length + ')' : '')),
           html('div', { className: 'bingo-sub' }, ps ? (ps.length ? ps.map(p => p.name).join(', ') : 'Nadie se unió') : 'Cargando…'),
@@ -4515,7 +4515,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
     html('div', { className: 'report-card' },
       html('div', { className: 'report-h' }, '🎱 Nueva partida de Bingo 宾果'),
       html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Cada alumno recibe un cartón distinto. Vos sacás las fichas y ellos las buscan en su cartón. Se unen desde "Mi aula".'),
-      html('p', { className: 'admin-note' }, 'Premios: Terno (3 seguidas) 10/7/5 pts · Línea (fila, columna o diagonal) 20/15/10 pts · ¡Bingo! (cartón lleno) 50/35/25 pts. El servidor verifica cada uno.'),
+      html('p', { className: 'admin-note' }, 'Premios (uno de cada uno por partida, para el primero que lo canta bien): Terno · 3 seguidas · 10 pts — Línea · fila, columna o diagonal · 20 pts — ¡Bingo! · cartón lleno · 50 pts. Con el Bingo termina la partida.'),
       html('div', { className: 'admin-note', style: { fontWeight: 800, marginBottom: 6 } }, 'Jugar con'),
       html('div', { className: 'bingo-lessons' },
         [['hanzi', '汉字 Hanzi de las lecciones'], ['numeros', '一二三 Números en chino']].map(([m, t]) => html('button', { key: m, type: 'button',
@@ -4541,7 +4541,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
     toasts.length > 0 && html('div', { className: 'bingo-toasts' }, toasts.map(t => html('div', { key: t.id, className: 'bingo-toast ' + (t.kind || 'bingo') },
       html('span', { className: 'bingo-toast-icon' }, t.kind === 'bingo' ? '🏆' : '🎉'),
       html('span', { className: 'bingo-toast-txt' }, html('b', null, t.name), ' cantó ', html('b', null, PRIZE_NAMES[t.kind || 'bingo']),
-        html('small', null, (t.place || 1) + '° puesto · +' + (t.points || 0) + ' pts')),
+        html('small', null, '+' + (t.points || 0) + ' pts')),
       html('button', { className: 'bingo-toast-x', onClick: () => setToasts(ts => ts.filter(x => x.id !== t.id)), title: 'Cerrar' }, '✕')))),
     err && html('div', { className: 'admin-status err', style: { marginBottom: 10 } }, '❌ ' + err),
     html('div', { className: 'bingo-host-head' },
@@ -4632,6 +4632,7 @@ function BingoPlayer({ gameId, onBack }) {
   const mine = winners.filter(w => w.user_id === card.student_id);
   const myPoints = mine.reduce((a, w) => a + (Number(w.points) || 0), 0);
   const claimed = (k) => mine.some(w => (w.kind || 'bingo') === k);
+  const takenBy = (k) => { const w = winners.find(x => (x.kind || 'bingo') === k); return w && w.user_id !== card.student_id ? w.name : null; };
 
   const toggle = (i) => {
     if (game.status !== 'playing') return;
@@ -4643,7 +4644,8 @@ function BingoPlayer({ gameId, onBack }) {
     const { data, error } = await db.rpc('bingo_claim', { p_game: gameId, p_kind: kind });
     if (error) { setMsg({ type: 'err', text: error.message }); return; }
     const name = PRIZE_NAMES[kind].replace(/[¡!]/g, '');
-    if (data.ok) { playLevelChime(); setMsg({ type: 'ok', text: '¡' + name + '! ' + (data.place || 1) + '° puesto · +' + (data.points || 0) + ' puntos' }); loadGame(); }
+    if (data.ok) { playLevelChime(); setMsg({ type: 'ok', text: '¡' + name + '! +' + (data.points || 0) + ' puntos' }); loadGame(); }
+    else if (data.taken) { playWrong(); setMsg({ type: 'err', text: data.msg }); loadGame(); }
     else { playWrong(); setMsg({ type: 'err', text: (data.wrong && data.wrong.length) ? 'Falso ' + name.toLowerCase() + ': ' + data.wrong.join('、') + ' todavía no ' + (data.wrong.length === 1 ? 'salió' : 'salieron') + '.' : data.msg }); }
   };
 
@@ -4671,9 +4673,9 @@ function BingoPlayer({ gameId, onBack }) {
       msg && html('div', { className: 'admin-status ' + (msg.type === 'ok' ? 'ok' : 'err'), style: { marginTop: 10, textAlign: 'center' } }, msg.text),
       game.status === 'playing' && html('div', { className: 'bingo-claims' + (n < 4 ? ' two' : '') },
         ['terno', 'linea', 'bingo'].filter(k => k !== 'terno' || n >= 4).map(k => html('button', { key: k, type: 'button',
-          className: 'bingo-claim ' + k + (claimed(k) ? ' done' : ''), disabled: claimed(k) || !ready[k], onClick: () => claim(k) },
-          html('span', { className: 'bingo-claim-t' }, claimed(k) ? '✓ ' + PRIZE_NAMES[k] : 'Cantar ' + PRIZE_NAMES[k]),
-          html('span', { className: 'bingo-claim-s' }, k === 'terno' ? '3 seguidas' : k === 'linea' ? 'fila, columna o diagonal' : 'cartón lleno')))),
+          className: 'bingo-claim ' + k + (claimed(k) ? ' done' : '') + (takenBy(k) ? ' taken' : ''), disabled: claimed(k) || !!takenBy(k) || !ready[k], onClick: () => claim(k) },
+          html('span', { className: 'bingo-claim-t' }, claimed(k) ? '✓ ' + PRIZE_NAMES[k] : takenBy(k) ? PRIZE_NAMES[k] : 'Cantar ' + PRIZE_NAMES[k]),
+          html('span', { className: 'bingo-claim-s' }, takenBy(k) ? 'lo ganó ' + takenBy(k) : k === 'terno' ? '3 seguidas · 10 pts' : k === 'linea' ? 'fila, columna o diagonal · 20 pts' : 'cartón lleno · 50 pts')))),
       html('div', { className: 'bingo-mypts' }, 'Tus puntos: ', html('b', null, myPoints)),
       html(BingoLastPrize, { winners }),
       winners.length > 0 && html('div', { className: 'report-card', style: { marginTop: 10 } }, html('div', { className: 'report-h' }, '🏆 Puntos'), html(BingoWinners, { winners, me: card.student_id })),

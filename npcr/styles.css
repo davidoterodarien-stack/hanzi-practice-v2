@@ -1502,3 +1502,4 @@ main.mem-main { padding-bottom: 8px !important; }
 .bingo-toast-txt small { display: block; font-size: 13px; font-weight: 800; color: var(--lacquer-dark); }
 .bingo-toast-x { background: none; border: none; font-size: 16px; color: var(--ink-soft); cursor: pointer; }
 @keyframes bingotoast { 0% { opacity: 0; transform: translateY(-20px) scale(.9); } 100% { opacity: 1; transform: none; } }
+.bingo-claim.taken { opacity: .7; background: var(--paper-deep); border-color: var(--paper-deep); color: var(--ink-soft); }

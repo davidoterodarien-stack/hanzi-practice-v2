@@ -28,10 +28,17 @@ function isCodeAccount(email) { return !!email && email.endsWith('@' + STUDENT_E
 function makeStudentCode(name) {
   const base = (name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .trim().split(/\s+/)[0].toUpperCase().replace(/[^A-Z]/g, '').slice(0, 8) || 'ALUMNO';
-  let tail = '';
-  for (let i = 0; i < 4; i++) tail += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  return base + '-' + tail;
+  // 6 caracteres al azar seguro (los códigos viejos de 4 siguen sirviendo)
+  return base + '-' + secureRandomChars(CODE_CHARS, 6);
 }
+// Azar seguro del navegador (no Math.random) para códigos y contraseñas
+function secureRandomChars(chars, n) {
+  const buf = new Uint32Array(n);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, x => chars[x % chars.length]).join('');
+}
+// Mensaje del límite de intentos con códigos (npcr_seguridad.sql)
+const codeErrMsg = (err) => /intentos/i.test((err && err.message) || '') ? err.message : 'No se pudo verificar el código. Revisá tu conexión.';
 
 function timeAgo(iso) {
   if (!iso) return 'nunca';
@@ -481,7 +488,7 @@ function AuthGate({ onAuthenticated, onBeforeAuth }) {
       const { data: st, error: stErr } = await db.rpc('npcr_code_status', { p_code: code });
       codeInfo = st && st[0];
       if (stErr || !codeInfo || !codeInfo.found) {
-        setErr(stErr ? 'No se pudo verificar el código. Revisá tu conexión.' : 'Ese código no existe. Revisalo con tu lǎoshī.');
+        setErr(stErr ? codeErrMsg(stErr) : 'Ese código no existe. Revisalo con tu lǎoshī.');
         setLoading(false);
         return;
       }
@@ -1301,7 +1308,7 @@ function App() {
     const code = normalizeCode(rawCode);
     const { data: st, error: stErr } = await db.rpc('npcr_code_status', { p_code: code });
     const info = st && st[0];
-    if (stErr) return { ok: false, msg: 'No se pudo verificar el código. Revisá tu conexión.' };
+    if (stErr) return { ok: false, msg: codeErrMsg(stErr) };
     if (!info || !info.found) return { ok: false, msg: 'Ese código no existe. Revisalo con tu lǎoshī.' };
     const { data: { user } } = await db.auth.getUser();
     if (info.claimed && info.login_email && (!user || user.email !== info.login_email)) {
@@ -1312,7 +1319,7 @@ function App() {
     }
     const { data: cl, error: clErr } = await db.rpc('npcr_claim_code', { p_code: code });
     const r = cl && cl[0];
-    if (clErr) { console.error('npcr_claim_code', clErr); return { ok: false, msg: 'No se pudo activar el código (' + (clErr.message || clErr.code || 'error') + ').' }; }
+    if (clErr) { console.error('npcr_claim_code', clErr); return { ok: false, msg: /intentos/i.test(clErr.message || '') ? clErr.message : 'No se pudo activar el código (' + (clErr.message || clErr.code || 'error') + ').' }; }
     if (!r || r.status === 'invalid') return { ok: false, msg: 'Ese código no existe. Revisalo con tu lǎoshī.' };
     if (r.status === 'other') return { ok: false, msg: 'Ese código ya está activado en otra cuenta. Pedile a tu lǎoshī uno nuevo.' };
     // Cuenta anónima (o de dispositivo) → cuenta fija con el código como llave
@@ -6965,8 +6972,7 @@ function ClassManager({ session, isAdmin, isSuper, onReports }) {
     e.preventDefault();
     const name = newClassName.trim();
     if (!name) return;
-    let code = '';
-    for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    const code = secureRandomChars(CODE_CHARS, 6);
     const { data, error } = await db.from('classes').insert({ name, code, laoshi_id: session.user.id }).select('id').maybeSingle();
     if (error) { flash('err', '❌ ' + error.message); return; }
     setNewClassName('');
@@ -7076,10 +7082,7 @@ function ClassManager({ session, isAdmin, isSuper, onReports }) {
 const ROLE_LABELS = { superadmin: '👑 Superadmin', admin: '🔓 Admin', laoshi: '🏫 Lǎoshī' };
 
 function makePassword() {
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  let p = '';
-  for (let i = 0; i < 10; i++) p += chars[Math.floor(Math.random() * chars.length)];
-  return p;
+  return secureRandomChars('abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789', 12);
 }
 
 function staffWelcome(name, email, password, role) {

@@ -469,9 +469,18 @@ function validStudentName(n) {
   return t.replace(/[^\p{L}]/gu, '').length >= 2 && !GENERIC_NAMES.test(t);
 }
 
+// Código que llega en el link de ingreso (…/#codigo=XXXX): se lee una vez y se borra de la barra
+const LINK_CODE = (() => {
+  try {
+    const m = /(?:^|[#&])codigo=([A-Za-z0-9-]+)/.exec(location.hash || '');
+    if (m) history.replaceState(null, '', location.pathname + location.search);
+    return m ? m[1].toUpperCase() : null;
+  } catch (e) { return null; }
+})();
+
 function AuthGate({ onAuthenticated, onBeforeAuth }) {
   const [name, setName] = useState('');
-  const [studentCode, setStudentCode] = useState('');
+  const [studentCode, setStudentCode] = useState(LINK_CODE || '');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -1160,6 +1169,7 @@ function App() {
   // Nombre y código que eligió el alumno al entrar. Se guardan ANTES de iniciar sesión,
   // porque Supabase avisa la sesión nueva antes de que AuthGate llame a onAuthenticated.
   const pendingAuthRef = React.useRef({ name: null, code: null });
+  const linkCodeUsed = React.useRef(false);
 
   useEffect(() => {
     db.auth.getSession().then(({ data }) => {
@@ -1369,8 +1379,10 @@ function App() {
 
   useEffect(() => {
     if (!studentId) { setMyClasses(null); setAssignments([]); setClassSettings(null); setClassHard([]); return; }
-    const pendingCode = pendingAuthRef.current.code;
+    // Código escrito al entrar, o el del link de ingreso si ya había una sesión abierta
+    const pendingCode = pendingAuthRef.current.code || (!linkCodeUsed.current && LINK_CODE) || null;
     pendingAuthRef.current.code = null;
+    linkCodeUsed.current = true;
     (pendingCode ? activateStudentCode(pendingCode, { allowSwitch: true }) : Promise.resolve(null))
       .then((res) => {
         if (res) setCodeNotice({ type: res.ok ? 'ok' : 'err', msg: res.msg });
@@ -6834,8 +6846,11 @@ const cmIconBtn = { background: 'none', border: 'none', cursor: 'pointer', fontS
 function inviteMessage(name, code) {
   const url = location.origin + location.pathname;
   return '¡Hola ' + name + '! 👋\nTu código de alumno para NPCR Practice es: ' + code +
-    '\n\n1. Entrá a ' + url + '\n2. Escribí tu nombre y el código\n\nCon ese código entrás desde cualquier celular o compu y tu progreso queda guardado. 加油！';
+    '\n\nEntrá directo con este link (ya trae tu código):\n' + url + '#codigo=' + code +
+    '\n\nO entrá a ' + url + ' y escribí el código.\n\nCon ese código entrás desde cualquier celular o compu y tu progreso queda guardado. 加油！';
 }
+// Link directo de ingreso de un alumno (lo que va después de # no viaja a ningún servidor)
+const studentLink = (code) => location.origin + location.pathname + '#codigo=' + code;
 
 function copyText(text, onDone) {
   const done = () => onDone && onDone();

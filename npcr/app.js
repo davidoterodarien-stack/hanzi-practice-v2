@@ -780,17 +780,20 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     setTasks(t.data || []);
     const m = {}; (pr.data || []).forEach(r => { m[r.assignment_id] = r; }); setTaskProgress(m);
   });
-  const loadSettings = () => db.from('npcr_class_settings').select('max_lesson,weekly_title,weekly_words,hsk1_enabled,hsk1_exam_date,hsk2_enabled,hsk2_exam_date').eq('class_id', classId).maybeSingle()
+  const loadSettings = () => db.from('npcr_class_settings').select('*').eq('class_id', classId).maybeSingle()
     .then(({ data }) => setSettings({ max_lesson: data && data.max_lesson ? String(data.max_lesson) : '', weekly_title: (data && data.weekly_title) || '', weekly_words: (data && data.weekly_words) || [],
       hsk1_enabled: !!(data && data.hsk1_enabled), hsk1_exam_date: (data && data.hsk1_exam_date) || '',
-      hsk2_enabled: !!(data && data.hsk2_enabled), hsk2_exam_date: (data && data.hsk2_exam_date) || '' }));
+      hsk2_enabled: !!(data && data.hsk2_enabled), hsk2_exam_date: (data && data.hsk2_exam_date) || '',
+      hidden_activities: (data && data.hidden_activities) || [], _hasHidden: !!data && 'hidden_activities' in data }));
   const saveSettings = async (patch) => {
     const next = { ...settings, ...patch };
     setSettings(next);
     const { error } = await db.from('npcr_class_settings').upsert({ class_id: classId, max_lesson: next.max_lesson ? Number(next.max_lesson) : null,
       weekly_title: next.weekly_title || null, weekly_words: next.weekly_words,
       hsk1_enabled: !!next.hsk1_enabled, hsk1_exam_date: next.hsk1_exam_date || null,
-      hsk2_enabled: !!next.hsk2_enabled, hsk2_exam_date: next.hsk2_exam_date || null, updated_at: new Date().toISOString() });
+      hsk2_enabled: !!next.hsk2_enabled, hsk2_exam_date: next.hsk2_exam_date || null,
+      ...(next._hasHidden || (next.hidden_activities || []).length ? { hidden_activities: next.hidden_activities || [] } : {}),
+      updated_at: new Date().toISOString() });
     setSavedMsg(error ? '❌ ' + error.message : '✅ Guardado');
     setTimeout(() => setSavedMsg(null), 2000);
   };
@@ -998,6 +1001,20 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
         html('select', { value: settings.max_lesson, onChange: e => saveSettings({ max_lesson: e.target.value }), style: { ...cmInput, width: '100%', fontWeight: 700 } },
           html('option', { value: '' }, 'Todas las lecciones habilitadas'),
           lessons.map(l => html('option', { key: l, value: l }, 'Habilitado hasta la lección ' + l))),
+      ),
+      html('div', { className: 'report-card' },
+        html('div', { className: 'report-h' }, '🎒 Actividades de Mi aula'),
+        html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Elegí qué actividades ven los alumnos de esta clase. Las Tareas se ven siempre; el HSK se habilita abajo.'),
+        html('div', { className: 'aula-toggles' }, AULA_TOGGLES.map(a => {
+          const on = !(settings.hidden_activities || []).includes(a.id);
+          return html('label', { key: a.id, className: 'aula-toggle' + (on ? ' on' : '') },
+            html('input', { type: 'checkbox', checked: on, onChange: e => {
+              const cur = settings.hidden_activities || [];
+              saveSettings({ hidden_activities: e.target.checked ? cur.filter(x => x !== a.id) : [...cur, a.id], _hasHidden: true });
+            } }),
+            html(AulaIcon, { name: a.icon, tone: on ? a.tone : 'blue', size: 30 }),
+            html('span', null, a.title));
+        })),
       ),
       [1, 2].map(n => {
         const on = 'hsk' + n + '_enabled', date = 'hsk' + n + '_exam_date';
@@ -1283,13 +1300,13 @@ function App() {
     loadStaffPreview(id);
   };
 
-  const loadMyClasses = () => Promise.all([db.rpc('npcr_my_classes'), db.rpc('my_assignments'), db.rpc('npcr_my_class_settings'), db.rpc('npcr_my_class_hard_words')])
-    .then(([cRes, aRes, sRes, hRes]) => {
+  const loadMyClasses = () => Promise.all([db.rpc('npcr_my_classes'), db.rpc('my_assignments'), db.rpc('npcr_my_class_settings'), db.rpc('npcr_my_class_hard_words'), db.rpc('npcr_my_hidden_activities')])
+    .then(([cRes, aRes, sRes, hRes, hidRes]) => {
       const list = cRes.error ? [] : (cRes.data || []);
       if (!list.length && staffRef.current) return loadStaffPreview(previewClassId);
       setMyClasses(list);
       setAssignments(aRes.error ? [] : (aRes.data || []));
-      setClassSettings(!list.length || sRes.error ? null : ((sRes.data || [])[0] || null));
+      setClassSettings(!list.length || sRes.error ? null : (sRes.data && sRes.data[0] ? { ...sRes.data[0], hidden_activities: hidRes.error ? [] : (hidRes.data || []) } : null));
       setClassHard(!list.length || hRes.error ? [] : (hRes.data || []));
       // Con código, el nombre es el que cargó el laoshi: se guarda también en el perfil
       const official = list[0] && list[0].display_name;
@@ -2367,7 +2384,13 @@ function AulaIcon({ name, tone = 'gold', size = 40 }) {
       (AULA_ICONS[name] || []).map((d, i) => html('path', { key: i, d }))));
 }
 
+// Actividades que el profe puede activar/desactivar por clase (Tareas y HSK van aparte)
+const AULA_TRAINING = { id: 'entrenamiento', icon: 'target', tone: 'red', title: 'Entrenamiento diario' };
+const aulaHidden = (settings, id) => !!(settings && (settings.hidden_activities || []).includes(id));
 function aulaActivities(settings, hardCount) {
+  return aulaActivitiesAll(settings, hardCount).filter(a => a.id.startsWith('hsk') || !aulaHidden(settings, a.id));
+}
+function aulaActivitiesAll(settings, hardCount) {
   const weekly = (settings && settings.weekly_words) || [];
   const hskAct = (n) => {
     if (!settings || !settings['hsk' + n + '_enabled']) return null;
@@ -2388,6 +2411,8 @@ function aulaActivities(settings, hardCount) {
     { id: 'progreso', icon: 'chart', tone: 'blue', title: 'Mi progreso', sub: 'Fuertes y a reforzar' },
   ].filter(Boolean);
 }
+const AULA_TOGGLES = [AULA_TRAINING, ...aulaActivitiesAll({ weekly_words: [{}] }, 1).filter(a => !a.id.startsWith('hsk'))
+  .map(a => a.id === 'semana' ? { ...a, title: 'Palabras de la semana' } : a)];
 
 function ClassBox({ cls, dailyCount, dailyDone, assignments, settings, hardCount, onOpen, onTraining, onProgress, onActivity, staffClasses, onPreviewClass }) {
   const tasks = assignments || [];
@@ -2411,7 +2436,7 @@ function ClassBox({ cls, dailyCount, dailyDone, assignments, settings, hardCount
       html('div', { className: 'class-box-badge', title: 'Aula' }, '课堂'),
     ),
     html('div', { className: 'class-box-actions' },
-      html('button', { className: 'class-action' + (dailyDone ? ' done' : ''), onClick: onTraining },
+      !aulaHidden(settings, 'entrenamiento') && html('button', { className: 'class-action' + (dailyDone ? ' done' : ''), onClick: onTraining },
         html(AulaIcon, { name: dailyDone ? 'check' : 'target', tone: dailyDone ? 'green' : 'red' }),
         html('span', null,
           html('div', { className: 'class-action-title' }, 'Entrenamiento diario'),
@@ -2458,8 +2483,8 @@ function ClassHome({ cls, dailyCount, dailyDone, assignments, settings, hardCoun
     ),
     html('div', { style: { padding: '0 16px' } },
       html(BingoInvite, { game: bingoGame, onJoin: onBingo }),
-      html('h2', { className: 'section-title' }, 'Hoy'),
-      html('button', { className: 'class-training-card' + (dailyDone ? ' done' : ''), onClick: onTraining },
+      !aulaHidden(settings, 'entrenamiento') && html('h2', { className: 'section-title' }, 'Hoy'),
+      !aulaHidden(settings, 'entrenamiento') && html('button', { className: 'class-training-card' + (dailyDone ? ' done' : ''), onClick: onTraining },
         html(AulaIcon, { name: dailyDone ? 'check' : 'target', tone: 'white', size: 52 }),
         html('div', { style: { flex: 1, textAlign: 'left' } },
           html('div', { style: { fontWeight: 800, fontSize: 17 } }, 'Entrenamiento diario'),

@@ -8388,6 +8388,10 @@ function ClasificadorGameBody({ onBack, onFinish, playerName, rawQuestions, titl
   const parts = q.sentence.split('___');
   const fullSentence = q.sentence.replace('___', q.answer);
   const fullPinyin = q.pinyin.replace('___', q.answer_pinyin || q.answer);
+  // La pista no puede regalar la respuesta: antes de responder se ocultan las partes que la nombran
+  const hintBefore = String(q.hint || '').split(/\s+[—–-]\s+/).filter(p => !p.includes(q.answer)).join(' — ');
+  // Opciones cortas (una palabra) → cuadrícula de 2×2 con botones grandes
+  const shortOpts = opts.length === 4 && opts.every(o => String(o).length <= 6);
 
   const [newCorrectRef, setNewCorrectRef] = useState(0);
   const [showPinyin, setShowPinyin] = useState(false);
@@ -8447,7 +8451,7 @@ function ClasificadorGameBody({ onBack, onFinish, playerName, rawQuestions, titl
         onClick: () => setShowPinyin(v => !v),
       }, showPinyin ? '🙈 Ocultar pīnyīn' : '👁 Ver pīnyīn'),
       showPinyin && !selected && html(TonedPinyin, { text: q.pinyin, className: 'clas-pinyin' }),
-      html('div', { className: 'clas-hint' }, q.hint),
+      html('div', { className: 'clas-hint' }, selected ? '' : hintBefore),
       selected
         ? html(React.Fragment, null,
             html('div', { style: { borderRadius: 16, padding: '18px 20px', textAlign: 'center', fontWeight: 800, marginBottom: 12,
@@ -8463,8 +8467,8 @@ function ClasificadorGameBody({ onBack, onFinish, playerName, rawQuestions, titl
               index + 1 >= questions.length ? 'Ver resultado' : 'Siguiente →'
             )
           )
-        : html('div', { className: 'quiz-options' },
-            opts.map(opt => html('button', { key: opt, className: 'quiz-option', onClick: () => handlePick(opt) }, opt))
+        : html('div', { className: 'quiz-options' + (shortOpts ? ' grid2' : '') },
+            opts.map(opt => html('button', { key: opt, className: 'quiz-option' + (shortOpts ? ' hanzi-font' : ''), onClick: () => handlePick(opt) }, opt))
           )
     )
   );

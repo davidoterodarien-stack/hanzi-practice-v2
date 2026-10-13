@@ -1540,3 +1540,8 @@ main.mem-main { padding-bottom: 8px !important; }
 .scrollx-btn.l { left: 4px; } .scrollx-btn.r { right: 4px; }
 .scrollx-btn:hover { border-color: var(--lacquer); color: var(--lacquer); }
 .scrollx.arrows-top .scrollx-btn { top: 8px; transform: none; }
+
+/* Opciones cortas (una palabra): cuadrícula 2×2 de botones grandes */
+.quiz-options.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.quiz-options.grid2 .quiz-option { min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 40px !important; font-weight: 700; padding: 12px; }
+@media (max-width: 480px) { .quiz-options.grid2 { gap: 10px; } .quiz-options.grid2 .quiz-option { min-height: 96px; font-size: 32px !important; } }

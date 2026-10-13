@@ -1671,3 +1671,4 @@ main.tz-main { padding-bottom: 8px !important; }
 .tz-tip .tone1, .tz-tip .tone2, .tz-tip .tone3, .tz-tip .tone4, .tz-tip span { color: #fff !important; }
 .tz-path-tip { align-self: center; background: var(--ink); color: #fff; font-weight: 800; font-size: 15px; padding: 4px 12px; border-radius: 10px; margin-top: -4px; }
 .tz-path-tip span { color: #fff !important; }
+.merge-box { background: var(--gold-light, #FFF4D6); border: 2px solid var(--gold, #E5B53A); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; font-size: 14px; }

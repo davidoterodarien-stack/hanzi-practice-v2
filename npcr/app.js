@@ -7489,6 +7489,21 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   const [activityError, setActivityError] = useState(null);
   const [regFilter, setRegFilter] = useState('todos'); // todos | codigo | libre
   const [regSearch, setRegSearch] = useState('');
+  // Pasar el progreso de un invitado a un alumno con código (npcr_merge_accounts)
+  const [mergeFrom, setMergeFrom] = useState(null);
+  const [mergeTo, setMergeTo] = useState('');
+  const [mergeMsg, setMergeMsg] = useState(null);
+  const doMerge = async () => {
+    const to = activityLog.find(x => x.user_id === mergeTo);
+    if (!mergeFrom || !to) return;
+    if (!window.confirm('¿Pasar todo el progreso de "' + (mergeFrom.name || 'Sin nombre') + '" (invitado) a ' + to.name + ' (' + (to.code || 'con código') + ')?' + String.fromCharCode(10, 10) + 'Lo que exista en las dos cuentas se combina quedándose con lo mejor. El invitado deja de aparecer en el registro. No se puede deshacer.')) return;
+    const { data, error } = await db.rpc('npcr_merge_accounts', { p_from: mergeFrom.user_id, p_to: to.user_id });
+    if (error) { setMergeMsg({ type: 'err', msg: '❌ ' + error.message + (/function|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_unir_cuentas.sql?' : '') }); return; }
+    const d = data || {};
+    setMergeMsg({ type: 'ok', msg: '✅ Listo: ' + to.name + ' recibió ' + (d.lecciones || 0) + ' resultados de lecciones, ' + (d.tarjetas || 0) + ' tarjetas y ' + (d.sesiones || 0) + ' sesiones. Que cierre y vuelva a abrir la app para verlo.' });
+    setMergeFrom(null); setMergeTo('');
+    loadActivityLog();
+  };
   // Al entrar a Alumnos o Ingresos, el registro se carga solo
   useEffect(() => {
     if (!isAdmin) return;
@@ -8038,6 +8053,16 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                         html('input', { value: regSearch, onChange: e => setRegSearch(e.target.value), placeholder: 'Buscar por nombre…', style: { ...cmInput, flex: '1 1 160px' } }),
                         html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto', padding: '7px 12px', fontSize: 12 }, onClick: loadActivityLog }, '🔄 Actualizar'),
                       ),
+                      mergeMsg && html('div', { className: 'admin-status ' + (mergeMsg.type === 'ok' ? 'ok' : 'err'), style: { marginBottom: 8 } }, mergeMsg.msg),
+                      mergeFrom && html('div', { className: 'merge-box' },
+                        html('div', null, '↪ Pasar el progreso de ', html('b', null, mergeFrom.name || 'Sin nombre'), ' (invitado · ' + mergeFrom.sessions + ' sesiones · ' + mergeFrom.visits + ' visitas) a:'),
+                        html('select', { value: mergeTo, onChange: e => setMergeTo(e.target.value), style: { ...cmInput, width: '100%', marginTop: 8 } },
+                          html('option', { value: '' }, 'Elegí el alumno con código…'),
+                          activityLog.filter(x => x.has_code).sort((a, b) => String(a.name).localeCompare(String(b.name)))
+                            .map(x => html('option', { key: x.user_id, value: x.user_id }, x.name + ' · ' + (x.class_name || '') + (x.code ? ' · ' + x.code : '')))),
+                        html('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                          html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, disabled: !mergeTo, onClick: doMerge }, 'Pasar progreso'),
+                          html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => { setMergeFrom(null); setMergeTo(''); } }, 'Cancelar'))),
                       activityError && html('div', { className: 'admin-status err' }, '❌ ' + activityError + (/function|does not exist/.test(activityError) ? ' — ¿Ejecutaste npcr_registro.sql?' : '')),
                       !activityError && rows.length === 0
                         ? html('p', { className: 'admin-note' }, activityLog.length ? 'Ningún alumno coincide con el filtro.' : 'Sin registros todavía.')
@@ -8049,7 +8074,8 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                                 html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap' } },
                                   r.name || html('span', { style: { fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-soft)' }, title: 'Abrió la app pero no escribió su nombre' }, 'Sin nombre'),
                                   html('span', { className: 'reg-badge' + (r.has_code ? ' code' : '') }, r.has_code ? 'código' : 'libre')),
-                                html('td', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '') : '—'),
+                                html('td', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '')
+                                  : html('button', { className: 'mini-btn', title: 'Pasar el progreso de este invitado a un alumno con código', onClick: () => { setMergeFrom(r); setMergeTo(''); setMergeMsg(null); } }, '↪ Pasar a un alumno')),
                                 html('td', { style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
                                 html('td', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, timeAgo(r.last_seen)),
                                 html('td', null, r.visits),

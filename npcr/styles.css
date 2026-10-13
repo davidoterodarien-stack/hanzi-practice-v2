@@ -1653,3 +1653,14 @@ main.tz-main { padding-bottom: 8px !important; }
 .tz-path-c.done { border-color: var(--jade); background: var(--jade-light); color: var(--jade-dark); }
 .tz-path-c.now { border-color: var(--lacquer); color: var(--lacquer-dark); box-shadow: 0 0 0 3px var(--lacquer-light); }
 .tz-path-c i { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%; background: var(--jade); color: #fff; font-size: 11px; font-style: normal; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+/* Trazos: tarjeta con pinyin y significado al completar (encima del cuadro, sin mover nada) */
+.tz-board-box { position: relative; }
+.tz-info { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); box-sizing: border-box; padding: 0 12px; display: flex; justify-content: center; pointer-events: none; animation: tzInfo .35s ease; }
+.tz-info > * { pointer-events: auto; }
+.tz-info { gap: 10px; align-items: center; }
+.tz-info-ch { font-size: 36px; font-weight: 700; color: var(--jade-dark); background: #fff; border: 2px solid var(--jade); border-radius: 12px; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; flex: none; box-shadow: 0 3px 10px rgba(0,0,0,.12); }
+.tz-info-txt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; background: #fff; border: 2px solid var(--jade); border-radius: 12px; padding: 8px 12px; font-weight: 800; font-size: 14px; color: var(--ink); box-shadow: 0 3px 10px rgba(0,0,0,.12); max-width: calc(100% - 64px); }
+.tz-info-txt small { color: var(--ink-soft); font-weight: 700; }
+.tz-info-txt b { font-size: 20px; }
+.tz-info-py { font-size: 16px; font-weight: 800; }
+@keyframes tzInfo { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }

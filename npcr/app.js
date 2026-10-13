@@ -8630,7 +8630,7 @@ function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate
 }
 
 // Practicar un hanzi: Mirar → Calcar → Completar → De memoria (hasta el 100 %)
-function TrazoPractice({ ch, word, onDone, onBack, title, path, onJump }) {
+function TrazoPractice({ ch, word, inWord, onDone, onComplete, onBack, title, path, onJump }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [stage, setStage] = useState(0);          // 0 mirar · 1 calcar · 2 completar · 3 memoria · 4 listo
@@ -8688,7 +8688,7 @@ function TrazoPractice({ ch, word, onDone, onBack, title, path, onJump }) {
       if (next >= n) {
         playCorrect();
         if (stage < 3) setTimeout(() => startStage(stage + 1), 650);
-        else { setStage(4); playLevelChime(); audioLater(() => speakReal(ch), 250); setAnimate([]); }
+        else { setStage(4); playLevelChime(); audioLater(() => speakReal(ch), 250); setAnimate([]); onComplete && onComplete(); }
       }
     } else {
       playWrong(); setShake(true); setTimeout(() => setShake(false), 350);
@@ -8717,6 +8717,12 @@ function TrazoPractice({ ch, word, onDone, onBack, title, path, onJump }) {
         html('span', { className: 'hanzi-font tz-ch' }, ch),
         word && html('span', null, html(TonedPinyin, { text: word.pinyin, className: 'tz-py' }), html('small', null, word.es))),
       html('div', { className: 'tz-board-box', ref: boxRef, style: { height: size } },
+        stage === 4 && (word || inWord) && html('div', { className: 'tz-info', style: { width: size } },
+          html('span', { className: 'tz-info-ch hanzi-font' }, ch),
+          word
+            ? html('span', { className: 'tz-info-txt' }, html(TonedPinyin, { text: word.pinyin, className: 'tz-info-py' }), html('span', null, word.es))
+            : html('span', { className: 'tz-info-txt' }, html('small', null, 'en'), html('b', { className: 'hanzi-font' }, inWord.hanzi),
+                html(TonedPinyin, { text: inWord.pinyin, className: 'tz-info-py' }), html('span', null, inWord.es))),
         html(TrazoBoard, { data, size, filled, current, hint, shake, animate, run, onStroke,
           mode: stage === 0 ? 'watch' : stage === 1 ? 'trace' : stage === 2 ? 'complete' : stage === 3 ? 'memory' : 'watch' })),
       html('div', { ref: belowRef, className: 'tz-below' },
@@ -8754,6 +8760,7 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
     }).filter(x => x.chars.length);
   }, [vocab, lessons]);
   const wordOf = (c, w) => (w && w.hanzi === c) ? w : (Object.values(vocab).flat().find(x => x.hanzi === c) || null);
+  const inWordOf = (c, w) => (w && w.hanzi !== c && String(w.hanzi).includes(c)) ? w : null;
   const lessonDone = (p) => p.chars.every(x => done.has(x.c));
   const unlocked = (k) => (k === 0 || lessonDone(path[k - 1])) && !(maxLesson && parseFloat(path[k].lesson) > maxLesson);
   const allDone = path.length > 0 && path.every(lessonDone);
@@ -8766,11 +8773,11 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
   if (view.name === 'practice') {
     const p = path[view.k]; const item = p.chars[view.i];
     const nextIdx = p.chars.findIndex((x, i) => i > view.i && !done.has(x.c));
-    return html(TrazoPractice, { key: item.c, ch: item.c, word: wordOf(item.c, item.w), title: 'Lección ' + p.lesson + ' · ' + (view.i + 1) + '/' + p.chars.length,
+    return html(TrazoPractice, { key: item.c, ch: item.c, word: wordOf(item.c, item.w), inWord: wordOf(item.c, item.w) ? null : inWordOf(item.c, item.w), title: 'Lección ' + p.lesson + ' · ' + (view.i + 1) + '/' + p.chars.length,
       path: p.chars.map(x => ({ c: x.c, done: done.has(x.c) })), onJump: (i) => setView({ name: 'practice', k: view.k, i }),
       onBack: () => setView({ name: 'lesson', k: view.k }),
+      onComplete: () => markDone(item.c),     // se guarda apenas termina, aunque no toque "Siguiente"
       onDone: () => {
-        markDone(item.c);
         const firstLeft = nextIdx >= 0 ? nextIdx : p.chars.findIndex(x => x.c !== item.c && !done.has(x.c));
         setView(firstLeft >= 0 ? { name: 'practice', k: view.k, i: firstLeft } : { name: 'lesson', k: view.k, justDone: true });
       } });

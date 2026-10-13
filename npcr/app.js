@@ -784,7 +784,8 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     .then(({ data }) => setSettings({ max_lesson: data && data.max_lesson ? String(data.max_lesson) : '', weekly_title: (data && data.weekly_title) || '', weekly_words: (data && data.weekly_words) || [],
       hsk1_enabled: !!(data && data.hsk1_enabled), hsk1_exam_date: (data && data.hsk1_exam_date) || '',
       hsk2_enabled: !!(data && data.hsk2_enabled), hsk2_exam_date: (data && data.hsk2_exam_date) || '',
-      hidden_activities: (data && data.hidden_activities) || [], _hasHidden: !!data && 'hidden_activities' in data }));
+      hidden_activities: (data && data.hidden_activities) || [], _hasHidden: !!data && 'hidden_activities' in data,
+      shown_activities: (data && data.shown_activities) || [], _hasShown: !!data && 'shown_activities' in data }));
   const saveSettings = async (patch) => {
     const next = { ...settings, ...patch };
     setSettings(next);
@@ -793,6 +794,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       hsk1_enabled: !!next.hsk1_enabled, hsk1_exam_date: next.hsk1_exam_date || null,
       hsk2_enabled: !!next.hsk2_enabled, hsk2_exam_date: next.hsk2_exam_date || null,
       ...(next._hasHidden || (next.hidden_activities || []).length ? { hidden_activities: next.hidden_activities || [] } : {}),
+      ...(next._hasShown || (next.shown_activities || []).length ? { shown_activities: next.shown_activities || [] } : {}),
       updated_at: new Date().toISOString() });
     setSavedMsg(error ? '❌ ' + error.message : '✅ Guardado');
     setTimeout(() => setSavedMsg(null), 2000);
@@ -1006,11 +1008,16 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
         html('div', { className: 'report-h' }, '🎒 Actividades de Mi aula'),
         html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Elegí qué actividades ven los alumnos de esta clase. Las Tareas se ven siempre; el HSK se habilita abajo.'),
         html('div', { className: 'aula-toggles' }, AULA_TOGGLES.map(a => {
-          const on = !(settings.hidden_activities || []).includes(a.id);
+          const on = aulaVisible(settings, a);
           return html('label', { key: a.id, className: 'aula-toggle' + (on ? ' on' : '') },
             html('input', { type: 'checkbox', checked: on, onChange: e => {
-              const cur = settings.hidden_activities || [];
-              saveSettings({ hidden_activities: e.target.checked ? cur.filter(x => x !== a.id) : [...cur, a.id], _hasHidden: true });
+              if (a.optIn) {
+                const cur = settings.shown_activities || [];
+                saveSettings({ shown_activities: e.target.checked ? [...cur.filter(x => x !== a.id), a.id] : cur.filter(x => x !== a.id), _hasShown: true });
+              } else {
+                const cur = settings.hidden_activities || [];
+                saveSettings({ hidden_activities: e.target.checked ? cur.filter(x => x !== a.id) : [...cur, a.id], _hasHidden: true });
+              }
             } }),
             html(AulaIcon, { name: a.icon, tone: on ? a.tone : 'blue', size: 30 }),
             html('span', null, a.title));
@@ -1300,13 +1307,13 @@ function App() {
     loadStaffPreview(id);
   };
 
-  const loadMyClasses = () => Promise.all([db.rpc('npcr_my_classes'), db.rpc('my_assignments'), db.rpc('npcr_my_class_settings'), db.rpc('npcr_my_class_hard_words'), db.rpc('npcr_my_hidden_activities')])
-    .then(([cRes, aRes, sRes, hRes, hidRes]) => {
+  const loadMyClasses = () => Promise.all([db.rpc('npcr_my_classes'), db.rpc('my_assignments'), db.rpc('npcr_my_class_settings'), db.rpc('npcr_my_class_hard_words'), db.rpc('npcr_my_hidden_activities'), db.rpc('npcr_my_shown_activities')])
+    .then(([cRes, aRes, sRes, hRes, hidRes, shRes]) => {
       const list = cRes.error ? [] : (cRes.data || []);
       if (!list.length && staffRef.current) return loadStaffPreview(previewClassId);
       setMyClasses(list);
       setAssignments(aRes.error ? [] : (aRes.data || []));
-      setClassSettings(!list.length || sRes.error ? null : (sRes.data && sRes.data[0] ? { ...sRes.data[0], hidden_activities: hidRes.error ? [] : (hidRes.data || []) } : null));
+      setClassSettings(!list.length || sRes.error ? null : (sRes.data && sRes.data[0] ? { ...sRes.data[0], hidden_activities: hidRes.error ? [] : (hidRes.data || []), shown_activities: shRes.error ? [] : (shRes.data || []) } : null));
       setClassHard(!list.length || hRes.error ? [] : (hRes.data || []));
       // Con código, el nombre es el que cargó el laoshi: se guarda también en el perfil
       const official = list[0] && list[0].display_name;
@@ -1553,6 +1560,9 @@ function App() {
       staffClasses, onPreviewClass: choosePreviewClass,
       bingoGame, onBingo: () => bingoGame && setScreen({ name: 'bingo', gameId: bingoGame.id }),
     });
+  } else if (screen.name === 'trazos' && aulaShown(classSettings, 'trazos')) {
+    content = html(TrazosGame, { vocab, lessons, studentId, maxLesson: classSettings && classSettings.max_lesson ? Number(classSettings.max_lesson) : null,
+      onBack: () => setScreen({ name: myClasses && myClasses.length ? 'clase' : 'home' }) });
   } else if (screen.name === 'bingo' && screen.gameId) {
     content = html(BingoPlayer, { key: screen.gameId, gameId: screen.gameId, onBack: () => setScreen({ name: myClasses && myClasses.length ? 'clase' : 'home' }) });
   } else if ((screen.name === 'hsk1' && hsk1Allowed) || (screen.name === 'hsk2' && hsk2Allowed)) {
@@ -1858,7 +1868,7 @@ function App() {
   const navIsRefuerzo = screen.name === 'refuerzo';
   const navIsPractica = screen.name === 'practica' || (screen.name === 'prueba' && screen.from !== 'clase');
   const navIsAdmin = screen.name === 'admin' || screen.name === 'reports';
-  const navIsClase = ['clase', 'entrenamiento', 'refuerzo-clase', 'semana', 'tonos', 'dictado', 'bingo'].includes(screen.name) || (screen.name === 'prueba' && screen.from === 'clase');
+  const navIsClase = ['clase', 'entrenamiento', 'refuerzo-clase', 'semana', 'tonos', 'dictado', 'bingo', 'trazos'].includes(screen.name) || (screen.name === 'prueba' && screen.from === 'clase');
   const navIsProgreso = screen.name === 'progreso' || screen.name === 'dificiles';
 
   const sidebar = html('aside', { className: 'sidebar' },
@@ -2387,8 +2397,12 @@ function AulaIcon({ name, tone = 'gold', size = 40 }) {
 // Actividades que el profe puede activar/desactivar por clase (Tareas y HSK van aparte)
 const AULA_TRAINING = { id: 'entrenamiento', icon: 'target', tone: 'red', title: 'Entrenamiento diario' };
 const aulaHidden = (settings, id) => !!(settings && (settings.hidden_activities || []).includes(id));
+const aulaShown = (settings, id) => !!(settings && (settings.shown_activities || []).includes(id));
+// Las actividades de siempre se ven salvo que el profe las oculte; las nuevas (optIn)
+// arrancan desactivadas y se ven solo si el profe o un admin las habilita.
+const aulaVisible = (settings, a) => a.id.startsWith('hsk') || (a.optIn ? aulaShown(settings, a.id) : !aulaHidden(settings, a.id));
 function aulaActivities(settings, hardCount) {
-  return aulaActivitiesAll(settings, hardCount).filter(a => a.id.startsWith('hsk') || !aulaHidden(settings, a.id));
+  return aulaActivitiesAll(settings, hardCount).filter(a => aulaVisible(settings, a));
 }
 function aulaActivitiesAll(settings, hardCount) {
   const weekly = (settings && settings.weekly_words) || [];
@@ -2408,6 +2422,7 @@ function aulaActivitiesAll(settings, hardCount) {
     { id: 'aula-tiempo', icon: 'clock', tone: 'gold', title: 'Expresiones de tiempo', sub: 'La hora: 点, 分, 刻, 差 y 半' },
     { id: 'aula-clas', icon: 'tag', tone: 'purple', title: 'Clasificadores', sub: 'Elegí 个, 本, 张, 斤 correctamente' },
     { id: 'aula-zhe', icon: 'photo', tone: 'green', title: 'Zhè shì shénme?', sub: 'Mirá la foto y elegí el hanzi, contra reloj' },
+    { id: 'trazos', icon: 'pencil', tone: 'purple', title: 'Trazos', sub: 'Dibujá cada hanzi con el dedo, lección por lección', optIn: true },
     { id: 'progreso', icon: 'chart', tone: 'blue', title: 'Mi progreso', sub: 'Fuertes y a reforzar' },
   ].filter(Boolean);
 }
@@ -8500,6 +8515,289 @@ function ClasificadorGameBody({ onBack, onFinish, playerName, rawQuestions, titl
           )
     )
   );
+}
+
+// ═════════════ Trazos (Mi aula): dibujar cada hanzi con el dedo, lección por lección ═════════════
+// Usa los modelos de trazos que ya publica la app (NPCR_MEDIA.svg): de cada uno se toma
+// la forma de cada trazo (para pintarlo prolijo) y su recorrido (para corregir orden,
+// dirección y forma de lo que se dibuja). Progreso en npcr_trazos_done.
+const _trazoCache = {};
+function loadTrazos(ch) {
+  if (_trazoCache[ch]) return _trazoCache[ch];
+  _trazoCache[ch] = fetch(NPCR_MEDIA.svg[ch]).then(r => r.text()).then(txt => {
+    const doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+    const outlines = [...doc.querySelectorAll('clipPath path')].map(p => p.getAttribute('d'));
+    const medians = [...doc.querySelectorAll('path[clip-path]')].map(p =>
+      (p.getAttribute('d').match(/-?\d+(\.\d+)?/g) || []).map(Number).reduce((a, v, i, arr) => (i % 2 ? a : [...a, [v, arr[i + 1]]]), []));
+    if (!outlines.length || outlines.length !== medians.length) throw new Error('modelo incompleto');
+    return { outlines, medians };
+  });
+  _trazoCache[ch].catch(() => { delete _trazoCache[ch]; });
+  return _trazoCache[ch];
+}
+const tzDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const tzLen = (pts) => pts.reduce((s, p, i) => i ? s + tzDist(pts[i - 1], p) : 0, 0);
+function tzResample(pts, n) {
+  const total = tzLen(pts);
+  if (pts.length < 2 || !total) return Array.from({ length: n }, () => pts[0]);
+  const out = []; let seg = 0, acc = 0;
+  for (let k = 0; k < n; k++) {
+    const target = total * k / (n - 1);
+    while (seg < pts.length - 2 && acc + tzDist(pts[seg], pts[seg + 1]) < target) { acc += tzDist(pts[seg], pts[seg + 1]); seg++; }
+    const d = tzDist(pts[seg], pts[seg + 1]) || 1, t = Math.min(1, Math.max(0, (target - acc) / d));
+    out.push([pts[seg][0] + (pts[seg + 1][0] - pts[seg][0]) * t, pts[seg][1] + (pts[seg + 1][1] - pts[seg][1]) * t]);
+  }
+  return out;
+}
+// ¿El trazo dibujado coincide con el del modelo? (empieza cerca, va en la dirección
+// correcta, sigue la forma y tiene un largo parecido). lenient > 1 = más tolerante.
+function tzMatch(user, median, lenient) {
+  if (user.length < 2) return false;
+  const L = lenient || 1;
+  const lu = tzLen(user), lm = tzLen(median);
+  if (lm < 90) {           // trazo muy corto (punto)
+    const c = (pts) => pts.reduce((a, p) => [a[0] + p[0] / pts.length, a[1] + p[1] / pts.length], [0, 0]);
+    return tzDist(c(user), c(median)) < 170 * L && lu < 420;
+  }
+  const U = tzResample(user, 16), M = tzResample(median, 16);
+  const avg = U.reduce((s, p, i) => s + tzDist(p, M[i]), 0) / U.length;
+  const du = [U[15][0] - U[0][0], U[15][1] - U[0][1]], dm = [M[15][0] - M[0][0], M[15][1] - M[0][1]];
+  const dirOk = du[0] * dm[0] + du[1] * dm[1] > 0;
+  const ratio = lu / lm;
+  return dirOk && ratio > 0.35 && ratio < 2.6 && avg < 150 * L && tzDist(U[0], M[0]) < 230 * L && tzDist(U[15], M[15]) < 260 * L;
+}
+const tzPathD = (pts) => pts.map((p, i) => (i ? 'L' : 'M') + Math.round(p[0]) + ' ' + Math.round(p[1])).join(' ');
+
+// Lienzo de un hanzi: muestra los trazos según el paso y recibe lo que se dibuja
+function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate, shake }) {
+  const gRef = React.useRef(null);
+  const [drawing, setDrawing] = useState(null);
+  const uid = React.useRef('tz' + Math.random().toString(36).slice(2, 8)).current;
+  const toChar = (e) => {
+    const g = gRef.current; if (!g) return null;
+    const m = g.getScreenCTM(); if (!m) return null;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+    return [p.x, p.y];
+  };
+  const canDraw = mode !== 'watch' && current < data.outlines.length;
+  const down = (e) => { if (!canDraw) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); const p = toChar(e); if (p) setDrawing([p]); };
+  const move = (e) => { if (!drawing) return; const p = toChar(e); if (p && tzDist(p, drawing[drawing.length - 1]) > 6) setDrawing(d => [...d, p]); };
+  const up = () => { if (!drawing) return; const pts = drawing; setDrawing(null); onStroke(pts); };
+  const n = data.outlines.length;
+  const showGuide = mode === 'trace' || mode === 'complete';
+  const med = data.medians[current];
+  // Flecha del trazo que toca (solo al calcar)
+  const arrow = mode === 'trace' && med && med.length > 1 ? (() => {
+    const a = med[0], b = med[Math.min(med.length - 1, Math.max(1, Math.floor(med.length / 2)))];
+    return { a, b };
+  })() : null;
+  const COLORS = ['#C1432B', '#D97706', '#16A34A', '#2563EB', '#8B3FD9', '#DB2777', '#0891B2', '#65A30D'];
+  return html('svg', { className: 'tz-board' + (shake ? ' shake' : ''), viewBox: '0 0 1024 1024', width: size, height: size,
+      onPointerDown: down, onPointerMove: move, onPointerUp: up, onPointerCancel: up, style: { touchAction: 'none' } },
+    html('defs', null,
+      data.outlines.map((d, i) => html('clipPath', { key: i, id: uid + 'c' + i }, html('path', { d }))),
+      html('marker', { id: uid + 'arr', viewBox: '0 0 10 10', refX: 5, refY: 5, markerWidth: 5, markerHeight: 5, orient: 'auto-start-reverse' },
+        html('path', { d: 'M0,0 L10,5 L0,10 z', fill: '#2563EB' }))),
+    // Cuadrícula 田字格
+    html('rect', { x: 8, y: 8, width: 1008, height: 1008, rx: 24, fill: '#fff', stroke: '#E8C9B8', strokeWidth: 6 }),
+    html('g', { stroke: '#F0D5C6', strokeWidth: 4, strokeDasharray: '18 14' },
+      html('line', { x1: 512, y1: 8, x2: 512, y2: 1016 }), html('line', { x1: 8, y1: 512, x2: 1016, y2: 512 }),
+      html('line', { x1: 8, y1: 8, x2: 1016, y2: 1016 }), html('line', { x1: 1016, y1: 8, x2: 8, y2: 1016 })),
+    html('g', { ref: gRef, transform: 'scale(1, -1) translate(0, -900)' },
+      // Guía gris: al calcar y completar se ven todos los trazos del hanzi
+      showGuide && data.outlines.map((d, i) => html('path', { key: 'g' + i, d, fill: mode === 'complete' ? '#EFEAE4' : '#E2DCD5' })),
+      // Trazo que toca, más marcado (solo al calcar)
+      mode === 'trace' && current < n && html('path', { d: data.outlines[current], fill: '#C9D8F5' }),
+      // Trazos ya hechos, pintados prolijos
+      data.outlines.map((d, i) => filled[i] && html('path', { key: 'f' + i, d, fill: mode === 'watch' ? '#3a3a3a' : COLORS[i % COLORS.length], className: 'tz-fill' })),
+      // Animación (mirar / pista): el recorrido se dibuja recortado por la forma del trazo
+      (animate || []).map(({ i, delay }) => {
+        const m = data.medians[i]; const len = Math.ceil(tzLen(m)) + 20;
+        return html('path', { key: 'a' + i + '-' + delay, d: tzPathD(m), clipPath: 'url(#' + uid + 'c' + i + ')', fill: 'none', stroke: '#C1432B', strokeWidth: 150, strokeLinecap: 'round',
+          strokeDasharray: len, strokeDashoffset: len, className: 'tz-anim', style: { '--len': len, animationDelay: delay + 's' } });
+      }),
+      // Pista: el trazo que toca parpadea
+      hint && current < n && html('path', { d: data.outlines[current], className: 'tz-hint', fill: '#F59E0B' }),
+      // Punto de inicio y flecha
+      arrow && html('g', null,
+        html('line', { x1: arrow.a[0], y1: arrow.a[1], x2: arrow.b[0], y2: arrow.b[1], stroke: '#2563EB', strokeWidth: 16, strokeLinecap: 'round', markerEnd: 'url(#' + uid + 'arr)', opacity: 0.85 }),
+        html('circle', { cx: arrow.a[0], cy: arrow.a[1], r: 34, fill: '#2563EB', className: 'tz-start' })),
+      // Lo que se está dibujando
+      drawing && drawing.length > 1 && html('path', { d: tzPathD(drawing), fill: 'none', stroke: '#1F2937', strokeWidth: 44, strokeLinecap: 'round', strokeLinejoin: 'round', opacity: 0.55 }),
+    ));
+}
+
+// Practicar un hanzi: Mirar → Calcar → Completar → De memoria (hasta el 100 %)
+function TrazoPractice({ ch, word, onDone, onBack, title }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [stage, setStage] = useState(0);          // 0 mirar · 1 calcar · 2 completar · 3 memoria · 4 listo
+  const [current, setCurrent] = useState(0);
+  const [filled, setFilled] = useState([]);
+  const [misses, setMisses] = useState(0);
+  const [hint, setHint] = useState(false);
+  const [shake, setShake] = useState(false);
+  const [animate, setAnimate] = useState([]);
+  const [msg, setMsg] = useState(null);
+  const [size, setSize] = useState(300);
+  const wrapRef = React.useRef(null);
+  const boxRef = React.useRef(null);
+  const belowRef = React.useRef(null);
+  useEffect(() => { loadTrazos(ch).then(setData, e => setErr(String(e.message || e))); }, [ch]);
+  useEffect(() => stopAudio, []);
+  // Tamaño del cuadro: lo más grande posible sin deslizar
+  const fit = () => {
+    const el = wrapRef.current, box = boxRef.current, below = belowRef.current; if (!el || !box || !below) return;
+    const top = box.getBoundingClientRect().top + window.scrollY;
+    const h = window.innerHeight - top - below.getBoundingClientRect().height - 20;
+    setSize(Math.max(200, Math.min(el.clientWidth, h, 560)));
+  };
+  React.useLayoutEffect(fit, [data]);
+  useEffect(() => { window.addEventListener('resize', fit); return () => window.removeEventListener('resize', fit); }, []);
+
+  const n = data ? data.outlines.length : 0;
+  const keep = Math.ceil(n / 2);                  // en "Completar", trazos que ya vienen hechos
+  const startStage = (s) => {
+    setStage(s); setMisses(0); setHint(false); setMsg(null);
+    if (s === 0) { setFilled([]); setCurrent(0); setAnimate(data.outlines.map((_, i) => ({ i, delay: 0.25 + i * 0.75 }))); audioLater(() => speakReal(ch), 200); }
+    if (s === 1) { setFilled([]); setCurrent(0); setAnimate([]); }
+    if (s === 2) { setFilled(data.outlines.map((_, i) => i < keep)); setCurrent(keep); setAnimate([]); }
+    if (s === 3) { setFilled([]); setCurrent(0); setAnimate([]); }
+  };
+  useEffect(() => { if (data) startStage(0); }, [data]);
+
+  if (err) return html(GameStatusScreen, { onBack, title: title || 'Trazos', msg: 'No se pudo cargar el modelo de ' + ch + '.' });
+  if (!data) return html(GameStatusScreen, { onBack, title: title || 'Trazos', msg: '⏳ Cargando ' + ch + '…' });
+
+  // Avance total: mirar (1) + calcar (n) + completar (n-keep) + memoria (n)
+  const totalSteps = 1 + n + (n - keep) + n;
+  const doneSteps = stage === 0 ? 0 : stage === 1 ? 1 + current : stage === 2 ? 1 + n + (current - keep) : stage === 3 ? 1 + n + (n - keep) + current : totalSteps;
+  const pct = Math.round(doneSteps / totalSteps * 100);
+
+  const onStroke = (pts) => {
+    if (stage === 0 || stage === 4 || current >= n) return;
+    const lenient = stage === 1 ? 1.25 : stage === 2 ? 1.1 : 1;
+    if (tzMatch(pts, data.medians[current], lenient)) {
+      const f = filled.slice(); f[current] = true; setFilled(f);
+      setMisses(0); setHint(false); setMsg(null);
+      const next = current + 1;
+      setCurrent(next);
+      if (next >= n) {
+        playCorrect();
+        if (stage < 3) setTimeout(() => startStage(stage + 1), 650);
+        else { setStage(4); playLevelChime(); audioLater(() => speakReal(ch), 250); setAnimate([]); }
+      }
+    } else {
+      playWrong(); setShake(true); setTimeout(() => setShake(false), 350);
+      // ¿Dibujó otro trazo del hanzi? → avisar del orden
+      const other = data.medians.findIndex((m, i) => i !== current && !filled[i] && tzMatch(pts, m, 1));
+      setMsg(other > current ? 'Ese trazo va después: seguí el orden.' : 'Probá de nuevo: fijate dónde empieza y hacia dónde va.');
+      const m = misses + 1; setMisses(m);
+      if (m >= 2) setHint(true);
+    }
+  };
+
+  const STAGES = ['Mirá', 'Calcá', 'Completá', 'De memoria'];
+  const INSTR = ['Mirá el orden de los trazos.', 'Repasá cada trazo desde el punto azul, siguiendo la flecha.', 'Dibujá los trazos que faltan.', 'Dibujá el hanzi completo, en orden.'];
+  return html('main', { className: 'tz-main', style: { paddingTop: 14, paddingBottom: 8 } },
+    html('div', { className: 'header-row' },
+      html('button', { className: 'back-btn', onClick: onBack }, '←'),
+      html('h1', null, title || 'Trazos'),
+      html('div', { className: 'flash-counter' }, pct + '%')),
+    html('div', { className: 'tz-wrap', ref: wrapRef },
+      html('div', { className: 'tz-bar' }, html('i', { style: { width: pct + '%' } })),
+      html('div', { className: 'tz-steps' }, STAGES.map((s, i) => html('span', { key: s, className: i < stage ? 'done' : i === stage ? 'now' : '' }, s))),
+      html('div', { className: 'tz-word' },
+        html('span', { className: 'hanzi-font tz-ch' }, ch),
+        word && html('span', null, html(TonedPinyin, { text: word.pinyin, className: 'tz-py' }), html('small', null, word.es))),
+      html('div', { className: 'tz-board-box', ref: boxRef, style: { height: size } },
+        html(TrazoBoard, { data, size, filled, current, hint, shake, animate, onStroke,
+          mode: stage === 0 ? 'watch' : stage === 1 ? 'trace' : stage === 2 ? 'complete' : stage === 3 ? 'memory' : 'watch' })),
+      html('div', { ref: belowRef, className: 'tz-below' },
+      html('div', { className: 'tz-msg' + (stage === 4 ? ' ok' : msg ? ' bad' : '') },
+        stage === 4 ? '¡Muy bien! Dibujaste ' + ch + ' completo.' : msg || INSTR[stage]),
+      html('div', { className: 'tz-btns' },
+        stage === 0 && html(React.Fragment, null,
+          html('button', { className: 'secondary-btn', onClick: () => startStage(0) }, '↻ Ver de nuevo'),
+          html('button', { className: 'primary-btn', onClick: () => startStage(1) }, 'Empezar →')),
+        (stage === 1 || stage === 2 || stage === 3) && html('button', { className: 'secondary-btn', onClick: () => { setHint(true); setMisses(2); } }, '💡 Pista'),
+        stage === 4 && html('button', { className: 'primary-btn', onClick: onDone }, 'Siguiente →'))),
+    ));
+}
+
+// Camino del 1 al 14: cada lección se desbloquea al completar todos los hanzi de la anterior
+function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
+  const [done, setDone] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('npcr-trazos-' + studentId)) || []); } catch (e) { return new Set(); } });
+  const [view, setView] = useState({ name: 'map' });
+  useEffect(() => {
+    db.from('npcr_trazos_done').select('hanzi').eq('student_id', studentId).then(({ data }) => {
+      if (data) setDone(prev => { const s = new Set(prev); data.forEach(r => s.add(r.hanzi)); return s; });
+    });
+  }, []);
+  useEffect(() => { try { localStorage.setItem('npcr-trazos-' + studentId, JSON.stringify([...done])); } catch (e) {} }, [done]);
+
+  // Hanzi de cada lección (la primera vez que aparecen, con modelo de trazos)
+  const path = useMemo(() => {
+    const seen = new Set();
+    return lessons.filter(l => /^\d+$/.test(l)).sort(lessonCompare).map(l => {
+      const chars = [];
+      (vocab[l] || []).forEach(w => [...String(w.hanzi || '')].forEach(c => {
+        if (!seen.has(c) && NPCR_MEDIA.svg[c]) { seen.add(c); chars.push({ c, w }); }
+      }));
+      return { lesson: l, chars };
+    }).filter(x => x.chars.length);
+  }, [vocab, lessons]);
+  const wordOf = (c, w) => (w && w.hanzi === c) ? w : (Object.values(vocab).flat().find(x => x.hanzi === c) || null);
+  const lessonDone = (p) => p.chars.every(x => done.has(x.c));
+  const unlocked = (k) => (k === 0 || lessonDone(path[k - 1])) && !(maxLesson && parseFloat(path[k].lesson) > maxLesson);
+  const allDone = path.length > 0 && path.every(lessonDone);
+
+  const markDone = (c) => {
+    setDone(prev => new Set([...prev, c]));
+    db.from('npcr_trazos_done').upsert({ student_id: studentId, hanzi: c }, { onConflict: 'student_id,hanzi', ignoreDuplicates: true }).then(() => {});
+  };
+
+  if (view.name === 'practice') {
+    const p = path[view.k]; const item = p.chars[view.i];
+    const nextIdx = p.chars.findIndex((x, i) => i > view.i && !done.has(x.c));
+    return html(TrazoPractice, { key: item.c, ch: item.c, word: wordOf(item.c, item.w), title: 'Lección ' + p.lesson + ' · ' + (view.i + 1) + '/' + p.chars.length,
+      onBack: () => setView({ name: 'lesson', k: view.k }),
+      onDone: () => {
+        markDone(item.c);
+        const firstLeft = nextIdx >= 0 ? nextIdx : p.chars.findIndex(x => x.c !== item.c && !done.has(x.c));
+        setView(firstLeft >= 0 ? { name: 'practice', k: view.k, i: firstLeft } : { name: 'lesson', k: view.k, justDone: true });
+      } });
+  }
+  if (view.name === 'lesson') {
+    const p = path[view.k];
+    const finished = lessonDone(p);
+    return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: () => setView({ name: 'map' }) }, '←'),
+        html('h1', null, 'Trazos · Lección ' + p.lesson)),
+      html('div', { className: 'tz-wrap' },
+        finished && html('div', { className: 'tz-banner' }, view.justDone ? '🎉 ¡Completaste la lección ' + p.lesson + '!' : '✓ Lección completa', view.k + 1 < path.length && unlocked(view.k + 1) && html('button', { className: 'mini-btn', onClick: () => setView({ name: 'lesson', k: view.k + 1 }) }, 'Ir a la lección ' + path[view.k + 1].lesson + ' →')),
+        html('div', { className: 'tz-chars' }, p.chars.map((x, i) => html('button', { key: x.c, className: 'tz-char hanzi-font' + (done.has(x.c) ? ' done' : ''), onClick: () => setView({ name: 'practice', k: view.k, i }) },
+          x.c, done.has(x.c) && html('span', { className: 'tz-check' }, '✓')))),
+        !finished && html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 14 },
+          onClick: () => setView({ name: 'practice', k: view.k, i: Math.max(0, p.chars.findIndex(x => !done.has(x.c))) }) }, 'Seguir practicando →')));
+  }
+  // Mapa de lecciones
+  return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '✍️ Trazos')),
+    html('div', { className: 'tz-wrap' },
+      allDone
+        ? html('div', { className: 'tz-win' }, html('div', { className: 'tz-win-big' }, '🏆'), html('b', null, '¡Ganaste!'),
+            html('span', null, 'Dibujaste los ' + path.reduce((s, p) => s + p.chars.length, 0) + ' hanzi de las ' + path.length + ' lecciones.'))
+        : html('p', { className: 'zhe-intro' }, 'Dibujá cada hanzi con el dedo, en el orden correcto. Completá una lección para desbloquear la siguiente, hasta la ' + (path.length ? path[path.length - 1].lesson : 14) + '.'),
+      html('div', { className: 'tz-map' }, path.map((p, k) => {
+        const n = p.chars.filter(x => done.has(x.c)).length;
+        const open = unlocked(k), full = n === p.chars.length;
+        return html('button', { key: p.lesson, className: 'tz-node' + (full ? ' full' : open ? ' open' : ' locked'), disabled: !open, onClick: () => setView({ name: 'lesson', k }) },
+          html('span', { className: 'tz-node-n' }, full ? '✓' : open ? p.lesson : '🔒'),
+          html('span', { className: 'tz-node-t' }, 'Lección ' + p.lesson),
+          html('span', { className: 'tz-node-s' }, n + '/' + p.chars.length + ' hanzi'),
+          html('span', { className: 'tz-node-bar' }, html('i', { style: { width: Math.round(n / p.chars.length * 100) + '%' } })));
+      }))));
 }
 
 // ═════════════ 这是什么？ (Mi aula): mirá la foto y elegí el hanzi, contra reloj ═════════════

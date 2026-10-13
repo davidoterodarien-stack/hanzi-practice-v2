@@ -1725,6 +1725,7 @@ function App() {
     else if (screen.game === 'modal') content = html(ClasificadorGame, { ...gameProps, tipo: 'modal' });
     else if (screen.game === 'tiempo') content = html(ClasificadorGame, { ...gameProps, tipo: 'tiempo' });
     else if (screen.game === 'dialogo') content = html(DialogoGame, gameProps);
+    else if (screen.game === 'zhe') content = html(ZheGame, { ...gameProps, zheConfig: appConfig.zhe_config });
     else if (screen.game === 'orden') content = html(OrdenGame, gameProps);
     else if (screen.game === 'audio') {
       const allWords = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').flatMap(id => vocab[id]);
@@ -2342,6 +2343,7 @@ const AULA_ICONS = {
   chat:     ['M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z', 'M8 12h.01', 'M12 12h.01', 'M16 12h.01'],
   tag:      ['M3 12V4h8l10 10-8 8L3 12Z', 'M7.5 7.5h.01'],
   award:    ['M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z', 'M8.2 13.9 7 22l5-3 5 3-1.2-8.1'],
+  photo:    ['M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z', 'M3 16l5-5 4 4 3-3 6 6', 'M15.5 9.5h.01'],
   users:    ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M22 21v-2a4 4 0 0 0-3-3.9', 'M16 3.1a4 4 0 0 1 0 7.8'],
   book:     ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z', 'M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5'],
   login:    ['M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4', 'M10 17l5-5-5-5', 'M15 12H3'],
@@ -2349,7 +2351,7 @@ const AULA_ICONS = {
   gear:     ['M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z'],
 };
 // Actividades de "Mi aula" que abren un juego de preguntas (npcr_clasificador_questions por tipo)
-const AULA_GAMES = { 'aula-modal': 'modal', 'aula-tiempo': 'tiempo', 'aula-clas': 'clas' };
+const AULA_GAMES = { 'aula-modal': 'modal', 'aula-tiempo': 'tiempo', 'aula-clas': 'clas', 'aula-zhe': 'zhe' };
 const AULA_TONES = {
   red:    { bg: 'var(--lacquer-light)', fg: 'var(--lacquer)' },
   blue:   { bg: 'var(--blue-light)', fg: 'var(--blue-dark)' },
@@ -2382,6 +2384,7 @@ function aulaActivities(settings, hardCount) {
     { id: 'aula-modal', icon: 'chat', tone: 'blue', title: 'Verbos modales', sub: 'Distinguí 会, 能, 可以 y 应该' },
     { id: 'aula-tiempo', icon: 'clock', tone: 'gold', title: 'Expresiones de tiempo', sub: 'La hora: 点, 分, 刻, 差 y 半' },
     { id: 'aula-clas', icon: 'tag', tone: 'purple', title: 'Clasificadores', sub: 'Elegí 个, 本, 张, 斤 correctamente' },
+    { id: 'aula-zhe', icon: 'photo', tone: 'green', title: '这是什么？', sub: 'Mirá la foto y elegí el hanzi, contra reloj' },
     { id: 'progreso', icon: 'chart', tone: 'blue', title: 'Mi progreso', sub: 'Fuertes y a reforzar' },
   ].filter(Boolean);
 }
@@ -8472,6 +8475,156 @@ function ClasificadorGameBody({ onBack, onFinish, playerName, rawQuestions, titl
           )
     )
   );
+}
+
+// ═════════════ 这是什么？ (Mi aula): mirá la foto y elegí el hanzi, contra reloj ═════════════
+// Fotos y palabras en npcr_zhe_items; rondas y velocidades en npcr_app_config 'zhe_config'.
+function ZheGame({ onBack, onFinish, zheConfig }) {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState(null);
+  const [speed, setSpeed] = useState(null);       // segundos por foto (null = pantalla de inicio)
+  const [game, setGame] = useState(null);         // { list, i, opts, picked, score, ok, streak, best, missed }
+  const [left, setLeft] = useState(0);            // milisegundos que quedan
+  const [done, setDone] = useState(false);
+  const [n, setN] = useState(0);                  // para "Otra vez"
+  // Alto de la foto: lo que queda de pantalla debajo del encabezado, para que foto,
+  // frase y las 4 opciones entren sin deslizar. Se calcula una vez por tamaño de pantalla
+  // (no cambia al responder, así nada se mueve).
+  const photoRef = React.useRef(null);
+  const belowRef = React.useRef(null);
+  const [photoH, setPhotoH] = useState(null);
+  const [belowH, setBelowH] = useState(null);
+  const dims = React.useRef(null);
+  const fitPhoto = () => {
+    const ph = photoRef.current, below = belowRef.current;
+    if (!ph || !below) return;
+    dims.current = { w: window.innerWidth, h: window.innerHeight };
+    const top = ph.getBoundingClientRect().top + window.scrollY;
+    below.style.minHeight = '';            // medir el alto natural (frase + 4 opciones)
+    ph.style.height = '';
+    const bh = below.getBoundingClientRect().height;
+    const free = window.innerHeight - top - bh - 18;
+    setBelowH(Math.ceil(bh));
+    setPhotoH(Math.max(120, Math.min(460, Math.floor(free))));
+  };
+  React.useLayoutEffect(() => {
+    if (!game || game.picked) return;
+    const d = dims.current;
+    if (photoH === null || !d || d.w !== window.innerWidth || Math.abs(d.h - window.innerHeight) > 120) fitPhoto();
+  });
+  useEffect(() => {
+    const onResize = () => {
+      const d = dims.current;
+      if (!d || d.w !== window.innerWidth || Math.abs(d.h - window.innerHeight) > 120) { setPhotoH(null); setBelowH(null); }
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize); };
+  }, []);
+  useEffect(() => {
+    db.from('npcr_zhe_items').select('*').eq('hidden', false).order('id').then(({ data, error }) => {
+      if (error) { setErr(error.message); return; }
+      (data || []).forEach(r => { if (r.audio) EXTRA_AUDIO[r.hanzi.replace(MEDIA_PUNCT_RE, '')] = r.audio; });
+      setItems(data || []);
+    });
+  }, []);
+  useEffect(() => stopAudio, []);
+
+  const cfg = zheConfig && zheConfig.rounds && Array.isArray(zheConfig.speeds) ? zheConfig : null;
+  const q = game && game.list[game.i];
+  const answered = !!(game && game.picked);
+
+  // Reloj: corre mientras no se respondió
+  useEffect(() => {
+    if (!game || answered || done) return;
+    if (left <= 0) { finishTurn(null); return; }
+    const t = setTimeout(() => setLeft(l => l - 100), 100);
+    return () => clearTimeout(t);
+  }, [left, game && game.i, answered, done]);
+
+  if (err) return html(GameStatusScreen, { onBack, title: '这是什么？', msg: '❌ ' + err + ' (¿ejecutaste npcr_zhe.sql?)' });
+  if (!items) return html(GameStatusScreen, { onBack, title: '这是什么？', msg: '⏳ Cargando fotos...' });
+  if (!cfg) return html(GameStatusScreen, { onBack, title: '这是什么？', msg: 'Falta la configuración del juego (zhe_config en la configuración de la app).' });
+  if (items.length < 4) return html(GameStatusScreen, { onBack, title: '这是什么？', msg: 'Todavía no hay fotos cargadas para este juego.' });
+
+  const optionsFor = (it) => shuffle([it, ...shuffle(items.filter(x => x.hanzi !== it.hanzi)).slice(0, 3)]);
+  const start = (sec) => {
+    const list = shuffle(items).slice(0, Math.min(cfg.rounds, items.length));
+    setSpeed(sec);
+    setGame({ list, i: 0, opts: optionsFor(list[0]), picked: null, score: 0, ok: 0, streak: 0, best: 0, missed: [] });
+    setLeft(sec * 1000); setDone(false); setN(x => x + 1);
+  };
+  function finishTurn(pick) {
+    if (!game || game.picked) return;
+    const good = pick && pick.hanzi === q.hanzi;
+    const pts = good ? 100 + Math.round(Math.max(0, left) / 100) : 0;
+    const streak = good ? game.streak + 1 : 0;
+    if (good) playLevelChime(); else playWrong();
+    audioLater(() => speakReal(q.hanzi), good ? 350 : 500);
+    setGame({ ...game, picked: pick || { timeout: true }, score: game.score + pts, ok: game.ok + (good ? 1 : 0), streak, best: Math.max(game.best, streak),
+      missed: good ? game.missed : [...game.missed, { hanzi: q.hanzi, pinyin: q.pinyin, es: q.es }] });
+  }
+  const next = () => {
+    stopAudio();
+    if (game.i + 1 >= game.list.length) {
+      setDone(true);
+      onFinish && onFinish(Math.round(game.ok / game.list.length * 100), game.missed);
+      return;
+    }
+    const i = game.i + 1;
+    setGame({ ...game, i, opts: optionsFor(game.list[i]), picked: null });
+    setLeft(speed * 1000);
+  };
+
+  // ── Inicio: elegir velocidad ──
+  if (!game) return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', { className: 'hanzi-font' }, '这是什么？')),
+    html('div', { className: 'zhe-wrap' },
+      html('p', { className: 'zhe-intro' }, 'Mirá la foto y elegí el hanzi que completa ', html('b', { className: 'hanzi-font' }, '这是＿＿。'),
+        ' Cuanto más rápido respondas, más puntos. ' + cfg.rounds + ' fotos por partida.'),
+      html('div', { className: 'zhe-speeds' }, cfg.speeds.map(sp => html('button', { key: sp.name, className: 'zhe-speed' + (sp.name === cfg.default ? ' def' : ''), onClick: () => start(sp.sec) },
+        html('b', null, sp.name), html('span', null, sp.sec + ' s por foto')))),
+    ));
+
+  // ── Resultado ──
+  if (done) return html(HskResult, {
+    title: '这是什么？', ok: game.ok, total: game.list.length,
+    missed: game.missed.map(m => ({ t: m.hanzi, py: m.pinyin, es: m.es })),
+    onAgain: () => start(speed), onBack,
+  }, html('div', { className: 'zhe-final' },
+    html('div', null, html('b', null, game.score), html('span', null, 'puntos')),
+    html('div', null, html('b', null, game.best), html('span', null, 'mejor racha'))));
+
+  // ── Juego ──
+  const total = speed * 1000;
+  const pct = Math.max(0, Math.min(100, left / total * 100));
+  const good = answered && game.picked.hanzi === q.hanzi;
+  return html('main', { className: 'zhe-main', style: { paddingTop: 14, paddingBottom: 24 } },
+    html('div', { className: 'header-row' },
+      html('button', { className: 'back-btn', onClick: onBack }, '←'),
+      html('h1', { className: 'hanzi-font' }, '这是什么？'),
+      html('div', { className: 'flash-counter' }, (game.i + 1) + '/' + game.list.length)),
+    html('div', { className: 'zhe-wrap' },
+      html('div', { className: 'zhe-stats' },
+        html('span', null, '⭐ ', html('b', null, game.score)),
+        game.streak > 1 && html('span', { className: 'zhe-streak' }, '🔥 ' + game.streak + ' seguidas'),
+        html('span', null, '⏱ ', html('b', null, Math.ceil(Math.max(0, left) / 1000) + ' s'))),
+      html('div', { className: 'zhe-timer' + (pct < 30 ? ' low' : '') }, html('i', { style: { width: (answered ? 0 : pct) + '%' } })),
+      html('div', { className: 'zhe-photo', ref: photoRef, style: photoH ? { height: photoH } : null }, html('img', { key: q.id, src: q.image, alt: '' })),
+      html('div', { ref: belowRef, className: 'zhe-below', style: belowH ? { minHeight: belowH } : null },
+      html('div', { className: 'zhe-q hanzi-font' }, '这是',
+        html('span', { className: 'zhe-blank' + (answered ? (good ? ' ok' : ' bad') : '') }, answered ? q.hanzi : ''), '。'),
+      answered
+        ? html('div', { className: 'zhe-fb ' + (good ? 'ok' : 'bad') },
+            html('div', { className: 'zhe-fb-title' }, good ? '¡Correcto!' : game.picked.timeout ? '⏱ Se acabó el tiempo' : 'Incorrecto'),
+            html(TonedPinyin, { text: 'Zhè shì ' + q.pinyin + '.', className: 'zhe-fb-py' }),
+            html('div', { className: 'zhe-fb-es' }, q.es_s),
+            html('div', { className: 'zhe-fb-btns' },
+              html('button', { className: 'mini-btn', onClick: () => speakReal(q.hanzi) }, '🔊 Escuchar'),
+              html('button', { className: 'primary-btn', onClick: next }, game.i + 1 >= game.list.length ? 'Ver resultado' : 'Siguiente →')))
+        : html('div', { className: 'quiz-options grid2 zhe-opts' },
+            game.opts.map(o => html('button', { key: o.hanzi, className: 'quiz-option hanzi-font', onClick: () => finishTurn(o) }, o.hanzi)))),
+    ));
 }
 
 // ----------------- Prueba: Diálogo -----------------

@@ -530,7 +530,12 @@ function AuthGate({ onAuthenticated, onBeforeAuth }) {
         res = await db.auth.signUp({ email, password: pwd, options: { data: { name: displayName } } });
       }
       if (res.error || !res.data?.session) {
-        setErr('No se pudo conectar. Verificá tu conexión.');
+        // Mostrar el motivo real (ej. límite de ingresos de Supabase desde una misma red)
+        const why = String((anonRes.error && anonRes.error.message) || (res.error && res.error.message) || '');
+        console.error('ingreso', anonRes.error, res.error);
+        setErr(/rate limit|too many|429/i.test(why)
+          ? 'Muchos ingresos al mismo tiempo desde esta red (por ejemplo, el wifi del instituto). Esperá unos minutos o probá con los datos del celular.'
+          : 'No se pudo entrar' + (why ? ' (' + why + ')' : '') + '. Revisá tu conexión y probá de nuevo.');
         setLoading(false);
         return;
       }

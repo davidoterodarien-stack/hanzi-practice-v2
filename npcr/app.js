@@ -4535,6 +4535,38 @@ function loadDigitAudio() {
 }
 
 const PRIZE_NAMES = { terno: 'Terno', linea: 'Línea', bingo: '¡Bingo!' };
+// Premios que se festejan con un aviso grande en todas las pantallas
+const PRIZE_POPUP = ['linea', 'bingo'];
+// Cola de avisos grandes: se muestran de a uno y cada uno se cierra solo a los pocos segundos
+function usePrizePopups() {
+  const [queue, setQueue] = useState([]);
+  const [sec, setSec] = useState(null);
+  useEffect(() => {
+    db.from('npcr_app_config').select('value').eq('key', 'bingo_prize_sec').maybeSingle()
+      .then(({ data }) => setSec(Number(data && data.value) || null));
+  }, []);
+  const current = queue[0] || null;
+  useEffect(() => {
+    if (!current) return;
+    const t = setTimeout(() => setQueue(q => q.slice(1)), (sec || 4) * 1000);
+    return () => clearTimeout(t);
+  }, [current && current.id]);
+  const push = (items) => items.length && setQueue(q => [...q, ...items]);
+  const close = () => setQueue(q => q.slice(1));
+  return { current, push, close, sec: sec || 4 };
+}
+function BingoPrizePopup({ prize, mine, sec, onClose }) {
+  if (!prize) return null;
+  const big = (prize.kind || 'bingo') === 'bingo';
+  return html('div', { key: prize.id, className: 'bingo-prize-overlay', onClick: onClose, style: { '--sec': sec + 's' } },
+    html('div', { className: 'bingo-prize-card' + (big ? ' big' : '') },
+      html('div', { className: 'bingo-confetti' }, ['🎉', '✨', '🎊', '⭐', '🎉', '✨', '🎊', '⭐'].map((c, i) => html('span', { key: i, style: { '--i': i } }, c))),
+      html('div', { className: 'bingo-prize-icon' }, big ? '🏆' : '🎉'),
+      html('div', { className: 'bingo-prize-kind' }, PRIZE_NAMES[prize.kind || 'bingo']),
+      html('div', { className: 'bingo-prize-who' }, mine ? '¡Lo cantaste vos!' : html(React.Fragment, null, html('b', null, prize.name), ' cantó ' + PRIZE_NAMES[prize.kind || 'bingo'])),
+      html('div', { className: 'bingo-prize-pts' }, '+' + (prize.points || 0) + ' puntos'),
+      html('i', { className: 'bingo-prize-bar' })));
+}
 // Puntos por jugador sumando sus premios (los calcula y guarda el servidor)
 function bingoScores(winners) {
   const by = {};
@@ -4637,6 +4669,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
   // Avisos de premios cantados (terno, línea, bingo) para quien dirige
   const [toasts, setToasts] = useState([]);
   const seenPrizes = React.useRef({ game: null, count: 0 });
+  const popups = usePrizePopups();
 
   const loadGame = () => db.from('bingo_games').select('*').eq('class_id', classId).order('created_at', { ascending: false }).limit(5)
     .then(({ data, error }) => {
@@ -4676,8 +4709,10 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
       const nuevos = game.winners.slice(seen.count).map((w, k) => ({ ...w, id: game.id + ':' + (seen.count + k) }));
       seen.count = prizeCount;
       playLevelChime();
-      setToasts(ts => [...ts, ...nuevos]);
-      nuevos.forEach(t => setTimeout(() => setToasts(ts => ts.filter(x => x.id !== t.id)), 9000));
+      popups.push(nuevos.filter(t => PRIZE_POPUP.includes(t.kind || 'bingo')));
+      const chicos = nuevos.filter(t => !PRIZE_POPUP.includes(t.kind || 'bingo'));
+      setToasts(ts => [...ts, ...chicos]);
+      chicos.forEach(t => setTimeout(() => setToasts(ts => ts.filter(x => x.id !== t.id)), 9000));
     }
   }, [game && game.id, prizeCount]);
 
@@ -4741,6 +4776,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
 
   const winners = game.winners || [];
   return html('div', { ref: boxRef, className: 'bingo-host' },
+    html(BingoPrizePopup, { prize: popups.current, sec: popups.sec, onClose: popups.close }),
     toasts.length > 0 && html('div', { className: 'bingo-toasts' }, toasts.map(t => html('div', { key: t.id, className: 'bingo-toast ' + (t.kind || 'bingo') },
       html('span', { className: 'bingo-toast-icon' }, t.kind === 'bingo' ? '🏆' : '🎉'),
       html('span', { className: 'bingo-toast-txt' }, html('b', null, t.name), ' cantó ', html('b', null, PRIZE_NAMES[t.kind || 'bingo']),
@@ -4806,6 +4842,7 @@ function BingoPlayer({ gameId, onBack }) {
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
   const lastWin = React.useRef(0);
+  const popups = usePrizePopups();
 
   useEffect(() => {
     db.rpc('bingo_join', { p_game: gameId }).then(({ data, error }) => {
@@ -4828,7 +4865,17 @@ function BingoPlayer({ gameId, onBack }) {
 
   // Aviso cuando alguien canta bingo
   const winners = (game && game.winners) || [];
-  useEffect(() => { if (winners.length > lastWin.current) { if (lastWin.current) playLevelChime(); lastWin.current = winners.length; } }, [winners.length]);
+  const firstWinLoad = React.useRef(true);
+  useEffect(() => {
+    if (!game) return;
+    if (firstWinLoad.current) { firstWinLoad.current = false; lastWin.current = winners.length; return; }   // al entrar no se repiten avisos viejos
+    if (winners.length > lastWin.current) {
+      const nuevos = winners.slice(lastWin.current).map((w, k) => ({ ...w, id: gameId + ':' + (lastWin.current + k) }));
+      lastWin.current = winners.length;
+      playLevelChime();
+      popups.push(nuevos.filter(w => PRIZE_POPUP.includes(w.kind || 'bingo')));
+    }
+  }, [game && game.id, winners.length]);
   // Pista del lǎoshī: aparece en grande unos segundos y se va (al entrar no se repite una vieja)
   useEffect(() => {
     if (!game) return;
@@ -4876,6 +4923,7 @@ function BingoPlayer({ gameId, onBack }) {
   };
 
   return html('main', { className: 'bingo-main', style: { paddingTop: 12 } },
+    html(BingoPrizePopup, { prize: popups.current, sec: popups.sec, onClose: popups.close, mine: !!(popups.current && card && popups.current.user_id === card.student_id) }),
     hint && html('div', { key: 'hint' + hint.key, className: 'bingo-hint-overlay', onClick: () => setHint(null), style: { '--sec': (hintSec || 5) + 's' } },
       html('div', { className: 'bingo-hint-card' },
         html('small', null, '💡 Pista de tu lǎoshī'),

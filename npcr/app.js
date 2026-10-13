@@ -891,7 +891,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       ),
     );
   } else if (tab === 'ranking') {
-    body = html('div', { className: 'report-card', style: { padding: 0, overflowX: 'auto' } },
+    body = html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
       html('table', { className: 'rank-table' },
         html('thead', null, html('tr', null,
           html('th', null, '#'), th('display_name', 'Alumno'), th('mastery', 'Dominio', 'Promedio de las lecciones: 60% tarjetas + 40% juegos'),
@@ -913,7 +913,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       html('p', { className: 'admin-note', style: { padding: '8px 12px', margin: 0 } }, 'Tocá un encabezado para ordenar y un alumno para ver su ficha.'),
     );
   } else if (tab === 'mapa') {
-    body = html('div', { className: 'report-card', style: { padding: 0, overflowX: 'auto' } },
+    body = html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
       html('table', { className: 'heat-table' },
         html('thead', null, html('tr', null, html('th', null, 'Alumno'), lessons.map(l => html('th', { key: l }, 'L' + l)))),
         html('tbody', null, active.map(r => html('tr', { key: r.seat_id, onClick: () => setStudent(r) },
@@ -4390,7 +4390,7 @@ function HskClassReport({ classId, level }) {
       html('p', { className: 'admin-note', style: { margin: 0 } },
         withSim.length ? passing + ' de ' + withSim.length + ' alumnos aprobarían según su último simulacro (120/200).' : 'Todavía nadie hizo un simulacro.'),
     ),
-    html('div', { style: { overflowX: 'auto' } },
+    html(ScrollX, { arrows: 'top' },
       html('table', { className: 'rank-table hsk-report' },
         html('thead', null, html('tr', null,
           html('th', null, 'Alumno'), html('th', null, 'Palabras'), html('th', null, 'Último simulacro'), html('th', null, 'Mejor'),
@@ -5962,7 +5962,7 @@ function SimOral({ preguntas, horario, onPracticarDialogo }) {
     html('div', { style: { background: 'var(--jade-light)', borderRadius: 12, padding: '12px 14px', marginBottom: 16 } },
       html('div', { style: { fontWeight: 700, fontSize: 13, color: 'var(--jade-dark)', marginBottom: 8 } }, 'Opción A — Diálogo con planilla de horarios'),
       html('p', { style: { fontSize: 12, color: 'var(--ink-mid)', marginBottom: 10 } }, 'Dos amigos quieren acordar una actividad juntos según este horario:'),
-      html('div', { style: { overflowX: 'auto' } },
+      html(ScrollX, { arrows: 'top' },
         html('table', { style: { borderCollapse: 'collapse', fontSize: 12, width: '100%' } },
           html('thead', null,
             html('tr', null,
@@ -7262,7 +7262,7 @@ function ContentTrash() {
         html('button', { className: 'mini-btn danger', onClick: () => purgeQ(q) }, 'Borrar definitivo'),
       )),
     ),
-    tab === 'historial' && html('div', { style: { overflowX: 'auto' } },
+    tab === 'historial' && html(ScrollX, { arrows: 'top' },
       history.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay cambios registrados.')
       : html('table', { className: 'rank-table' },
           html('thead', null, html('tr', null, ['Cuándo', 'Quién', 'Qué', 'Detalle', ''].map(h => html('th', { key: h, style: { cursor: 'default' } }, h)))),
@@ -7716,10 +7716,10 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
             ),
 
             // ── Accesos directos ──
-            adminTabs.length > 1 && html('nav', { className: 'admin-nav' }, adminTabs.map(t => html('button', { key: t.id, type: 'button',
+            adminTabs.length > 1 && html(ScrollX, null, html('nav', { className: 'admin-nav' }, adminTabs.map(t => html('button', { key: t.id, type: 'button',
               className: 'admin-nav-btn' + (tab === t.id ? ' on' : ''), title: t.sub, onClick: () => setAdminTab(t.id) },
               html(AulaIcon, { name: t.icon, tone: t.tone, size: 34 }),
-              html('span', { className: 'admin-nav-txt' }, t.title)))),
+              html('span', { className: 'admin-nav-txt' }, t.title))))),
 
             ENABLE_CUI_EXAM && html('button', {
               className: 'secondary-btn',
@@ -7954,12 +7954,13 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                       activityError && html('div', { className: 'admin-status err' }, '❌ ' + activityError + (/function|does not exist/.test(activityError) ? ' — ¿Ejecutaste npcr_registro.sql?' : '')),
                       !activityError && rows.length === 0
                         ? html('p', { className: 'admin-note' }, activityLog.length ? 'Ningún alumno coincide con el filtro.' : 'Sin registros todavía.')
-                        : html('div', { style: { overflowX: 'auto' } },
+                        : html(ScrollX, { arrows: 'top' },
                             html('table', { className: 'rank-table' },
                               html('thead', null, html('tr', null,
                                 ['Alumno', 'Aula', 'Primera vez', 'Última vez', 'Visitas', 'Sesiones', 'Prom. 7 días', 'Hasta lección'].map(h => html('th', { key: h, style: { cursor: 'default' } }, h)))),
                               html('tbody', null, rows.map(r => html('tr', { key: r.user_id, style: { cursor: 'default' } },
-                                html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap' } }, r.name,
+                                html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap' } },
+                                  r.name || html('span', { style: { fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-soft)' }, title: 'Abrió la app pero no escribió su nombre' }, 'Sin nombre'),
                                   html('span', { className: 'reg-badge' + (r.has_code ? ' code' : '') }, r.has_code ? 'código' : 'libre')),
                                 html('td', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '') : '—'),
                                 html('td', { style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
@@ -8067,6 +8068,30 @@ function PruebaResult({ percent, total, correct, missed, onRetry, onBack, player
 // Los 3 juegos de abajo (Clasificadores/Diálogo/Ordenar) ya no traen su
 // banco de preguntas hardcodeado: lo piden a Supabase al montar. Mientras
 // llega, muestran un loader; si no hay preguntas cargadas todavía, avisan.
+// Contenido más ancho que la pantalla (tablas, pestañas): barra visible, sombra en el borde
+// y flechas ‹ › para ver lo que queda afuera. Las flechas solo aparecen si hay más.
+function ScrollX({ children, className, style, innerStyle, arrows }) {
+  const ref = React.useRef(null);
+  const [st, setSt] = useState({ l: false, r: false });
+  const update = () => {
+    const el = ref.current; if (!el) return;
+    const l = el.scrollLeft > 4, r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setSt(prev => prev.l === l && prev.r === r ? prev : { l, r });
+  };
+  React.useLayoutEffect(update);
+  useEffect(() => {
+    window.addEventListener('resize', update);
+    let ro = null;
+    if (window.ResizeObserver && ref.current) { ro = new ResizeObserver(update); ro.observe(ref.current); if (ref.current.firstElementChild) ro.observe(ref.current.firstElementChild); }
+    return () => { window.removeEventListener('resize', update); if (ro) ro.disconnect(); };
+  }, []);
+  const go = (d) => { const el = ref.current; if (el) el.scrollBy({ left: d * Math.max(120, el.clientWidth * 0.7), behavior: 'smooth' }); };
+  return html('div', { className: 'scrollx' + (st.l ? ' more-l' : '') + (st.r ? ' more-r' : '') + (arrows === 'top' ? ' arrows-top' : '') + (className ? ' ' + className : ''), style },
+    html('div', { ref, className: 'scrollx-in', style: innerStyle, onScroll: update }, children),
+    st.l && html('button', { type: 'button', className: 'scrollx-btn l', onClick: () => go(-1), 'aria-label': 'Ver más a la izquierda' }, '‹'),
+    st.r && html('button', { type: 'button', className: 'scrollx-btn r', onClick: () => go(1), 'aria-label': 'Ver más a la derecha' }, '›'));
+}
+
 function GameStatusScreen({ onBack, title, msg, onRetry }) {
   return html('main', { style: { paddingTop: '18px' } },
     html('div', { className: 'header-row' },

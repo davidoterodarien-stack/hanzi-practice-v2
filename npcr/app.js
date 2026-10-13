@@ -3575,6 +3575,7 @@ const isToday = (iso) => iso && todayLocal() === (() => { const d = new Date(iso
 function HskScreen({ level, studentId, appConfig, examDate, onHome, preview }) {
   const lv = hskLevel(level, appConfig['hsk' + level + '_exam']);
   const T = 'hsk' + level;
+  useEffect(() => stopAudio, []);   // al salir del HSK no sigue sonando nada
   const [words, setWords] = useState(null);
   const [wmAll, setWmAll] = useState({});
   const [bank, setBank] = useState(null);
@@ -3902,14 +3903,24 @@ function buildHskSection(kind, bank, wm, lv, count) {
 
 // HSK 1: solo audios grabados del material (nunca voz sintética)
 function speakReal(text, onEnd) { if (hasRealAudio(text)) speak(text, onEnd); else if (onEnd) onEnd(); }
+// Audios con pausas (repetición, encadenados): las esperas pendientes se cancelan con stopAudio()
+let _audioTimers = [];
+function audioLater(fn, ms) { const t = setTimeout(() => { _audioTimers = _audioTimers.filter(x => x !== t); fn(); }, ms); _audioTimers.push(t); }
+// Corta TODO lo que esté sonando o por sonar (al pasar de pregunta o salir)
+function stopAudio() {
+  _speakToken++;
+  _audioTimers.forEach(clearTimeout); _audioTimers = [];
+  if (_npcrAudio) { _npcrAudio.pause(); _npcrAudio = null; }
+}
 // Encadena grabaciones de palabras sueltas (ej. 三 + 点) para números, horas y precios
 function speakChain(tokens, onEnd) {
+  stopAudio();
   const list = tokens.filter(hasRealAudio);
-  const step = (k) => { if (k >= list.length) { onEnd && onEnd(); return; } speak(list[k], () => setTimeout(() => step(k + 1), 60)); };
+  const step = (k) => { if (k >= list.length) { onEnd && onEnd(); return; } speak(list[k], () => audioLater(() => step(k + 1), 60)); };
   step(0);
 }
 // Audio "como en el examen": suena dos veces
-function speakTwice(text) { speakReal(text, () => setTimeout(() => speakReal(text), 900)); }
+function speakTwice(text) { stopAudio(); speakReal(text, () => audioLater(() => speakReal(text), 900)); }
 
 function HskSectionHead({ kind, lv, onBack, right, exam }) {
   const meta = lv.sections[kind];
@@ -3929,7 +3940,12 @@ function HskSingles({ items, mode, onProgress, onDone }) {
   const [picked, setPicked] = useState(null);
   const [score, setScore] = useState({ ok: 0, missed: [] });
   const it = items[i];
-  useEffect(() => { if (it && it.say) setTimeout(() => speakTwice(it.say), 300); }, [i]);
+  // Al pasar de pregunta (o salir) se corta el audio anterior, también la segunda repetición
+  useEffect(() => {
+    if (!it || !it.say) return stopAudio;
+    audioLater(() => speakTwice(it.say), 300);
+    return stopAudio;
+  }, [i]);
 
   const isOk = (choice) => it.q === 'tf' ? choice === it.answer : it.options[choice].ok;
   const pick = (choice) => {
@@ -3981,6 +3997,7 @@ function HskSingles({ items, mode, onProgress, onDone }) {
 // Tablero para unir con líneas: tocás un elemento de la izquierda y después
 // uno de la derecha (o al revés). Tocar un elemento unido lo suelta.
 function HskBoard({ board, mode, onProgress, onDone }) {
+  useEffect(() => stopAudio, []);
   const [pairs, setPairs] = useState({});      // leftId → rightId
   const [sel, setSel] = useState(null);        // { side, id }
   const [checked, setChecked] = useState(false);
@@ -4277,7 +4294,11 @@ function HskDrill({ kind, bank, wm, lv, onBack, onSave, onAgain }) {
   const [done, setDone] = useState(false);
   const q = qs[i];
   const listen = kind === 'numeros';
-  useEffect(() => { if (!done && listen) setTimeout(() => speakChain(q.tokens), 300); }, [i]);
+  useEffect(() => {
+    if (done || !listen) return stopAudio;
+    audioLater(() => speakChain(q.tokens), 300);
+    return stopAudio;
+  }, [i, done]);
 
   if (done) return html(HskResult, { title: TITLES[kind], ok, total: qs.length, missed, onAgain, onBack });
   const pick = (k) => {

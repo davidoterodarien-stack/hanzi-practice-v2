@@ -7493,6 +7493,12 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   const [mergeFrom, setMergeFrom] = useState(null);
   const [mergeTo, setMergeTo] = useState('');
   const [mergeMsg, setMergeMsg] = useState(null);
+  // Al elegir un invitado, la ventanita (que está arriba de la tabla) se trae a la vista
+  useEffect(() => {
+    if (!mergeFrom) return;
+    const t = setTimeout(() => { const el = document.querySelector('.merge-box'); if (el) el.scrollIntoView({ block: 'center' }); }, 50);
+    return () => clearTimeout(t);
+  }, [mergeFrom]);
   const doMerge = async () => {
     const to = activityLog.find(x => x.user_id === mergeTo);
     if (!mergeFrom || !to) return;

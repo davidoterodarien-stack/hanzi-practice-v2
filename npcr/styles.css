@@ -1664,3 +1664,10 @@ main.tz-main { padding-bottom: 8px !important; }
 .tz-info-txt b { font-size: 20px; }
 .tz-info-py { font-size: 16px; font-weight: 800; }
 @keyframes tzInfo { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* Trazos: pinyin al apoyar el dedo / pasar el mouse */
+.tz-char, .tz-path-c { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.tz-tip { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 14px; font-weight: 800; padding: 4px 10px; border-radius: 8px; white-space: nowrap; z-index: 5; pointer-events: none; font-family: var(--font-body, inherit); }
+.tz-tip::after { content: ''; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--ink); }
+.tz-tip .tone1, .tz-tip .tone2, .tz-tip .tone3, .tz-tip .tone4, .tz-tip span { color: #fff !important; }
+.tz-path-tip { align-self: center; background: var(--ink); color: #fff; font-weight: 800; font-size: 15px; padding: 4px 12px; border-radius: 10px; margin-top: -4px; }
+.tz-path-tip span { color: #fff !important; }

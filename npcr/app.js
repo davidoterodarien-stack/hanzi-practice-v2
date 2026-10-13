@@ -8630,7 +8630,8 @@ function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate
 }
 
 // Practicar un hanzi: Mirar → Calcar → Completar → De memoria (hasta el 100 %)
-function TrazoPractice({ ch, word, inWord, onDone, onComplete, onBack, title, path, onJump }) {
+function TrazoPractice({ ch, word, inWord, info, onDone, onComplete, onBack, title, path, onJump }) {
+  const [tip, holdProps] = useHoldTip();
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [stage, setStage] = useState(0);          // 0 mirar · 1 calcar · 2 completar · 3 memoria · 4 listo
@@ -8711,15 +8712,18 @@ function TrazoPractice({ ch, word, inWord, onDone, onComplete, onBack, title, pa
       html('div', { className: 'tz-bar' }, html('i', { style: { width: pct + '%' } })),
       html('div', { className: 'tz-steps' }, STAGES.map((s, i) => html('span', { key: s, className: i < stage ? 'done' : i === stage ? 'now' : '' }, s))),
       path && html(ScrollX, { className: 'tz-path-wrap' }, html('div', { className: 'tz-path' }, path.map((x, i) => html('button', { key: x.c, type: 'button',
-        className: 'tz-path-c hanzi-font' + (x.c === ch ? ' now' : '') + (x.done ? ' done' : ''), onClick: () => x.c !== ch && onJump && onJump(i), title: x.done ? 'Completado' : '' },
+        className: 'tz-path-c hanzi-font' + (x.c === ch ? ' now' : '') + (x.done ? ' done' : ''), ...holdProps('P' + x.c, () => x.c !== ch && onJump && onJump(i)) },
         x.c, x.done && html('i', null, '✓'))))),
+      tip && path && (() => { const x = path.find(y => 'P' + y.c === tip); return x && x.py ? html('div', { className: 'tz-path-tip' }, html('span', { className: 'hanzi-font' }, x.c), ' ', html(TonedPinyin, { text: x.py })) : null; })(),
       html('div', { className: 'tz-word' },
         html('span', { className: 'hanzi-font tz-ch' }, ch),
-        word && html('span', null, html(TonedPinyin, { text: word.pinyin, className: 'tz-py' }), html('small', null, word.es))),
+        (info || word) && html('span', null, html(TonedPinyin, { text: (info || word).pinyin, className: 'tz-py' }), html('small', null, (info || word).es))),
       html('div', { className: 'tz-board-box', ref: boxRef, style: { height: size } },
-        stage === 4 && (word || inWord) && html('div', { className: 'tz-info', style: { width: size } },
+        stage === 4 && (info || word || inWord) && html('div', { className: 'tz-info', style: { width: size } },
           html('span', { className: 'tz-info-ch hanzi-font' }, ch),
-          word
+          info
+            ? html('span', { className: 'tz-info-txt' }, html(TonedPinyin, { text: info.pinyin, className: 'tz-info-py' }), html('span', null, info.es))
+            : word
             ? html('span', { className: 'tz-info-txt' }, html(TonedPinyin, { text: word.pinyin, className: 'tz-info-py' }), html('span', null, word.es))
             : html('span', { className: 'tz-info-txt' }, html('small', null, 'en'), html('b', { className: 'hanzi-font' }, inWord.hanzi),
                 html(TonedPinyin, { text: inWord.pinyin, className: 'tz-info-py' }), html('span', null, inWord.es))),
@@ -8738,7 +8742,32 @@ function TrazoPractice({ ch, word, inWord, onDone, onComplete, onBack, title, pa
 }
 
 // Camino del 1 al 14: cada lección se desbloquea al completar todos los hanzi de la anterior
+// Mantener apretado (o pasar el mouse) muestra el pinyin; un toque corto abre el hanzi
+function useHoldTip() {
+  const [tip, setTip] = useState(null);
+  const timer = React.useRef(null);
+  const held = React.useRef(false);
+  const props = (key, onTap) => ({
+    onPointerEnter: (e) => { if (e.pointerType === 'mouse') setTip(key); },
+    onPointerLeave: (e) => { if (e.pointerType === 'mouse') setTip(t => (t === key ? null : t)); },
+    onPointerDown: (e) => { if (e.pointerType === 'mouse') return; held.current = false; clearTimeout(timer.current);
+      timer.current = setTimeout(() => { held.current = true; setTip(key); }, 320); },
+    onPointerUp: (e) => { if (e.pointerType === 'mouse') return; clearTimeout(timer.current); if (held.current) setTimeout(() => setTip(t => (t === key ? null : t)), 1200); },
+    onPointerCancel: () => { clearTimeout(timer.current); setTip(null); },
+    onContextMenu: (e) => e.preventDefault(),
+    onClick: () => { if (held.current) { held.current = false; return; } onTap && onTap(); },
+  });
+  return [tip, props];
+}
+
 function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
+  const [info, setInfo] = useState({});
+  const [tip, holdProps] = useHoldTip();
+  useEffect(() => {
+    db.from('npcr_hanzi_info').select('hanzi,pinyin,es').eq('hidden', false).then(({ data }) => {
+      const m = {}; (data || []).forEach(r => { m[r.hanzi] = r; }); setInfo(m);
+    });
+  }, []);
   const [done, setDone] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem('npcr-trazos-' + studentId)) || []); } catch (e) { return new Set(); } });
   const [view, setView] = useState({ name: 'map' });
   useEffect(() => {
@@ -8774,7 +8803,8 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
     const p = path[view.k]; const item = p.chars[view.i];
     const nextIdx = p.chars.findIndex((x, i) => i > view.i && !done.has(x.c));
     return html(TrazoPractice, { key: item.c, ch: item.c, word: wordOf(item.c, item.w), inWord: wordOf(item.c, item.w) ? null : inWordOf(item.c, item.w), title: 'Lección ' + p.lesson + ' · ' + (view.i + 1) + '/' + p.chars.length,
-      path: p.chars.map(x => ({ c: x.c, done: done.has(x.c) })), onJump: (i) => setView({ name: 'practice', k: view.k, i }),
+      path: p.chars.map(x => ({ c: x.c, done: done.has(x.c), py: info[x.c] && info[x.c].pinyin })), onJump: (i) => setView({ name: 'practice', k: view.k, i }),
+      info: info[item.c] || null,
       onBack: () => setView({ name: 'lesson', k: view.k }),
       onComplete: () => markDone(item.c),     // se guarda apenas termina, aunque no toque "Siguiente"
       onDone: () => {
@@ -8790,8 +8820,10 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
         html('h1', null, 'Trazos · Lección ' + p.lesson)),
       html('div', { className: 'tz-wrap' },
         finished && html('div', { className: 'tz-banner' }, view.justDone ? '🎉 ¡Completaste la lección ' + p.lesson + '!' : '✓ Lección completa', view.k + 1 < path.length && unlocked(view.k + 1) && html('button', { className: 'mini-btn', onClick: () => setView({ name: 'lesson', k: view.k + 1 }) }, 'Ir a la lección ' + path[view.k + 1].lesson + ' →')),
-        html('div', { className: 'tz-chars' }, p.chars.map((x, i) => html('button', { key: x.c, className: 'tz-char hanzi-font' + (done.has(x.c) ? ' done' : ''), onClick: () => setView({ name: 'practice', k: view.k, i }) },
-          x.c, done.has(x.c) && html('span', { className: 'tz-check' }, '✓')))),
+        html('div', { className: 'tz-chars' }, p.chars.map((x, i) => html('button', { key: x.c, className: 'tz-char hanzi-font' + (done.has(x.c) ? ' done' : ''),
+          ...holdProps('L' + x.c, () => setView({ name: 'practice', k: view.k, i })) },
+          x.c, done.has(x.c) && html('span', { className: 'tz-check' }, '✓'),
+          tip === 'L' + x.c && info[x.c] && html(TonedPinyin, { text: info[x.c].pinyin, className: 'tz-tip' })))),
         !finished && html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 14 },
           onClick: () => setView({ name: 'practice', k: view.k, i: Math.max(0, p.chars.findIndex(x => !done.has(x.c))) }) }, 'Seguir practicando →')));
   }

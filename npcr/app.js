@@ -8142,10 +8142,12 @@ function ScrollX({ children, className, style, innerStyle, arrows }) {
   const [st, setSt] = useState({ l: false, r: false });
   const update = () => {
     const el = ref.current; if (!el) return;
-    const l = el.scrollLeft > 4, r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    const l = el.scrollLeft > 4, r = el.scrollLeft + el.clientWidth < el.scrollWidth - 8;
     setSt(prev => prev.l === l && prev.r === r ? prev : { l, r });
   };
-  React.useLayoutEffect(update);
+  // Se mide al montar, al cambiar de tamaño (ventana o contenido) y al desplazar.
+  // No en cada render: mostrar u ocultar una flecha no debe volver a disparar la medición.
+  React.useLayoutEffect(() => { update(); }, []);
   useEffect(() => {
     window.addEventListener('resize', update);
     let ro = null;
@@ -8569,7 +8571,7 @@ function tzMatch(user, median, lenient) {
 const tzPathD = (pts) => pts.map((p, i) => (i ? 'L' : 'M') + Math.round(p[0]) + ' ' + Math.round(p[1])).join(' ');
 
 // Lienzo de un hanzi: muestra los trazos según el paso y recibe lo que se dibuja
-function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate, shake }) {
+function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate, shake, run }) {
   const gRef = React.useRef(null);
   const [drawing, setDrawing] = useState(null);
   const uid = React.useRef('tz' + Math.random().toString(36).slice(2, 8)).current;
@@ -8613,7 +8615,7 @@ function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate
       // Animación (mirar / pista): el recorrido se dibuja recortado por la forma del trazo
       (animate || []).map(({ i, delay }) => {
         const m = data.medians[i]; const len = Math.ceil(tzLen(m)) + 20;
-        return html('path', { key: 'a' + i + '-' + delay, d: tzPathD(m), clipPath: 'url(#' + uid + 'c' + i + ')', fill: 'none', stroke: '#C1432B', strokeWidth: 150, strokeLinecap: 'round',
+        return html('path', { key: 'a' + i + '-' + delay + '-' + (run || 0), d: tzPathD(m), clipPath: 'url(#' + uid + 'c' + i + ')', fill: 'none', stroke: '#C1432B', strokeWidth: 150, strokeLinecap: 'round',
           strokeDasharray: len, strokeDashoffset: len, className: 'tz-anim', style: { '--len': len, animationDelay: delay + 's' } });
       }),
       // Pista: el trazo que toca parpadea
@@ -8628,7 +8630,7 @@ function TrazoBoard({ data, mode, filled, current, hint, size, onStroke, animate
 }
 
 // Practicar un hanzi: Mirar → Calcar → Completar → De memoria (hasta el 100 %)
-function TrazoPractice({ ch, word, onDone, onBack, title }) {
+function TrazoPractice({ ch, word, onDone, onBack, title, path, onJump }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
   const [stage, setStage] = useState(0);          // 0 mirar · 1 calcar · 2 completar · 3 memoria · 4 listo
@@ -8638,6 +8640,7 @@ function TrazoPractice({ ch, word, onDone, onBack, title }) {
   const [hint, setHint] = useState(false);
   const [shake, setShake] = useState(false);
   const [animate, setAnimate] = useState([]);
+  const [run, setRun] = useState(0);
   const [msg, setMsg] = useState(null);
   const [size, setSize] = useState(300);
   const wrapRef = React.useRef(null);
@@ -8659,7 +8662,7 @@ function TrazoPractice({ ch, word, onDone, onBack, title }) {
   const keep = Math.ceil(n / 2);                  // en "Completar", trazos que ya vienen hechos
   const startStage = (s) => {
     setStage(s); setMisses(0); setHint(false); setMsg(null);
-    if (s === 0) { setFilled([]); setCurrent(0); setAnimate(data.outlines.map((_, i) => ({ i, delay: 0.25 + i * 0.75 }))); audioLater(() => speakReal(ch), 200); }
+    if (s === 0) { setFilled([]); setCurrent(0); setRun(r => r + 1); setAnimate(data.outlines.map((_, i) => ({ i, delay: 0.25 + i * 0.75 }))); stopAudio(); audioLater(() => speakReal(ch), 200); }
     if (s === 1) { setFilled([]); setCurrent(0); setAnimate([]); }
     if (s === 2) { setFilled(data.outlines.map((_, i) => i < keep)); setCurrent(keep); setAnimate([]); }
     if (s === 3) { setFilled([]); setCurrent(0); setAnimate([]); }
@@ -8707,11 +8710,14 @@ function TrazoPractice({ ch, word, onDone, onBack, title }) {
     html('div', { className: 'tz-wrap', ref: wrapRef },
       html('div', { className: 'tz-bar' }, html('i', { style: { width: pct + '%' } })),
       html('div', { className: 'tz-steps' }, STAGES.map((s, i) => html('span', { key: s, className: i < stage ? 'done' : i === stage ? 'now' : '' }, s))),
+      path && html(ScrollX, { className: 'tz-path-wrap' }, html('div', { className: 'tz-path' }, path.map((x, i) => html('button', { key: x.c, type: 'button',
+        className: 'tz-path-c hanzi-font' + (x.c === ch ? ' now' : '') + (x.done ? ' done' : ''), onClick: () => x.c !== ch && onJump && onJump(i), title: x.done ? 'Completado' : '' },
+        x.c, x.done && html('i', null, '✓'))))),
       html('div', { className: 'tz-word' },
         html('span', { className: 'hanzi-font tz-ch' }, ch),
         word && html('span', null, html(TonedPinyin, { text: word.pinyin, className: 'tz-py' }), html('small', null, word.es))),
       html('div', { className: 'tz-board-box', ref: boxRef, style: { height: size } },
-        html(TrazoBoard, { data, size, filled, current, hint, shake, animate, onStroke,
+        html(TrazoBoard, { data, size, filled, current, hint, shake, animate, run, onStroke,
           mode: stage === 0 ? 'watch' : stage === 1 ? 'trace' : stage === 2 ? 'complete' : stage === 3 ? 'memory' : 'watch' })),
       html('div', { ref: belowRef, className: 'tz-below' },
       html('div', { className: 'tz-msg' + (stage === 4 ? ' ok' : msg ? ' bad' : '') },
@@ -8761,6 +8767,7 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
     const p = path[view.k]; const item = p.chars[view.i];
     const nextIdx = p.chars.findIndex((x, i) => i > view.i && !done.has(x.c));
     return html(TrazoPractice, { key: item.c, ch: item.c, word: wordOf(item.c, item.w), title: 'Lección ' + p.lesson + ' · ' + (view.i + 1) + '/' + p.chars.length,
+      path: p.chars.map(x => ({ c: x.c, done: done.has(x.c) })), onJump: (i) => setView({ name: 'practice', k: view.k, i }),
       onBack: () => setView({ name: 'lesson', k: view.k }),
       onDone: () => {
         markDone(item.c);

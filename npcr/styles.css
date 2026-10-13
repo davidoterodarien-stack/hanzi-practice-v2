@@ -1647,3 +1647,9 @@ main.tz-main { padding-bottom: 8px !important; }
 .tz-win-big { font-size: 54px; } .tz-win b { font-size: 24px; color: var(--lacquer-dark); } .tz-win span { font-weight: 700; color: var(--ink-mid); }
 .tz-below { display: flex; flex-direction: column; gap: 10px; }
 .tz-msg { min-height: 36px; display: flex; align-items: center; justify-content: center; }
+/* Trazos: camino de la lección (✓ = completado) */
+.tz-path { display: flex; gap: 6px; padding: 2px 2px 4px; }
+.tz-path-c { position: relative; flex: none; width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--paper-deep); background: #fff; font-size: 22px; color: var(--ink-soft); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.tz-path-c.done { border-color: var(--jade); background: var(--jade-light); color: var(--jade-dark); }
+.tz-path-c.now { border-color: var(--lacquer); color: var(--lacquer-dark); box-shadow: 0 0 0 3px var(--lacquer-light); }
+.tz-path-c i { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%; background: var(--jade); color: #fff; font-size: 11px; font-style: normal; font-weight: 900; display: flex; align-items: center; justify-content: center; }

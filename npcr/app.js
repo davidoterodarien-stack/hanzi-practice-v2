@@ -2384,7 +2384,7 @@ function aulaActivities(settings, hardCount) {
     { id: 'aula-modal', icon: 'chat', tone: 'blue', title: 'Verbos modales', sub: 'Distinguí 会, 能, 可以 y 应该' },
     { id: 'aula-tiempo', icon: 'clock', tone: 'gold', title: 'Expresiones de tiempo', sub: 'La hora: 点, 分, 刻, 差 y 半' },
     { id: 'aula-clas', icon: 'tag', tone: 'purple', title: 'Clasificadores', sub: 'Elegí 个, 本, 张, 斤 correctamente' },
-    { id: 'aula-zhe', icon: 'photo', tone: 'green', title: '这是什么？', sub: 'Mirá la foto y elegí el hanzi, contra reloj' },
+    { id: 'aula-zhe', icon: 'photo', tone: 'green', title: 'Zhè shì shénme?', sub: 'Mirá la foto y elegí el hanzi, contra reloj' },
     { id: 'progreso', icon: 'chart', tone: 'blue', title: 'Mi progreso', sub: 'Fuertes y a reforzar' },
   ].filter(Boolean);
 }

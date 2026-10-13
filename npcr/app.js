@@ -569,7 +569,7 @@ function AuthGate({ onAuthenticated, onBeforeAuth }) {
         }),
         html('input', {
           className: 'name-modal-input', type: 'text', placeholder: 'Código de alumno (opcional)',
-          value: studentCode, maxLength: 14, autoCapitalize: 'characters', autoComplete: 'off', spellCheck: false,
+          value: studentCode, maxLength: 24, autoCapitalize: 'characters', autoComplete: 'off', spellCheck: false,
           onChange: (e) => setStudentCode(e.target.value.toUpperCase()),
           disabled: loading,
           style: studentCode ? inputStyle : { marginTop: 8 },
@@ -2608,7 +2608,7 @@ function StudentCodeCard({ myClasses, onActivateCode, notice, onDismissNotice })
     ),
     !inClass && open && html('form', { onSubmit: submit, style: { display: 'flex', gap: 8, marginTop: 8 } },
       html('input', {
-        value: code, maxLength: 14, placeholder: 'MARTA-K7P2', autoFocus: true, autoComplete: 'off', spellCheck: false,
+        value: code, maxLength: 24, placeholder: 'MARTA-K7P2', autoFocus: true, autoComplete: 'off', spellCheck: false,
         onChange: e => setCode(e.target.value.toUpperCase()),
         style: { flex: 1, padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--paper-deep)', fontSize: 15, fontWeight: 800, letterSpacing: 1.5, minWidth: 0 },
       }),

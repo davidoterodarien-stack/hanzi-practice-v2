@@ -4689,7 +4689,16 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
     loadGame();
     return data;
   };
-  const create = () => run('bingo_create', { p_class: classId, p_lessons: mode === 'hanzi' ? pick : [], p_size: size, p_mode: mode, p_max: maxNum });
+  const [showHanzi, setShowHanzi] = useState(false);
+  const [hintSent, setHintSent] = useState(false);
+  const create = async () => {
+    const id = await run('bingo_create', { p_class: classId, p_lessons: mode === 'hanzi' ? pick : [], p_size: size, p_mode: mode, p_max: maxNum });
+    if (id && showHanzi) run('bingo_set_show', { p_game: id, p_on: true });
+  };
+  const sendHint = async () => {
+    const h = await run('bingo_hint', { p_game: game.id });
+    if (h) { setHintSent(true); setTimeout(() => setHintSent(false), 2500); }
+  };
   const toggleLesson = (l) => setPick(p => p.includes(l) ? p.filter(x => x !== l) : [...p, l].sort(lessonCompare));
   const fullscreen = () => { const el = boxRef.current; if (!el) return; if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); };
 
@@ -4721,6 +4730,11 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
       html('div', { className: 'admin-note', style: { fontWeight: 800, margin: '12px 0 6px' } }, 'Cartón'),
       html('div', { className: 'bingo-lessons' },
         [[3, '3 × 3 · rápido'], [4, '4 × 4 · clásico']].map(([n, t]) => html('button', { key: n, type: 'button', className: 'mode-check' + (size === n ? ' on' : ''), onClick: () => setSize(n) }, t))),
+      html('div', { className: 'admin-note', style: { fontWeight: 800, margin: '12px 0 6px' } }, 'Ayuda para los alumnos'),
+      html('label', { className: 'mode-check' + (showHanzi ? ' on' : ''), style: { display: 'inline-flex', gap: 8, alignItems: 'center' } },
+        html('input', { type: 'checkbox', checked: showHanzi, onChange: e => setShowHanzi(e.target.checked) }),
+        mode === 'numeros' ? 'Mostrarles el número en chino de cada ficha' : 'Mostrarles el hanzi de cada ficha (además del pinyin y el significado)'),
+      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Si no lo activás, durante el juego tenés el botón 💡 Pista para mostrarlo unos segundos. También se puede cambiar en plena partida.'),
       html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 14 }, disabled: busy || (mode === 'hanzi' && !pick.length), onClick: create }, busy ? 'Creando…' : 'Crear partida'),
     ),
     html(BingoHistory, { classId, refreshKey: game ? game.id + game.status : '' }));
@@ -4758,7 +4772,11 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
           game.mode !== 'numeros' && html('div', { className: 'bingo-call-es' }, current.e),
           html('div', { className: 'bingo-call-btns' },
             bingoHasAudio(game, current.h) && html('button', { className: 'mini-btn', onClick: () => bingoSay(game, current.h) }, '🔊 Repetir'),
-            html('button', { className: 'mini-btn', onClick: () => setReveal(!reveal) }, reveal ? 'Ocultar hanzi (para proyectar)' : 'Mostrar hanzi')))
+            html('button', { className: 'mini-btn', onClick: () => setReveal(!reveal) }, reveal ? 'Ocultar hanzi (para proyectar)' : 'Mostrar hanzi'),
+            !game.show_hanzi && html('button', { className: 'mini-btn bingo-hint-btn', disabled: busy, onClick: sendHint, title: 'Muestra esta ficha en grande en las pantallas de los alumnos por unos segundos' },
+              hintSent ? '✓ Pista enviada' : '💡 Pista: mostrar ' + (game.mode === 'numeros' ? 'el número en chino' : 'el hanzi')),
+            html('button', { className: 'mini-btn', disabled: busy, onClick: () => run('bingo_set_show', { p_game: game.id, p_on: !game.show_hanzi }) },
+              game.show_hanzi ? '👁 Alumnos ven el hanzi · ocultar' : '👁 Que los alumnos vean el hanzi')))
           : html('div', { className: 'bingo-sub', style: { padding: 30 } }, 'Sacá la primera ficha'),
         html('button', { className: 'primary-btn bingo-next', disabled: busy || called.length >= game.pool.length, onClick: () => run('bingo_call', { p_game: game.id }) },
           called.length >= game.pool.length ? 'Ya salieron todas' : busy ? '…' : 'Sacar ficha →')),
@@ -4775,6 +4793,13 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
 
 // ── Pantalla del alumno: cartón, marcar y cantar bingo ──
 function BingoPlayer({ gameId, onBack }) {
+  const [hint, setHint] = useState(null);           // { h, key } mientras se ve la pista
+  const hintSeen = React.useRef(null);               // última pista ya mostrada (null = recién entró)
+  const [hintSec, setHintSec] = useState(null);
+  useEffect(() => {
+    db.from('npcr_app_config').select('value').eq('key', 'bingo_hint_sec').maybeSingle()
+      .then(({ data }) => setHintSec(Number(data && data.value) || null));
+  }, []);
   const [game, setGame] = useState(null);
   const [card, setCard] = useState(null);
   const [marks, setMarks] = useState([]);
@@ -4804,6 +4829,18 @@ function BingoPlayer({ gameId, onBack }) {
   // Aviso cuando alguien canta bingo
   const winners = (game && game.winners) || [];
   useEffect(() => { if (winners.length > lastWin.current) { if (lastWin.current) playLevelChime(); lastWin.current = winners.length; } }, [winners.length]);
+  // Pista del lǎoshī: aparece en grande unos segundos y se va (al entrar no se repite una vieja)
+  useEffect(() => {
+    if (!game) return;
+    const n = game.hint_n || 0;
+    if (hintSeen.current === null) { hintSeen.current = n; return; }
+    if (n > hintSeen.current && game.hint_h) {
+      hintSeen.current = n;
+      setHint({ h: game.hint_h, key: n });
+      const t = setTimeout(() => setHint(x => (x && x.key === n ? null : x)), (hintSec || 5) * 1000);
+      return () => clearTimeout(t);
+    }
+  }, [game && game.hint_n]);
 
   if (err) return html(GameStatusScreen, { onBack, title: '🎱 Bingo', msg: err });
   if (!game || !card) return html('main', { style: { paddingTop: 18 } }, html('p', { className: 'admin-note', style: { textAlign: 'center' } }, 'Entrando al Bingo…'));
@@ -4839,6 +4876,11 @@ function BingoPlayer({ gameId, onBack }) {
   };
 
   return html('main', { className: 'bingo-main', style: { paddingTop: 12 } },
+    hint && html('div', { key: 'hint' + hint.key, className: 'bingo-hint-overlay', onClick: () => setHint(null), style: { '--sec': (hintSec || 5) + 's' } },
+      html('div', { className: 'bingo-hint-card' },
+        html('small', null, '💡 Pista de tu lǎoshī'),
+        html('div', { className: 'hanzi-font bingo-hint-h', style: { fontSize: 'min(200px, ' + Math.floor(74 / Math.max(1, [...hint.h].length)) + 'vw)' } }, hint.h),
+        html('i', { className: 'bingo-hint-bar' }))),
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
       html('h1', null, '🎱 Bingo 宾果'),
@@ -4850,7 +4892,10 @@ function BingoPlayer({ gameId, onBack }) {
           html('span', { className: 'bingo-last-n' }, 'Ficha ' + called.length),
           game.mode === 'numeros'
             ? html('span', { className: 'bingo-last-txt' }, html('span', { className: 'bingo-last-num' }, current.e), html('span', { className: 'bingo-last-es' }, 'Buscalo en chino en tu cartón'))
-            : html('span', { className: 'bingo-last-txt' }, html(TonedPinyin, { text: current.p, className: 'bingo-last-py' }), html('span', { className: 'bingo-last-es' }, current.e)),
+            : html(React.Fragment, null,
+                game.show_hanzi && html('span', { className: 'bingo-last-h hanzi-font' }, current.h),
+                html('span', { className: 'bingo-last-txt' }, html(TonedPinyin, { text: current.p, className: 'bingo-last-py' }), html('span', { className: 'bingo-last-es' }, current.e))),
+          game.mode === 'numeros' && game.show_hanzi && html('span', { className: 'bingo-last-h hanzi-font' }, current.h),
           game.mode !== 'numeros' && hasRealAudio(current.h) && html('button', { className: 'mini-btn', onClick: () => speak(current.h) }, '🔊'))
           : html('span', { className: 'bingo-sub' }, 'Todavía no salió ninguna ficha')),
       game.status === 'finished' && html('div', { className: 'bingo-banner' }, '🏁 La partida terminó · salieron ' + called.length + ' fichas' + (winners.length ? '' : ' · nadie cantó premios')),

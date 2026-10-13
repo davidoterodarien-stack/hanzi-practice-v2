@@ -1672,3 +1672,14 @@ main.tz-main { padding-bottom: 8px !important; }
 .tz-path-tip { align-self: center; background: var(--ink); color: #fff; font-weight: 800; font-size: 15px; padding: 4px 12px; border-radius: 10px; margin-top: -4px; }
 .tz-path-tip span { color: #fff !important; }
 .merge-box { background: var(--gold-light, #FFF4D6); border: 2px solid var(--gold, #E5B53A); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; font-size: 14px; }
+/* Bingo: hanzi visible para el alumno y pista del lǎoshī */
+.bingo-last-h { font-size: clamp(26px, 8vw, 34px); white-space: nowrap; font-weight: 700; color: var(--lacquer-dark); line-height: 1; }
+.bingo-hint-btn { border-color: var(--gold, #E5B53A) !important; }
+.bingo-hint-overlay { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: rgba(20, 16, 12, .45); animation: bhIn .25s ease; }
+.bingo-hint-card { max-width: 92vw; box-sizing: border-box; background: #fff; border-radius: 24px; padding: 18px 24px 0; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.35); overflow: hidden; min-width: 220px; animation: bhPop .3s ease; }
+.bingo-hint-card small { display: block; font-weight: 800; color: var(--ink-soft); font-size: 14px; }
+.bingo-hint-h { font-size: clamp(90px, 28vw, 200px); font-weight: 700; color: var(--lacquer); line-height: 1.15; padding: 6px 0 14px; }
+.bingo-hint-bar { display: block; height: 8px; margin: 0 -24px; background: var(--gold, #E5B53A); transform-origin: left; animation: bhBar var(--sec, 5s) linear forwards; }
+@keyframes bhIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bhPop { from { transform: scale(.7); } to { transform: scale(1); } }
+@keyframes bhBar { from { transform: scaleX(1); } to { transform: scaleX(0); } }

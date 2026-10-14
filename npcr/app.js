@@ -8134,12 +8134,6 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
 
             // ── Contenido: lecciones, módulos especiales y módulos de práctica ──
             isAdmin && showTab('contenido') && html(React.Fragment, null,
-            html('div', null,
-              html('label', null, '📷 Fotos de "Zhè shì shénme?" (这是什么？)'),
-              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
-                'Las fotos del juego de Mi aula. Ocultá las que confunden, cambiá una foto por otra (se achica sola) o agregá fotos nuevas. Si la palabra está en el HSK se usa su grabación original; si no, va sin audio.'),
-              html('details', { className: 'zadm-wrap' }, html('summary', null, 'Abrir fotos del juego'), html(ZheAdmin, { isSuper })),
-            ),
             html('p', { className: 'admin-note', style: { margin: 0 } },
               totalWords + ' palabras en ' + Object.keys(vocab).filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length + ' lecciones.'),
             html('div', null,
@@ -8275,13 +8269,14 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
             // ── Módulos de práctica ──
             html('div', null,
               html('label', null, '🎮 Módulos de práctica'),
-              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Activá o desactivá cada módulo para todos los alumnos.'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Activá o desactivá cada módulo para todos los alumnos y editá su contenido. En "Zhè shì shénme?" podés ocultar, cambiar o agregar fotos (se achican solas; si la palabra está en el HSK se usa su grabación original).'),
               html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
                 [
                   { id: 'mod-frase',    icon: '🧩', name: 'Completá la frase',    editable: true },
                   { id: 'mod-orden',    icon: '🔀', name: 'Ordená la oración',    editable: true },
                   { id: 'mod-audio',    icon: '🔊', name: 'Reconocer por audio',  editable: false },
                   { id: 'mod-refuerzo', icon: '💪', name: 'Reforcemos',           editable: false },
+                  { id: 'aula-zhe',     icon: '📷', name: 'Zhè shì shénme? (这是什么？)', editable: true, aula: true },
                 ].map(m => {
                   const theme = LESSON_THEMES[m.id] || {};
                   const isHidden = !!theme.hidden;
@@ -8291,13 +8286,14 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                       style: { background: '#fff', borderRadius: isOpen ? '12px 12px 0 0' : 12, padding: '10px 14px', boxShadow: 'var(--shadow-paper)', display: 'flex', alignItems: 'center', gap: 10, opacity: isHidden ? 0.6 : 1 }
                     },
                       html('span', { style: { fontSize: 22, minWidth: 32 } }, m.icon),
-                      html('div', { style: { flex: 1, fontWeight: 700, fontSize: 14 } }, m.name),
+                      html('div', { style: { flex: 1, fontWeight: 700, fontSize: 14 } }, m.name,
+                        m.aula && html('div', { style: { fontSize: 11, fontWeight: 600, color: 'var(--ink-soft)' } }, 'Fotos del juego de Mi aula · cada clase lo activa en su ⚙️ Configurar')),
                       m.editable && html('button', {
                         onClick: () => setExpandedMod(isOpen ? null : m.id),
-                        title: isOpen ? 'Cerrar editor' : 'Editar preguntas',
+                        title: isOpen ? 'Cerrar editor' : (m.aula ? 'Editar fotos' : 'Editar preguntas'),
                         style: { background: isOpen ? 'var(--lacquer)' : 'var(--paper-deep)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: isOpen ? '#fff' : 'var(--ink)', marginRight: 4 }
                       }, isOpen ? '▲ Editar' : '▼ Editar'),
-                      html('button', {
+                      !m.aula && html('button', {
                         onClick: () => handleToggleVisibility(m.id),
                         title: isHidden ? 'Mostrar a alumnos' : 'Ocultar a alumnos',
                         style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: isHidden ? 0.4 : 1 }
@@ -8306,7 +8302,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                     isOpen && html('div', {
                       style: { background: 'var(--paper)', borderRadius: '0 0 12px 12px', padding: '12px 14px', boxShadow: 'var(--shadow-paper)', borderTop: '1px solid var(--paper-deep)' }
                     },
-                      html(ModuleQuestionsEditor, { modId: m.id })
+                      m.aula ? html(ZheAdmin, { isSuper }) : html(ModuleQuestionsEditor, { modId: m.id })
                     ),
                   );
                 })

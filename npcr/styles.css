@@ -1722,21 +1722,24 @@ main.tz-main { padding-bottom: 8px !important; }
 .heat-table td:first-child, .heat-table th:first-child { position: sticky; left: 0; z-index: 1; background: #fff; }
 .heat-table th:first-child { background: var(--paper); }
 
-/* ── Celular: cada alumno es una tarjeta, sin deslizar de costado ── */
+/* ── Celular: cada alumno es una tarjeta compacta, sin deslizar de costado ── */
 @media (max-width: 640px) {
   .rank-table.cardify thead { display: none; }
   .rank-table.cardify, .rank-table.cardify tbody { display: block; }
-  .rank-table.cardify tbody tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; padding: 10px; margin: 8px 0;
-    border: 2px solid var(--paper-deep); border-radius: 14px; background: #fff; }
+  .rank-table.cardify tbody tr { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; row-gap: 2px; padding: 9px 12px; margin: 6px 0;
+    border: 1.5px solid var(--paper-deep); border-radius: 12px; background: #fff; }
   .rank-table.cardify tbody tr:hover { background: #fff; }
-  .rank-table.cardify td { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; border: none; border-radius: 10px; background: #F6F1E7 !important; font-size: 13px; text-align: left !important; white-space: normal !important; min-width: 0; }
-  .rank-table.cardify td::before { content: attr(data-l); font-size: 10px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; }
-  .rank-table.cardify td.cell-name { grid-column: 1 / -1; order: -2; background: none !important; padding: 0 2px 2px; font-size: 16px; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; }
+  .rank-table.cardify td { display: flex; align-items: baseline; gap: 5px; padding: 1px 0; border: none; background: none !important; font-size: 12px; line-height: 1.35;
+    text-align: left !important; white-space: nowrap !important; min-width: 0; }
+  .rank-table.cardify td.cell-wide, .rank-table.cardify td.cell-name { white-space: normal !important; }
+  .rank-table.cardify td::before { content: attr(data-l); flex-shrink: 0; font-size: 10px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; }
+  .rank-table.cardify td > div { display: inline; margin: 0 0 0 4px; }
+  .rank-table.cardify td.cell-name { grid-column: 1 / -1; order: -2; font-size: 15px; padding: 0 0 3px; flex-wrap: wrap; align-items: center; gap: 6px; }
   .rank-table.cardify td.cell-name::before { display: none; }
-  .rank-table.cardify td.cell-rank { order: -1; }
-  .rank-table.cardify tbody tr.sel-row { border-color: var(--gold); background: var(--gold-light); box-shadow: inset 5px 0 0 var(--lacquer); }
-  .rank-table.cardify tbody tr.sel-row td { background: #fff !important; }
-  .rank-table.cardify tbody tr.sel-row td.cell-name { background: none !important; box-shadow: none; }
+  .rank-table.cardify td.cell-rank { display: none; }
+  .rank-table.cardify td.cell-wide { grid-column: 1 / -1; }
+  .rank-table.cardify .mini-btn { padding: 3px 9px; }
+  .rank-table.cardify tbody tr.sel-row { border-color: var(--gold); background: var(--gold-light); box-shadow: inset 4px 0 0 var(--lacquer); }
   .rank-table.cardify tbody tr.sel-row td:first-child { box-shadow: none; }
   .sel-bar { top: 4px; flex-wrap: wrap; }
   .sel-info { flex: 1 1 calc(100% - 90px); order: 1; }

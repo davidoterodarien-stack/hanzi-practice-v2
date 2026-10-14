@@ -8399,15 +8399,15 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                                 html('td', { className: 'cell-name', style: { fontWeight: 800, whiteSpace: 'nowrap' } },
                                   r.name || html('span', { style: { fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-soft)' }, title: 'Abrió la app pero no escribió su nombre' }, 'Sin nombre'),
                                   html('span', { className: 'reg-badge' + (r.has_code ? ' code' : '') }, r.has_code ? 'código' : 'libre')),
-                                html('td', { 'data-l': 'Aula', style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '')
+                                html('td', { 'data-l': 'Aula', className: 'cell-wide', style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '')
                                   : html('button', { className: 'mini-btn', title: 'Pasar el progreso de este invitado a un alumno con código', onClick: () => { setMergeFrom(r); setMergeTo(''); setMergeMsg(null); } }, '↪ Pasar a un alumno')),
-                                html('td', { 'data-l': 'Primera vez', style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
+                                html('td', { 'data-l': 'Primera vez', className: 'cell-wide', style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
                                 html('td', { 'data-l': 'Última vez', style: { fontSize: 12, whiteSpace: 'nowrap' } }, timeAgo(r.last_seen)),
                                 html('td', { 'data-l': 'Visitas' }, r.visits),
                                 html('td', { 'data-l': 'Sesiones' }, r.sessions),
                                 html('td', { 'data-l': 'Prom. 7 días' }, r.avg_7d == null ? '—' : html(MasteryPill, { value: r.avg_7d, small: true })),
                                 html('td', { 'data-l': 'Hasta lección' }, r.max_lesson ? 'L' + r.max_lesson : '—'),
-                                isSuper && html('td', { 'data-l': 'Conexión', style: { fontSize: 12, whiteSpace: 'nowrap' } }, (() => {
+                                isSuper && html('td', { 'data-l': 'Conexión', className: 'cell-wide', style: { fontSize: 12, whiteSpace: 'nowrap' } }, (() => {
                                   const l = ipsOf[r.user_id];
                                   if (!l || !l.length) return '—';
                                   return html(React.Fragment, null, html('code', { className: 'ip-code' }, l[0].ip), ' ', html('span', { style: { color: 'var(--ink-soft)' } }, l[0].device.split(' · ')[0]),

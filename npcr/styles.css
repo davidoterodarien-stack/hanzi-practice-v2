@@ -1787,3 +1787,48 @@ main.tz-main { padding-bottom: 8px !important; }
 .ip-sub { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
 .ip-same { font-size: 12px; font-weight: 800; color: var(--lacquer-dark); margin-top: 4px; }
 .ip-more { font-size: 11px; font-weight: 800; color: var(--blue-dark); }
+/* ── Clases armadas por el lǎoshī ── */
+.plan-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plan-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.plan-card { display: flex; flex-direction: column; gap: 6px; text-align: left; background: #fff; border: 2px solid var(--paper-deep); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow-paper); font-family: inherit; color: var(--ink); }
+.plan-card.draft { border-style: dashed; background: #FCFBF8; }
+.plan-card.student { cursor: pointer; }
+.plan-card.student:hover { border-color: var(--lacquer); }
+.plan-card.complete { border-color: var(--jade); }
+.plan-card-top { display: flex; gap: 8px; align-items: flex-start; }
+.plan-card-title { font-weight: 900; font-size: 16px; }
+.plan-card-sub { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.plan-card-desc { font-size: 13px; color: var(--ink-mid); line-height: 1.4; }
+.plan-badge { flex-shrink: 0; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: var(--paper-deep); color: var(--ink-mid); }
+.plan-badge.on { background: var(--jade-light); color: var(--jade-dark); }
+.plan-steps-mini { display: flex; flex-wrap: wrap; gap: 4px; }
+.plan-steps-mini span, .plan-legend span { font-size: 11px; font-weight: 700; background: var(--paper); border-radius: 8px; padding: 2px 7px; color: var(--ink-mid); }
+.plan-legend { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.plan-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.plan-actions .mini-btn.strong { background: var(--lacquer); border-color: var(--lacquer); color: #fff; }
+.plan-copy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; background: var(--paper); border-radius: 10px; padding: 6px 8px; }
+.plan-edit-steps { display: flex; flex-direction: column; gap: 6px; }
+.plan-edit-step { display: flex; align-items: center; gap: 6px; background: var(--paper); border-radius: 10px; padding: 7px 8px; font-size: 13px; font-weight: 700; }
+.plan-edit-step small { display: block; font-weight: 500; color: var(--ink-soft); font-size: 11px; }
+.plan-num { width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: var(--lacquer); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; }
+.plan-add-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 10px; }
+.plan-add-btns .secondary-btn { margin: 0; }
+.plan-add { margin-top: 10px; background: var(--paper); border: 2px dashed var(--gold); border-radius: 12px; padding: 10px; }
+.plan-table td { min-width: 44px; }
+.plan-desc { background: #fff; border: 2px solid var(--paper-deep); border-radius: 14px; padding: 10px 12px; font-size: 14px; color: var(--ink-mid); margin-bottom: 10px; white-space: pre-wrap; }
+.plan-bar { height: 8px; border-radius: 999px; background: var(--paper-deep); overflow: hidden; }
+.plan-bar i { display: block; height: 100%; background: var(--jade); border-radius: 999px; transition: width .4s; }
+.plan-win { margin-top: 10px; background: var(--jade-light); color: var(--jade-dark); font-weight: 800; border-radius: 12px; padding: 10px 12px; }
+.plan-path { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.plan-step { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: #fff; border: 2px solid var(--paper-deep); border-radius: 14px; padding: 12px; cursor: pointer; font-family: inherit; color: var(--ink); box-shadow: 0 3px 0 var(--paper-deep); }
+.plan-step .plan-num { width: 34px; height: 34px; font-size: 15px; background: var(--paper-deep); color: var(--ink-mid); }
+.plan-step.done { border-color: var(--jade); }
+.plan-step.done .plan-num { background: var(--jade); color: #fff; }
+.plan-step.next { border-color: var(--lacquer); }
+.plan-step.next .plan-num { background: var(--lacquer); color: #fff; }
+.plan-step-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.plan-step-title { font-weight: 800; font-size: 15px; }
+.plan-step-sub { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.plan-go { font-size: 20px; font-weight: 900; color: var(--ink-soft); }
+.plan-text { background: #fff; border: 2px solid var(--paper-deep); border-radius: 16px; padding: 16px; font-size: 17px; line-height: 1.6; white-space: pre-wrap; font-family: 'Outfit', 'Noto Sans SC', sans-serif; }
+@media (max-width: 560px) { .plan-list { grid-template-columns: 1fr; } }

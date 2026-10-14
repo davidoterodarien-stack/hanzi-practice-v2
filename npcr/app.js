@@ -883,6 +883,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
 
   const tabs = [['alumnos', '👥 Alumnos'], ['resumen', '📊 Resumen'], ['ranking', '🏆 Ranking'], ['mapa', '🗺️ Mapa'], ['palabras', '🧩 Palabras difíciles'], ['tareas', '📋 Tareas'],
     ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ...(settings && settings.hsk2_enabled ? [['hsk2', '🎓 HSK 2']] : []),
+    ...(aulaShown(settings, 'clases') ? [['clases', '📚 Clases']] : []),
     ['bingo', '🎱 Bingo'], ['config', '⚙️ Configurar']];
 
   let body = null;
@@ -1016,6 +1017,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
 
   if (!err && rows !== null && !student && tab === 'hsk') body = html(HskClassReport, { key: 'hsk1', classId, level: 1, isSel, onSelect: pick });
   if (!err && rows !== null && !student && tab === 'hsk2') body = html(HskClassReport, { key: 'hsk2', classId, level: 2, isSel, onSelect: pick });
+  if (!err && rows !== null && !student && tab === 'clases') body = html(ClassPlans, { key: classId, classId, lessons, students: rows });
   if (!err && rows !== null && !student && tab === 'bingo') body = html(BingoHost, { key: classId, classId, className: cls ? cls.name : 'Clase', lessons, maxLesson: settings && settings.max_lesson ? Number(settings.max_lesson) : null });
 
   if (!err && rows !== null && !student && tab === 'config') {
@@ -1085,7 +1087,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     );
   }
 
-  const selBar = sel && !student && tab !== 'bingo' && tab !== 'config' && tab !== 'tareas' && tab !== 'palabras' && html('div', { className: 'sel-bar' },
+  const selBar = sel && !student && tab !== 'bingo' && tab !== 'config' && tab !== 'tareas' && tab !== 'palabras' && tab !== 'clases' && html('div', { className: 'sel-bar' },
     html('span', { className: 'sel-dot' }, (sel.name || '?').trim().charAt(0).toUpperCase()),
     html('div', { className: 'sel-info' },
       html('b', null, sel.name),
@@ -1110,6 +1112,292 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       classId && body,
     ),
   );
+}
+
+// ═════════════════ Clases armadas por el lǎoshī (módulo de Mi aula, opt-in) ═════════════════
+// Cada clase es una lista de pasos que reutilizan las actividades de la app.
+// Módulo aparte: abre los juegos dentro de su propia pantalla y anota el avance en
+// npcr_plan_progress (npcr_clases_plan.sql), sin cambiar cómo funciona el resto.
+const PLAN_LESSON_MODES = [['match', 'Emparejar'], ['cards', 'Tarjetas'], ['quiz', 'Opción múltiple'], ['memoria', 'Memoria'], ['frases', 'Frases clave']];
+const PLAN_GAMES = [['frase', 'Completá la frase'], ['orden', 'Ordená la oración'], ['audio', 'Reconocer por audio'], ['dialogo', 'Diálogos'],
+  ['modal', 'Verbos modales'], ['tiempo', 'Expresiones de tiempo'], ['clas', 'Clasificadores'], ['zhe', 'Zhè shì shénme?'], ['tonos', 'Tonos'], ['dictado', 'Dictado 听写']];
+const PLAN_KIND_ICON = { lesson: '📖', game: '🎮', texto: '📝' };
+function planStepLabel(s) {
+  if (s.kind === 'lesson') return 'Lección ' + s.lesson + ' · ' + ((PLAN_LESSON_MODES.find(m => m[0] === s.mode) || [])[1] || s.mode);
+  if (s.kind === 'game') return (PLAN_GAMES.find(g => g[0] === s.game) || [])[1] || s.game;
+  return s.title || 'Explicación';
+}
+const planNewId = () => secureRandomChars('abcdefghijklmnopqrstuvwxyz0123456789', 8);
+
+// ── Lǎoshī: armar, publicar y seguir las clases del aula ──
+function ClassPlans({ classId, lessons, students }) {
+  const [plans, setPlans] = useState(null);
+  const [report, setReport] = useState([]);
+  const [err, setErr] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [edit, setEdit] = useState(null);       // clase que se está armando
+  const [view, setView] = useState(null);       // id de la clase cuyo avance se mira
+  const [copyFor, setCopyFor] = useState(null); // clase a duplicar
+  const [classes, setClasses] = useState([]);
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+
+  const load = () => {
+    db.from('npcr_class_plans').select('*').eq('class_id', classId).order('position').order('created_at').then(({ data, error }) => {
+      if (error) { setErr(error.message); setPlans([]); return; }
+      setPlans(data || []);
+    });
+    db.rpc('npcr_plan_report', { p_class: classId }).then(({ data }) => setReport(data || []));
+  };
+  useEffect(() => { load(); db.from('classes').select('id,name,archived').order('created_at', { ascending: false }).then(({ data }) => setClasses((data || []).filter(c => !c.archived))); }, [classId]);
+
+  const active = (students || []).filter(r => r.user_id);
+  const doneOf = (p, uid) => p.steps.filter(s => report.some(x => x.plan_id === p.id && x.student_id === uid && x.step_id === s.id && x.done)).length;
+  const finished = (p) => p.steps.length ? active.filter(r => doneOf(p, r.user_id) === p.steps.length).length : 0;
+
+  const save = async () => {
+    const e = edit;
+    if (!e.title.trim()) { flash('err', 'Ponele un título a la clase.'); return; }
+    if (!e.steps.length) { flash('err', 'Agregá al menos un paso.'); return; }
+    const row = { title: e.title.trim(), description: e.description.trim() || null, steps: e.steps, updated_at: new Date().toISOString() };
+    const { error } = e.id
+      ? await db.from('npcr_class_plans').update(row).eq('id', e.id)
+      : await db.from('npcr_class_plans').insert({ ...row, class_id: classId, published: false, position: (plans || []).length });
+    if (error) { flash('err', '❌ ' + error.message); return; }
+    setEdit(null); load();
+    flash('ok', e.id ? '✅ Clase guardada.' : '✅ Clase creada como borrador. Publicala cuando quieras que la vean los alumnos.');
+  };
+  const update = async (p, patch, ok) => {
+    const { error } = await db.from('npcr_class_plans').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', p.id);
+    if (error) { flash('err', '❌ ' + error.message); return; }
+    load(); if (ok) flash('ok', ok);
+  };
+  const remove = async (p) => {
+    if (!window.confirm('¿Eliminar la clase "' + p.title + '"?\n\nSe borra también el avance de los alumnos en esta clase.')) return;
+    const { error } = await db.from('npcr_class_plans').delete().eq('id', p.id);
+    if (error) { flash('err', '❌ ' + error.message); return; }
+    load(); flash('ok', '🗑 Clase eliminada.');
+  };
+  const move = async (i, d) => {
+    const list = [...plans]; const j = i + d; if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    setPlans(list);
+    await Promise.all(list.map((p, k) => db.from('npcr_class_plans').update({ position: k }).eq('id', p.id)));
+  };
+  const duplicate = async (p, target) => {
+    const { error } = await db.from('npcr_class_plans').insert({ class_id: target, title: p.title + (target === classId ? ' (copia)' : ''), description: p.description,
+      steps: p.steps.map(s => ({ ...s, id: planNewId() })), published: false, position: target === classId ? plans.length : 999 });
+    setCopyFor(null);
+    if (error) { flash('err', '❌ ' + error.message); return; }
+    if (target === classId) load();
+    flash('ok', '⧉ Copia creada como borrador' + (target === classId ? '.' : ' en "' + ((classes.find(c => c.id === target) || {}).name || 'la otra aula') + '".'));
+  };
+
+  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + (/relation|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_clases_plan.sql?' : ''));
+  if (!plans) return html('p', { className: 'admin-note' }, 'Cargando clases…');
+  if (edit) return html(PlanEditor, { edit, setEdit, lessons, onSave: save, onCancel: () => setEdit(null), msg });
+
+  const viewing = view && plans.find(p => p.id === view);
+  if (viewing) return html('div', { className: 'report-card' },
+    html('div', { className: 'plan-head' }, html('button', { className: 'mini-btn', onClick: () => setView(null) }, '← Clases'), html('b', null, '📊 ' + viewing.title)),
+    active.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay alumnos activos en esta aula.')
+    : html(ScrollX, { arrows: 'top' }, html('table', { className: 'heat-table plan-table' },
+        html('thead', null, html('tr', null, html('th', null, 'Alumno'), viewing.steps.map((s, i) => html('th', { key: s.id, title: planStepLabel(s) }, (i + 1) + '. ' + PLAN_KIND_ICON[s.kind])), html('th', null, 'Total'))),
+        html('tbody', null, active.map(r => {
+          const n = doneOf(viewing, r.user_id);
+          return html('tr', { key: r.user_id },
+            html('td', { style: { textAlign: 'left', whiteSpace: 'nowrap' } }, r.display_name),
+            viewing.steps.map(s => {
+              const x = report.find(y => y.plan_id === viewing.id && y.student_id === r.user_id && y.step_id === s.id);
+              const c = !x ? { bg: 'var(--paper)', fg: 'var(--ink-soft)' } : x.done ? { bg: 'var(--jade-light)', fg: 'var(--jade-dark)' } : { bg: 'var(--gold-light)', fg: 'var(--gold-dark)' };
+              return html('td', { key: s.id, style: { background: c.bg, color: c.fg }, title: planStepLabel(s) + (x ? ' · ' + x.percent + '% · ' + x.attempts + (x.attempts === 1 ? ' intento' : ' intentos') : ' · sin hacer') }, x ? (x.done ? '✓' : x.percent + '%') : '·');
+            }),
+            html('td', { style: { fontWeight: 900 } }, n + '/' + viewing.steps.length));
+        })))),
+    html('div', { className: 'plan-legend' }, viewing.steps.map((s, i) => html('span', { key: s.id }, (i + 1) + '. ' + PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)))),
+    html('p', { className: 'admin-note', style: { margin: '8px 0 0' } }, '✓ hecho (70% o más) · % mejor resultado hasta ahora · · todavía no lo hizo.'));
+
+  return html('div', null,
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
+    html('div', { className: 'report-card' },
+      html('div', { className: 'plan-head' }, html('div', { className: 'report-h', style: { margin: 0, flex: 1 } }, '📚 Clases del aula'),
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto', padding: '8px 14px' }, onClick: () => setEdit({ title: '', description: '', steps: [] }) }, '+ Nueva clase')),
+      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Armá una clase con pasos: actividades de una lección, juegos de la app o una explicación. Los alumnos la ven en Mi aula cuando la publicás, y acá ves cómo le va a cada uno.')),
+    plans.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay clases armadas en esta aula.')
+    : html('div', { className: 'plan-list' }, plans.map((p, i) => html('div', { key: p.id, className: 'plan-card' + (p.published ? '' : ' draft') },
+        html('div', { className: 'plan-card-top' },
+          html('div', { style: { flex: 1, minWidth: 0 } },
+            html('div', { className: 'plan-card-title' }, p.title),
+            html('div', { className: 'plan-card-sub' }, p.steps.length + (p.steps.length === 1 ? ' paso' : ' pasos') + ' · ' + (p.published ? finished(p) + '/' + active.length + ' alumnos la completaron' : 'borrador: los alumnos todavía no la ven'))),
+          html('span', { className: 'plan-badge' + (p.published ? ' on' : '') }, p.published ? 'Publicada' : 'Borrador')),
+        p.description && html('div', { className: 'plan-card-desc' }, p.description),
+        html('div', { className: 'plan-steps-mini' }, p.steps.map((s, k) => html('span', { key: s.id }, (k + 1) + '. ' + PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)))),
+        copyFor === p.id && html('div', { className: 'plan-copy' }, 'Duplicar en: ',
+          html('select', { defaultValue: '', onChange: e => e.target.value && duplicate(p, e.target.value), style: { ...cmInput, flex: '1 1 160px' } },
+            html('option', { value: '' }, 'Elegí el aula…'),
+            classes.map(c => html('option', { key: c.id, value: c.id }, c.id === classId ? c.name + ' (esta aula)' : c.name))),
+          html('button', { className: 'mini-btn', onClick: () => setCopyFor(null) }, 'Cancelar')),
+        html('div', { className: 'plan-actions' },
+          html('button', { className: 'mini-btn' + (p.published ? '' : ' strong'), onClick: () => update(p, { published: !p.published }, p.published ? 'La clase volvió a borrador: los alumnos ya no la ven.' : '📢 Clase publicada: ya la ven los alumnos en Mi aula.') }, p.published ? '🙈 Despublicar' : '📢 Publicar'),
+          html('button', { className: 'mini-btn', onClick: () => setEdit({ id: p.id, title: p.title, description: p.description || '', steps: p.steps }) }, '✏️ Editar'),
+          html('button', { className: 'mini-btn', onClick: () => setView(p.id) }, '📊 Avance'),
+          html('button', { className: 'mini-btn', onClick: () => setCopyFor(p.id) }, '⧉ Duplicar'),
+          html('button', { className: 'mini-btn', disabled: i === 0, onClick: () => move(i, -1), title: 'Subir' }, '↑'),
+          html('button', { className: 'mini-btn', disabled: i === plans.length - 1, onClick: () => move(i, 1), title: 'Bajar' }, '↓'),
+          html('button', { className: 'mini-btn danger', onClick: () => remove(p) }, '🗑'))))),
+  );
+}
+
+function PlanEditor({ edit, setEdit, lessons, onSave, onCancel, msg }) {
+  const [adding, setAdding] = useState(null);   // 'lesson' | 'game' | 'texto'
+  const [draft, setDraft] = useState({});
+  const steps = edit.steps;
+  const setSteps = (s) => setEdit(e => ({ ...e, steps: s }));
+  const moveStep = (i, d) => { const j = i + d; if (j < 0 || j >= steps.length) return; const s = [...steps]; [s[i], s[j]] = [s[j], s[i]]; setSteps(s); };
+  const start = (kind) => { setAdding(kind); setDraft(kind === 'lesson' ? { lesson: lessons[0], modes: ['cards'] } : kind === 'game' ? { game: 'frase' } : { title: '', text: '' }); };
+  const addStep = () => {
+    if (adding === 'lesson') { if (!draft.modes.length) return; setSteps([...steps, ...draft.modes.map(m => ({ id: planNewId(), kind: 'lesson', lesson: draft.lesson, mode: m }))]); }
+    else if (adding === 'game') setSteps([...steps, { id: planNewId(), kind: 'game', game: draft.game }]);
+    else { if (!draft.title.trim() || !draft.text.trim()) return; setSteps([...steps, { id: planNewId(), kind: 'texto', title: draft.title.trim(), text: draft.text.trim() }]); }
+    setAdding(null);
+  };
+  return html('div', { className: 'report-card' },
+    html('div', { className: 'plan-head' }, html('button', { className: 'mini-btn', onClick: onCancel }, '← Volver'), html('b', null, edit.id ? '✏️ Editar clase' : '➕ Nueva clase')),
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { margin: '8px 0' } }, msg.text),
+    html('input', { value: edit.title, maxLength: 120, placeholder: 'Título (ej: Clase 12 · La comida)', onChange: e => setEdit({ ...edit, title: e.target.value }), style: { ...cmInput, width: '100%', margin: '10px 0 8px', fontWeight: 700 } }),
+    html('textarea', { value: edit.description, maxLength: 600, rows: 2, placeholder: 'Descripción o consigna para los alumnos (opcional)', onChange: e => setEdit({ ...edit, description: e.target.value }), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'inherit' } }),
+    html('div', { className: 'report-h', style: { margin: '14px 0 6px' } }, 'Pasos de la clase'),
+    steps.length === 0 ? html('p', { className: 'admin-note', style: { margin: 0 } }, 'Todavía no hay pasos. Agregá el primero abajo.')
+    : html('div', { className: 'plan-edit-steps' }, steps.map((s, i) => html('div', { key: s.id, className: 'plan-edit-step' },
+        html('span', { className: 'plan-num' }, i + 1),
+        html('span', { style: { flex: 1, minWidth: 0 } }, PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s), s.kind === 'texto' && html('small', null, s.text.slice(0, 80) + (s.text.length > 80 ? '…' : ''))),
+        html('button', { className: 'mini-btn', disabled: i === 0, onClick: () => moveStep(i, -1) }, '↑'),
+        html('button', { className: 'mini-btn', disabled: i === steps.length - 1, onClick: () => moveStep(i, 1) }, '↓'),
+        html('button', { className: 'mini-btn danger', onClick: () => setSteps(steps.filter(x => x.id !== s.id)) }, '✕')))),
+    !adding && html('div', { className: 'plan-add-btns' },
+      html('button', { className: 'secondary-btn', onClick: () => start('lesson') }, '📖 Lección del libro'),
+      html('button', { className: 'secondary-btn', onClick: () => start('game') }, '🎮 Actividad de la app'),
+      html('button', { className: 'secondary-btn', onClick: () => start('texto') }, '📝 Explicación')),
+    adding && html('div', { className: 'plan-add' },
+      adding === 'lesson' && html(React.Fragment, null,
+        html('select', { value: draft.lesson, onChange: e => setDraft({ ...draft, lesson: e.target.value }), style: { ...cmInput, width: '100%', marginBottom: 8 } },
+          lessons.map(l => html('option', { key: l, value: l }, (LESSON_THEMES[l] && LESSON_THEMES[l].name ? 'L' + l + ' · ' + LESSON_THEMES[l].name : 'Lección ' + l)))),
+        html('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } }, PLAN_LESSON_MODES.map(([m, label]) => html('label', { key: m, className: 'mode-check' + (draft.modes.includes(m) ? ' on' : '') },
+          html('input', { type: 'checkbox', checked: draft.modes.includes(m), onChange: () => setDraft({ ...draft, modes: draft.modes.includes(m) ? draft.modes.filter(x => x !== m) : [...draft.modes, m] }) }), label))),
+        html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Cada actividad marcada se agrega como un paso. Frases clave solo funciona en lecciones que tienen frases.')),
+      adding === 'game' && html('select', { value: draft.game, onChange: e => setDraft({ ...draft, game: e.target.value }), style: { ...cmInput, width: '100%' } },
+        PLAN_GAMES.map(([g, label]) => html('option', { key: g, value: g }, label))),
+      adding === 'texto' && html(React.Fragment, null,
+        html('input', { value: draft.title, maxLength: 80, placeholder: 'Título (ej: Cómo se usa 的)', onChange: e => setDraft({ ...draft, title: e.target.value }), style: { ...cmInput, width: '100%', marginBottom: 8 } }),
+        html('textarea', { value: draft.text, maxLength: 2000, rows: 5, placeholder: 'Texto de la explicación. Podés escribir en chino y en español.', onChange: e => setDraft({ ...draft, text: e.target.value }), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'inherit' } })),
+      html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: addStep }, 'Agregar paso'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setAdding(null) }, 'Cancelar'))),
+    html('div', { style: { display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--paper-deep)', paddingTop: 12 } },
+      html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: onSave }, edit.id ? '💾 Guardar cambios' : '💾 Guardar clase'),
+      html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: onCancel }, 'Cancelar')));
+}
+
+// ── Alumno: las clases publicadas de su aula, paso a paso ──
+function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onRecordCard, lessons, openLessons, appConfig, playerName, onLessonResult, onLog }) {
+  const [plans, setPlans] = useState(null);
+  const [prog, setProg] = useState([]);
+  const [err, setErr] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const [run, setRun] = useState(null);         // paso que se está haciendo
+  const [runN, setRunN] = useState(0);
+  const load = () => {
+    db.from('npcr_class_plans').select('*').eq('class_id', classId).eq('published', true).order('position').order('created_at').then(({ data, error }) => {
+      if (error) { setErr(error.message); setPlans([]); return; }
+      setPlans(data || []);
+    });
+    db.from('npcr_plan_progress').select('plan_id,step_id,percent,done').then(({ data }) => setProg(data || []));
+  };
+  useEffect(() => { load(); }, [classId]);
+  useEffect(() => stopAudio, []);
+
+  const stOf = (pid, sid) => prog.find(x => x.plan_id === pid && x.step_id === sid);
+  const nDone = (p) => p.steps.filter(s => (stOf(p.id, s.id) || {}).done).length;
+  const record = (p, s, percent) => {
+    const v = Math.round(percent || 0);
+    setProg(list => {
+      const cur = list.find(x => x.plan_id === p.id && x.step_id === s.id);
+      const nx = { plan_id: p.id, step_id: s.id, percent: Math.max(v, cur ? cur.percent : 0), done: (cur && cur.done) || v >= 70 };
+      return cur ? list.map(x => x === cur ? nx : x) : [...list, nx];
+    });
+    if (!preview) db.rpc('npcr_plan_step', { p_plan: p.id, p_step: s.id, p_percent: v }).then(() => {});
+  };
+
+  if (err) return html(GameStatusScreen, { onBack, title: '📚 Clases', msg: '❌ ' + err + ' (¿ejecutaste npcr_clases_plan.sql?)' });
+  if (!plans) return html(GameStatusScreen, { onBack, title: '📚 Clases', msg: '⏳ Cargando clases…' });
+  const plan = openId && plans.find(p => p.id === openId);
+
+  // Un paso en curso: se abre el juego de siempre, dentro de este módulo
+  if (plan && run) {
+    const s = run;
+    const back = () => { stopAudio(); setRun(null); };
+    const finish = (percent, missed, total) => record(plan, s, percent);
+    const key = 'plan-' + s.id + '-' + runN;
+    if (s.kind === 'texto') return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: back }, '←'), html('h1', null, '📝 ' + s.title)),
+      html('div', { style: { padding: '0 16px' } },
+        html('div', { className: 'plan-text' }, s.text),
+        html('button', { className: 'primary-btn', style: { marginTop: 16 }, onClick: () => { record(plan, s, 100); back(); } }, '✓ Listo, lo leí')));
+    if (s.kind === 'lesson') return html(PlayScreen, { key, vocab, sentences, lessonId: s.lesson, mode: s.mode, cardState, onRecordCard,
+      onBack: back, onHome: back, onFinish: (percent, missed) => { onLessonResult(s.lesson, s.mode, percent, missed); finish(percent); },
+      nextAction: null, savedResult: null, onSaveResult: () => {}, onClearResult: () => {} });
+    const gp = { key, onBack: back, playerName, priorMissed: [],
+      onFinish: (percent, missed, total) => { onLog('prueba', null, s.game, percent, total == null ? null : total, (missed || []).length); finish(percent); } };
+    const allWords = lessons.filter(id => !String(id).startsWith('mod-')).flatMap(id => vocab[id] || []);
+    if (s.game === 'frase') return html(ClasificadorGame, { ...gp, tipo: 'frase' });
+    if (s.game === 'clas') return html(ClasificadorGame, { ...gp, tipo: 'clasificador' });
+    if (s.game === 'modal') return html(ClasificadorGame, { ...gp, tipo: 'modal' });
+    if (s.game === 'tiempo') return html(ClasificadorGame, { ...gp, tipo: 'tiempo' });
+    if (s.game === 'dialogo') return html(DialogoGame, gp);
+    if (s.game === 'orden') return html(OrdenGame, gp);
+    if (s.game === 'zhe') return html(ZheGame, { ...gp, zheConfig: appConfig.zhe_config });
+    if (s.game === 'audio') return html(AudioGame, { ...gp, allWords });
+    if (s.game === 'tonos') return html(ToneGame, { ...gp, vocab, lessons: openLessons });
+    if (s.game === 'dictado') return html(DictationGame, { ...gp, vocab, lessons: openLessons });
+    return html(GameStatusScreen, { onBack: back, title: '📚 Clases', msg: 'Esta actividad no está disponible.' });
+  }
+
+  // Una clase abierta: el camino de pasos
+  if (plan) {
+    const n = nDone(plan);
+    const next = plan.steps.find(s => !(stOf(plan.id, s.id) || {}).done);
+    return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: () => setOpenId(null) }, '←'),
+        html('div', { style: { flex: 1, minWidth: 0 } }, html('h1', null, plan.title),
+          html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 2 } }, n + ' de ' + plan.steps.length + ' pasos hechos'))),
+      html('div', { style: { padding: '0 16px' } },
+        plan.description && html('div', { className: 'plan-desc' }, plan.description),
+        html('div', { className: 'plan-bar' }, html('i', { style: { width: (plan.steps.length ? n / plan.steps.length * 100 : 0) + '%' } })),
+        n === plan.steps.length && plan.steps.length > 0 && html('div', { className: 'plan-win' }, '🎉 ¡Terminaste esta clase! Podés repetir cualquier paso para mejorar.'),
+        html('div', { className: 'plan-path' }, plan.steps.map((s, i) => {
+          const st = stOf(plan.id, s.id);
+          return html('button', { key: s.id, className: 'plan-step' + (st && st.done ? ' done' : '') + (next && next.id === s.id ? ' next' : ''), onClick: () => { setRun(s); setRunN(k => k + 1); } },
+            html('span', { className: 'plan-num' }, st && st.done ? '✓' : i + 1),
+            html('span', { className: 'plan-step-main' },
+              html('span', { className: 'plan-step-title' }, PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)),
+              html('span', { className: 'plan-step-sub' }, st ? (st.done ? '¡Hecho! · ' + st.percent + '%' : 'Mejor resultado: ' + st.percent + '% · necesitás 70%') : next && next.id === s.id ? 'Seguí por acá' : 'Sin hacer')),
+            html('span', { className: 'plan-go' }, '→'));
+        })),
+        preview && html('p', { className: 'admin-note', style: { marginTop: 12 } }, '👁 Vista de profe: podés probar los pasos, pero tu avance no se guarda.')));
+  }
+
+  // Lista de clases
+  return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '📚 Clases')),
+    html('div', { style: { padding: '0 16px' } },
+      plans.length === 0 ? html('p', { className: 'admin-note' }, 'Tu lǎoshī todavía no publicó clases. Cuando lo haga, van a aparecer acá.')
+      : html('div', { className: 'plan-list' }, plans.map(p => {
+          const n = nDone(p);
+          return html('button', { key: p.id, className: 'plan-card student' + (n === p.steps.length && n ? ' complete' : ''), onClick: () => setOpenId(p.id) },
+            html('div', { className: 'plan-card-title' }, (n === p.steps.length && n ? '✅ ' : '📚 ') + p.title),
+            p.description && html('div', { className: 'plan-card-desc' }, p.description),
+            html('div', { className: 'plan-bar' }, html('i', { style: { width: (p.steps.length ? n / p.steps.length * 100 : 0) + '%' } })),
+            html('div', { className: 'plan-card-sub' }, n + ' de ' + p.steps.length + ' pasos' + (n === 0 ? ' · ¡Empezá!' : n < p.steps.length ? ' · Seguí' : ' · ¡Completa!')));
+        }))));
 }
 
 // ----------------- BrandAnimText -----------------
@@ -1600,6 +1888,11 @@ function App() {
       staffClasses, onPreviewClass: choosePreviewClass,
       bingoGame, onBingo: () => bingoGame && setScreen({ name: 'bingo', gameId: bingoGame.id }),
     });
+  } else if (screen.name === 'clases' && aulaShown(classSettings, 'clases') && myClasses && myClasses.length) {
+    content = html(PlanModule, { key: myClasses[0].class_id, classId: myClasses[0].class_id, preview: !!myClasses[0].preview,
+      vocab, sentences, cardState, onRecordCard: recordCard, lessons, openLessons, appConfig, playerName,
+      onLessonResult: updateLessonResult, onLog: logActivity,
+      onBack: () => setScreen({ name: 'clase' }) });
   } else if (screen.name === 'trazos' && aulaShown(classSettings, 'trazos')) {
     content = html(TrazosGame, { vocab, lessons, studentId, maxLesson: classSettings && classSettings.max_lesson ? Number(classSettings.max_lesson) : null,
       onBack: () => setScreen({ name: myClasses && myClasses.length ? 'clase' : 'home' }) });
@@ -2454,6 +2747,7 @@ function aulaActivitiesAll(settings, hardCount) {
   };
   return [
     hskAct(1), hskAct(2),
+    { id: 'clases', icon: 'book', tone: 'red', title: 'Clases', sub: 'Las clases que armó tu lǎoshī, paso a paso', optIn: true },
     { id: 'refuerzo-clase', icon: 'layers', tone: 'purple', title: 'Refuerzo de clase', sub: hardCount ? hardCount + ' palabras que le cuestan al grupo' : 'Todavía sin datos del grupo', disabled: !hardCount },
     weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + (weekly.length === 1 ? ' palabra elegida' : ' palabras elegidas') + ' por tu lǎoshī' },
     { id: 'tonos', icon: 'music', tone: 'green', title: 'Tonos', sub: 'Escuchá y elegí el tono' },

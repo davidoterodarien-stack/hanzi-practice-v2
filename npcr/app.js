@@ -1124,11 +1124,22 @@ const PLAN_LESSON_MODES = [['match', 'Emparejar'], ['cards', 'Tarjetas'], ['quiz
 const PLAN_WORD_MODES = [['cards', 'Tarjetas'], ['match', 'Emparejar'], ['quiz', 'Opción múltiple'], ['memoria', 'Memoria']];
 const PLAN_GAMES = [['frase', 'Completá la frase'], ['orden', 'Ordená la oración'], ['audio', 'Reconocer por audio'], ['dialogo', 'Diálogos'],
   ['modal', 'Verbos modales'], ['tiempo', 'Expresiones de tiempo'], ['clas', 'Clasificadores'], ['zhe', 'Zhè shì shénme?'], ['tonos', 'Tonos'], ['dictado', 'Dictado 听写']];
-const PLAN_KIND_ICON = { lesson: '📖', game: '🎮', texto: '📝', words: '🔤', quiz: '❓', orden: '🔀' };
+const PLAN_KIND_ICON = { lesson: '📖', game: '🎮', texto: '📝', words: '🔤', quiz: '❓', orden: '🔀', trazos: '✍️' };
+// Juegos de oraciones a los que el lǎoshī puede sumar preguntas propias (solo para esa clase)
+const PLAN_CLAS_TIPOS = { frase: 'frase', clas: 'clasificador', modal: 'modal', tiempo: 'tiempo' };
+const PLAN_CLAS_TITLES = { frase: 'Completá la frase', clasificador: 'Clasificadores', modal: 'Verbos modales', tiempo: 'Expresiones de tiempo' };
+// Hanzi con modelo de trazos de una lista de palabras (sin repetir)
+const planTrazoChars = (vocab, list) => {
+  const seen = new Set(), out = [];
+  planWordsOf(vocab, list).forEach(w => [...String(w.hanzi || '')].forEach(c => { if (!seen.has(c) && NPCR_MEDIA.svg[c]) { seen.add(c); out.push({ c, w }); } }));
+  return out;
+};
 const planModeName = (list, m) => (list.find(x => x[0] === m) || [])[1] || m;
+const planWordsOf = (vocab, list) => (list || []).map(x => { const w = (vocab[x.lesson] || []).find(v => v.hanzi === x.hanzi); return w ? { ...w, _lesson: x.lesson } : null; }).filter(Boolean);
 function planStepLabel(s) {
   if (s.kind === 'lesson') return 'Lección ' + s.lesson + ' · ' + planModeName(PLAN_LESSON_MODES, s.mode);
-  if (s.kind === 'game') return planModeName(PLAN_GAMES, s.game);
+  if (s.kind === 'game') return planModeName(PLAN_GAMES, s.game) + ((s.extra || []).length ? (s.only ? ' · solo ' : ' · +') + s.extra.length + (s.extra.length === 1 ? ' pregunta propia' : ' preguntas propias') : '');
+  if (s.kind === 'trazos') return (s.title || (s.words || []).slice(0, 4).map(w => w.hanzi).join(' ') + ((s.words || []).length > 4 ? '…' : '')) + ' · trazos';
   if (s.kind === 'words') return (s.title || (s.words || []).slice(0, 4).map(w => w.hanzi).join(' ') + ((s.words || []).length > 4 ? '…' : '')) + ' · ' + planModeName(PLAN_WORD_MODES, s.mode);
   const n = (s.items || []).length;
   if (s.kind === 'quiz') return (s.title || 'Preguntas') + ' · ' + n + (n === 1 ? ' pregunta' : ' preguntas');
@@ -1136,7 +1147,6 @@ function planStepLabel(s) {
   return s.title || 'Explicación';
 }
 const planNewId = () => secureRandomChars('abcdefghijklmnopqrstuvwxyz0123456789', 8);
-const planWordsOf = (vocab, list) => (list || []).map(x => { const w = (vocab[x.lesson] || []).find(v => v.hanzi === x.hanzi); return w ? { ...w, _lesson: x.lesson } : null; }).filter(Boolean);
 
 // ── Juegos propios del módulo: preguntas de opción múltiple y oraciones para ordenar ──
 function PlanResult({ title, percent, wrong, onAgain, onBack }) {
@@ -1210,6 +1220,57 @@ function PlanOrderGame({ title, items, onBack, onFinish }) {
       checked === null
         ? html('button', { className: 'primary-btn', style: { marginTop: 14 }, disabled: chosen.length !== q.pool.length, onClick: check }, 'Comprobar')
         : html('button', { className: 'primary-btn', style: { marginTop: 14 }, onClick: next }, i + 1 < list.length ? 'Siguiente →' : 'Ver resultado')));
+}
+
+// Juego de oraciones (Completá la frase, Clasificadores…) con las preguntas de siempre más las
+// propias de esta clase, o solo las propias. Las propias no se agregan al banco general.
+function PlanClasGame(props) {
+  const { tipo, extra, only } = props;
+  const title = PLAN_CLAS_TITLES[tipo] || 'Preguntas';
+  const own = (extra || []).map(q => ({ sentence: q.sentence, pinyin: q.pinyin || '', answer: q.answer, answer_pinyin: q.answer_pinyin || null,
+    options: [q.answer, ...(q.wrong || [])], hint: q.hint || '', tipo }));
+  const [raw, setRaw] = useState(only ? own : null);
+  const [rawErr, setRawErr] = useState(false);
+  const load = () => {
+    if (only) return;
+    setRaw(null); setRawErr(false);
+    db.from('npcr_clasificador_questions').select('sentence,pinyin,answer,answer_pinyin,options,hint,tipo').eq('active', true).eq('tipo', tipo)
+      .then(({ data, error }) => { if (error) setRawErr(true); else setRaw([...(data || []).map(nfcRow), ...own]); });
+  };
+  useEffect(() => { load(); }, []);
+  if (rawErr) return html(GameStatusScreen, { onBack: props.onBack, title, msg: '❌ Error de conexión.', onRetry: load });
+  if (raw === null) return html(GameStatusScreen, { onBack: props.onBack, title, msg: '⏳ Cargando preguntas...' });
+  if (raw.length === 0) return html(GameStatusScreen, { onBack: props.onBack, title, msg: 'Esta actividad todavía no tiene preguntas.' });
+  return html(ClasificadorGameBody, { ...props, title, rawQuestions: shuffle(raw) });
+}
+
+// Trazos de los hanzi que eligió el lǎoshī, uno detrás de otro
+function PlanTrazos({ title, chars, vocab, onBack, onFinish }) {
+  const [info, setInfo] = useState({});
+  const [done, setDone] = useState(new Set());
+  const [i, setI] = useState(0);
+  const [end, setEnd] = useState(false);
+  useEffect(() => {
+    db.from('npcr_hanzi_info').select('hanzi,pinyin,es').eq('hidden', false).then(({ data }) => {
+      const m = {}; (data || []).forEach(r => { m[r.hanzi] = r; }); setInfo(m);
+    });
+  }, []);
+  if (!chars.length) return html(GameStatusScreen, { onBack, title: '✍️ Trazos', msg: 'Estas palabras no tienen modelo de trazos.' });
+  if (end) return html(PlanResult, { title: '✍️ ' + title, percent: 100, wrong: [], onBack, onAgain: () => { setDone(new Set()); setI(0); setEnd(false); } });
+  const item = chars[i];
+  const wordOf = (c, w) => (w && w.hanzi === c) ? w : (Object.values(vocab).flat().find(x => x.hanzi === c) || null);
+  const finishAll = (set) => { if (set.size === chars.length) { onFinish(100); setEnd(true); return true; } return false; };
+  return html(TrazoPractice, { key: item.c + i, ch: item.c, word: wordOf(item.c, item.w), inWord: wordOf(item.c, item.w) ? null : (String(item.w.hanzi).includes(item.c) ? item.w : null),
+    title: title + ' · ' + (i + 1) + '/' + chars.length, info: info[item.c] || null,
+    path: chars.map(x => ({ c: x.c, done: done.has(x.c), py: info[x.c] && info[x.c].pinyin })), onJump: (k) => setI(k),
+    onBack,
+    onComplete: () => setDone(prev => new Set([...prev, item.c])),
+    onDone: () => {
+      const set = new Set([...done, item.c]);
+      if (finishAll(set)) return;
+      const nx = chars.findIndex((x, k) => k > i && !set.has(x.c));
+      setI(nx >= 0 ? nx : chars.findIndex(x => !set.has(x.c)));
+    } });
 }
 
 // ── Lǎoshī: armar, publicar, dar en vivo y seguir las clases del aula ──
@@ -1396,6 +1457,8 @@ function PlanLibrary({ onBack, onUse }) {
 // Lo que se proyecta del paso actual (explicación, palabras, preguntas…)
 function PlanStepShow({ s, vocab, big }) {
   if (s.kind === 'texto') return html('div', { className: 'plan-text' + (big ? ' big' : '') }, s.text);
+  if (s.kind === 'trazos') return html('div', { className: 'plan-show-words' }, planTrazoChars(vocab, s.words).map(x => html('div', { key: x.c, className: 'plan-show-word' },
+    html('div', { className: 'hanzi-font', style: { fontSize: 46 } }, x.c))));
   if (s.kind === 'words') return html('div', { className: 'plan-show-words' }, planWordsOf(vocab, s.words).map(w => html('div', { key: w._lesson + w.hanzi, className: 'plan-show-word' },
     html('div', { className: 'hanzi-font' }, w.hanzi), html(TonedPinyin, { text: w.pinyin }), html('small', null, w.es))));
   if (s.kind === 'quiz') return html('div', { className: 'plan-show-list' }, (s.items || []).map((it, k) => html('div', { key: k }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, it.q))));
@@ -1434,28 +1497,61 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
   const [adding, setAdding] = useState(null);   // tipo de paso que se está agregando
   const [draft, setDraft] = useState({});
   const [err, setErr] = useState(null);
+  const [editingId, setEditingId] = useState(null);   // paso que se está corrigiendo
   const steps = edit.steps;
   const setSteps = (s) => setEdit(e => ({ ...e, steps: s }));
   const moveStep = (i, d) => { const j = i + d; if (j < 0 || j >= steps.length) return; const s = [...steps]; [s[i], s[j]] = [s[j], s[i]]; setSteps(s); };
+  const qBlank = { qs: '', qpy: '', qa: '', qapy: '', w1: '', w2: '', w3: '', qh: '' };
   const start = (kind) => {
-    setErr(null); setAdding(kind);
-    setDraft(kind === 'lesson' ? { lesson: lessons[0], modes: ['cards'] } : kind === 'game' ? { game: 'frase' }
+    setErr(null); setAdding(kind); setEditingId(null);
+    setDraft(kind === 'lesson' ? { lesson: lessons[0], modes: ['cards'] } : kind === 'game' ? { game: 'frase', extra: [], only: false, ...qBlank }
       : kind === 'words' ? { title: '', mode: 'cards', words: [], pick: lessons[0] }
+      : kind === 'trazos' ? { title: '', words: [], pick: lessons[0] }
       : kind === 'quiz' ? { title: '', items: [], q: '', ok: '', b1: '', b2: '', b3: '' }
       : kind === 'orden' ? { title: '', items: [], zh: '', es: '' } : { title: '', text: '' });
   };
+  // Abre un paso ya agregado para corregirlo (sus pasos siguen guardando el avance: el id no cambia)
+  const editStep = (st) => {
+    setErr(null); setEditingId(st.id); setAdding(st.kind);
+    setDraft(st.kind === 'lesson' ? { lesson: st.lesson, modes: [st.mode] }
+      : st.kind === 'game' ? { game: st.game, extra: st.extra || [], only: !!st.only, ...qBlank }
+      : st.kind === 'words' ? { title: st.title || '', mode: st.mode, words: st.words || [], pick: (st.words && st.words[0] && st.words[0].lesson) || lessons[0] }
+      : st.kind === 'trazos' ? { title: st.title || '', words: st.words || [], pick: (st.words && st.words[0] && st.words[0].lesson) || lessons[0] }
+      : st.kind === 'quiz' || st.kind === 'orden' ? { title: st.title || '', items: st.items || [], q: '', ok: '', b1: '', b2: '', b3: '', zh: '', es: '' }
+      : { title: st.title || '', text: st.text || '' });
+  };
   const addStep = () => {
     const d = draft;
-    if (adding === 'lesson') { if (!d.modes.length) return setErr('Marcá al menos una actividad.'); setSteps([...steps, ...d.modes.map(m => ({ id: planNewId(), kind: 'lesson', lesson: d.lesson, mode: m }))]); }
-    else if (adding === 'game') setSteps([...steps, { id: planNewId(), kind: 'game', game: d.game }]);
+    let made;
+    if (adding === 'lesson') { if (!d.modes.length) return setErr('Marcá al menos una actividad.'); made = d.modes.map(m => ({ kind: 'lesson', lesson: d.lesson, mode: m })); }
+    else if (adding === 'game') {
+      if (d.only && !(d.extra || []).length) return setErr('Para usar solo tus preguntas, agregá al menos una.');
+      made = [{ kind: 'game', game: d.game, ...(PLAN_CLAS_TIPOS[d.game] && (d.extra || []).length ? { extra: d.extra, only: !!d.only } : {}) }];
+    }
     else if (adding === 'words') {
       if (d.words.length < (d.mode === 'cards' ? 1 : 4)) return setErr(d.mode === 'cards' ? 'Elegí al menos una palabra.' : 'Para este juego hacen falta al menos 4 palabras.');
-      setSteps([...steps, { id: planNewId(), kind: 'words', title: d.title.trim() || null, mode: d.mode, words: d.words }]);
+      made = [{ kind: 'words', title: d.title.trim() || null, mode: d.mode, words: d.words }];
     }
-    else if (adding === 'quiz') { if (!d.items.length) return setErr('Agregá al menos una pregunta.'); setSteps([...steps, { id: planNewId(), kind: 'quiz', title: d.title.trim() || 'Preguntas', items: d.items }]); }
-    else if (adding === 'orden') { if (!d.items.length) return setErr('Agregá al menos una oración.'); setSteps([...steps, { id: planNewId(), kind: 'orden', title: d.title.trim() || 'Ordená las oraciones', items: d.items }]); }
-    else { if (!d.title.trim() || !d.text.trim()) return setErr('Completá el título y el texto.'); setSteps([...steps, { id: planNewId(), kind: 'texto', title: d.title.trim(), text: d.text.trim() }]); }
-    setAdding(null); setErr(null);
+    else if (adding === 'trazos') {
+      if (!planTrazoChars(vocab, d.words).length) return setErr('Elegí al menos una palabra con hanzi para dibujar.');
+      made = [{ kind: 'trazos', title: d.title.trim() || null, words: d.words }];
+    }
+    else if (adding === 'quiz') { if (!d.items.length) return setErr('Agregá al menos una pregunta.'); made = [{ kind: 'quiz', title: d.title.trim() || 'Preguntas', items: d.items }]; }
+    else if (adding === 'orden') { if (!d.items.length) return setErr('Agregá al menos una oración.'); made = [{ kind: 'orden', title: d.title.trim() || 'Ordená las oraciones', items: d.items }]; }
+    else { if (!d.title.trim() || !d.text.trim()) return setErr('Completá el título y el texto.'); made = [{ kind: 'texto', title: d.title.trim(), text: d.text.trim() }]; }
+    if (editingId) {
+      const k = steps.findIndex(x => x.id === editingId);
+      setSteps([...steps.slice(0, k), { ...made[0], id: editingId }, ...made.slice(1).map(x => ({ ...x, id: planNewId() })), ...steps.slice(k + 1)]);
+    } else setSteps([...steps, ...made.map(x => ({ ...x, id: planNewId() }))]);
+    setAdding(null); setEditingId(null); setErr(null);
+  };
+  const addOwnQ = () => {
+    const d = draft;
+    const wrong = [d.w1, d.w2, d.w3].map(x => (x || '').trim()).filter(Boolean);
+    if (!d.qs.includes('___')) return setErr('La oración tiene que tener ___ (tres guiones bajos) donde va la respuesta.');
+    if (!d.qa.trim() || !wrong.length) return setErr('Poné la respuesta correcta y al menos una opción incorrecta.');
+    setErr(null);
+    setDraft({ ...d, ...qBlank, extra: [...(d.extra || []), { sentence: d.qs.trim(), pinyin: d.qpy.trim() || null, answer: d.qa.trim(), answer_pinyin: d.qapy.trim() || null, wrong, hint: d.qh.trim() || null }] });
   };
   const inp = (key, ph, extra) => html('input', { value: draft[key] || '', placeholder: ph, maxLength: 200, onChange: e => setDraft({ ...draft, [key]: e.target.value }), style: { ...cmInput, width: '100%', ...(extra || {}) } });
   const hasW = (l, h) => draft.words.some(x => x.lesson === l && x.hanzi === h);
@@ -1471,6 +1567,7 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
     : html('div', { className: 'plan-edit-steps' }, steps.map((s, i) => html('div', { key: s.id, className: 'plan-edit-step' },
         html('span', { className: 'plan-num' }, i + 1),
         html('span', { style: { flex: 1, minWidth: 0 } }, PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s), s.kind === 'texto' && html('small', null, s.text.slice(0, 80) + (s.text.length > 80 ? '…' : ''))),
+        html('button', { className: 'mini-btn', title: 'Editar este paso', disabled: !!adding, onClick: () => editStep(s) }, '✏️'),
         html('button', { className: 'mini-btn', disabled: i === 0, onClick: () => moveStep(i, -1) }, '↑'),
         html('button', { className: 'mini-btn', disabled: i === steps.length - 1, onClick: () => moveStep(i, 1) }, '↓'),
         html('button', { className: 'mini-btn danger', onClick: () => setSteps(steps.filter(x => x.id !== s.id)) }, '✕')))),
@@ -1480,20 +1577,38 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
       html('button', { className: 'secondary-btn', onClick: () => start('words') }, '🔤 Mis palabras'),
       html('button', { className: 'secondary-btn', onClick: () => start('quiz') }, '❓ Mis preguntas'),
       html('button', { className: 'secondary-btn', onClick: () => start('orden') }, '🔀 Ordenar oraciones'),
+      html('button', { className: 'secondary-btn', onClick: () => start('trazos') }, '✍️ Trazos'),
       html('button', { className: 'secondary-btn', onClick: () => start('texto') }, '📝 Explicación')),
     adding && html('div', { className: 'plan-add' },
-      html('div', { className: 'report-h', style: { margin: '0 0 8px' } }, { lesson: '📖 Lección del libro', game: '🎮 Actividad de la app', words: '🔤 Mis palabras', quiz: '❓ Mis preguntas', orden: '🔀 Ordenar oraciones', texto: '📝 Explicación' }[adding]),
+      html('div', { className: 'report-h', style: { margin: '0 0 8px' } }, (editingId ? '✏️ Editar paso · ' : '') + { lesson: '📖 Lección del libro', game: '🎮 Actividad de la app', words: '🔤 Mis palabras', quiz: '❓ Mis preguntas', orden: '🔀 Ordenar oraciones', trazos: '✍️ Trazos', texto: '📝 Explicación' }[adding]),
       adding === 'lesson' && html(React.Fragment, null,
         html('select', { value: draft.lesson, onChange: e => setDraft({ ...draft, lesson: e.target.value }), style: { ...cmInput, width: '100%', marginBottom: 8 } },
           lessons.map(l => html('option', { key: l, value: l }, (LESSON_THEMES[l] && LESSON_THEMES[l].name ? 'L' + l + ' · ' + LESSON_THEMES[l].name : 'Lección ' + l)))),
         html('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } }, PLAN_LESSON_MODES.map(([m, label]) => html('label', { key: m, className: 'mode-check' + (draft.modes.includes(m) ? ' on' : '') },
           html('input', { type: 'checkbox', checked: draft.modes.includes(m), onChange: () => setDraft({ ...draft, modes: draft.modes.includes(m) ? draft.modes.filter(x => x !== m) : [...draft.modes, m] }) }), label))),
         html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Cada actividad marcada se agrega como un paso. Frases clave solo funciona en lecciones que tienen frases.')),
-      adding === 'game' && html('select', { value: draft.game, onChange: e => setDraft({ ...draft, game: e.target.value }), style: { ...cmInput, width: '100%' } },
-        PLAN_GAMES.map(([g, label]) => html('option', { key: g, value: g }, label))),
-      adding === 'words' && html(React.Fragment, null,
-        inp('title', 'Título (opcional, ej: Comidas y bebidas)', { marginBottom: 8 }),
-        html('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' } },
+      adding === 'game' && html(React.Fragment, null,
+        html('select', { value: draft.game, onChange: e => setDraft({ ...draft, game: e.target.value }), style: { ...cmInput, width: '100%' } },
+          PLAN_GAMES.map(([g, label]) => html('option', { key: g, value: g }, label))),
+        PLAN_CLAS_TIPOS[draft.game] && html('div', { className: 'plan-own' },
+          html('div', { className: 'plan-own-h' }, '➕ Preguntas propias para esta clase (opcional)'),
+          html('p', { className: 'admin-note', style: { margin: '0 0 6px' } }, 'Se suman a las preguntas de siempre solo en esta clase; no cambian el juego general.'),
+          (draft.extra || []).length > 0 && html('div', { className: 'plan-edit-steps', style: { marginBottom: 8 } }, draft.extra.map((q, k) => html('div', { key: k, className: 'plan-edit-step' },
+            html('span', { style: { flex: 1, minWidth: 0 } }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, q.sentence.replace('___', '【' + q.answer + '】')),
+              html('small', null, '✕ ' + q.wrong.join(' · ') + (q.hint ? ' · pista: ' + q.hint : ''))),
+            html('button', { className: 'mini-btn danger', onClick: () => setDraft({ ...draft, extra: draft.extra.filter((_, j) => j !== k) }) }, '✕')))),
+          html('div', { className: 'plan-q-form' },
+            inp('qs', 'Oración con ___ donde va la respuesta (ej: 我买三___书。)', { fontFamily: 'Noto Sans SC, sans-serif' }),
+            html('div', { className: 'plan-q-bad' }, inp('qa', '✓ Respuesta (ej: 本)', { borderColor: 'var(--jade)', fontFamily: 'Noto Sans SC, sans-serif' }), inp('qpy', 'Pinyin de la oración (opcional)'), inp('qapy', 'Pinyin de la respuesta (opcional)')),
+            html('div', { className: 'plan-q-bad' }, inp('w1', '✕ Incorrecta 1'), inp('w2', '✕ Incorrecta 2'), inp('w3', '✕ Incorrecta 3')),
+            inp('qh', 'Pista o traducción (opcional, ej: Compro tres libros.)'),
+            html('button', { className: 'mini-btn strong', style: { alignSelf: 'flex-start' }, onClick: addOwnQ }, '+ Agregar pregunta propia')),
+          (draft.extra || []).length > 0 && html('label', { className: 'mode-check' + (draft.only ? ' on' : ''), style: { marginTop: 8, display: 'inline-flex', gap: 6, alignItems: 'center' } },
+            html('input', { type: 'checkbox', checked: !!draft.only, onChange: e => setDraft({ ...draft, only: e.target.checked }) }),
+            'Usar solo mis preguntas (sin las de siempre)'))),
+      (adding === 'words' || adding === 'trazos') && html(React.Fragment, null,
+        inp('title', adding === 'trazos' ? 'Título (opcional, ej: Hanzi de la comida)' : 'Título (opcional, ej: Comidas y bebidas)', { marginBottom: 8 }),
+        adding === 'words' && html('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' } },
           html('span', { style: { fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)' } }, 'Juego:'),
           PLAN_WORD_MODES.map(([m, label]) => html('button', { key: m, className: 'report-tab' + (draft.mode === m ? ' active' : ''), onClick: () => setDraft({ ...draft, mode: m }) }, label))),
         draft.words.length > 0 && html('div', { className: 'word-pick-selected' },
@@ -1502,7 +1617,9 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
           lessons.map(l => html('option', { key: l, value: l }, 'Palabras de la lección ' + l))),
         html('div', { className: 'word-pick-grid' }, (vocab[draft.pick] || []).map(w => html('button', { key: w.hanzi, className: 'word-pick' + (hasW(draft.pick, w.hanzi) ? ' on' : ''), onClick: () => togW(draft.pick, w.hanzi), title: w.pinyin + ' · ' + w.es },
           html('span', { className: 'hanzi-font' }, w.hanzi), html('small', null, (w.es || '').slice(0, 14))))),
-        html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, draft.words.length + ' elegidas. Podés mezclar palabras de distintas lecciones; se usan con su audio del libro.')),
+        html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, adding === 'trazos'
+          ? draft.words.length + ' palabras elegidas → ' + planTrazoChars(vocab, draft.words).length + ' hanzi para dibujar (los que se repiten van una sola vez).'
+          : draft.words.length + ' elegidas. Podés mezclar palabras de distintas lecciones; se usan con su audio del libro.')),
       adding === 'quiz' && html(React.Fragment, null,
         inp('title', 'Título del paso (ej: ¿Qué pedimos?)', { marginBottom: 8 }),
         draft.items.length > 0 && html('div', { className: 'plan-edit-steps', style: { marginBottom: 8 } }, draft.items.map((it, k) => html('div', { key: k, className: 'plan-edit-step' },
@@ -1535,8 +1652,8 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
         html('textarea', { value: draft.text, maxLength: 2000, rows: 5, placeholder: 'Texto de la explicación. Podés escribir en chino y en español.', onChange: e => setDraft({ ...draft, text: e.target.value }), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'inherit' } })),
       err && html('div', { className: 'admin-status err', style: { marginTop: 8 } }, err),
       html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
-        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: addStep }, 'Agregar paso a la clase'),
-        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => { setAdding(null); setErr(null); } }, 'Cancelar'))),
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: addStep }, editingId ? 'Guardar paso' : 'Agregar paso a la clase'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => { setAdding(null); setEditingId(null); setErr(null); } }, 'Cancelar'))),
     html('div', { style: { display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--paper-deep)', paddingTop: 12 } },
       html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: onSave }, edit.id ? '💾 Guardar cambios' : '💾 Guardar clase'),
       html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: onCancel }, 'Cancelar')));
@@ -1618,6 +1735,8 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
       if (s.mode === 'quiz') return wrap(html(QuizGame, { ...common, words }));
       return wrap(html(MemoryGame, { ...common, words }));
     }
+    if (s.kind === 'trazos') return wrap(html(PlanTrazos, { key, title: s.title || 'Trazos', chars: planTrazoChars(vocab, s.words), vocab, onBack: back,
+      onFinish: (percent) => { onLog('prueba', null, 'clase-trazos', percent, null, 0); finish(percent); } }));
     if (s.kind === 'quiz' || s.kind === 'orden') {
       const G = s.kind === 'quiz' ? PlanQuizGame : PlanOrderGame;
       return wrap(html(G, { key, title: s.title, items: s.items || [], onBack: back,
@@ -1626,6 +1745,7 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
     const gp = { key, onBack: back, playerName, priorMissed: [],
       onFinish: (percent, missed, total) => { onLog('prueba', null, s.game, percent, total == null ? null : total, (missed || []).length); finish(percent); } };
     const allWords = lessons.filter(id => !String(id).startsWith('mod-')).flatMap(id => vocab[id] || []);
+    if (PLAN_CLAS_TIPOS[s.game] && (s.extra || []).length) return wrap(html(PlanClasGame, { ...gp, tipo: PLAN_CLAS_TIPOS[s.game], extra: s.extra, only: !!s.only }));
     if (s.game === 'frase') return wrap(html(ClasificadorGame, { ...gp, tipo: 'frase' }));
     if (s.game === 'clas') return wrap(html(ClasificadorGame, { ...gp, tipo: 'clasificador' }));
     if (s.game === 'modal') return wrap(html(ClasificadorGame, { ...gp, tipo: 'modal' }));

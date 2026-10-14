@@ -1883,3 +1883,6 @@ main.tz-main { padding-bottom: 8px !important; }
 .plan-score { font-size: 64px; font-weight: 900; color: var(--lacquer); margin-top: 20px; }
 .plan-score.ok { color: var(--jade-dark); }
 .plan-wrong { text-align: left; background: var(--paper); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+/* Clases: preguntas propias en los juegos de oraciones */
+.plan-own { margin-top: 10px; background: #fff; border: 1.5px solid var(--paper-deep); border-radius: 12px; padding: 10px; }
+.plan-own-h { font-weight: 900; font-size: 13px; margin-bottom: 2px; }

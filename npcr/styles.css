@@ -1744,3 +1744,31 @@ main.tz-main { padding-bottom: 8px !important; }
   .sel-x { order: 2; }
   .sel-bar .mini-btn { order: 3; margin-left: 44px; }
 }
+/* ── Consola: fotos de 这是什么？ ── */
+.zadm-wrap > summary { cursor: pointer; font-weight: 800; color: var(--lacquer-dark); padding: 8px 0; }
+.zadm-wrap[open] > summary { margin-bottom: 8px; }
+.zadm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.zadm-card { display: flex; flex-direction: column; background: #fff; border: 2px solid var(--paper-deep); border-radius: 14px; overflow: hidden; }
+.zadm-card.off { opacity: .6; border-style: dashed; }
+.zadm-photo { position: relative; height: 150px; background: var(--paper-deep); display: flex; align-items: center; justify-content: center; }
+.zadm-photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.zadm-tag { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.7); color: #fff; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
+.zadm-tag.new { background: var(--jade-dark); }
+.zadm-busy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.75); font-weight: 800; }
+.zadm-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.zadm-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.zadm-h .hanzi-font { font-size: 24px; font-weight: 700; }
+.zadm-py { font-size: 13px; font-weight: 700; }
+.zadm-es { font-size: 13px; color: var(--ink-mid); }
+.zadm-meta { font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+.zadm-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 10px; }
+.zadm-actions .mini-btn { cursor: pointer; }
+.mini-btn.danger { color: var(--lacquer); border-color: var(--lacquer-light); }
+.zadm-add { background: var(--paper); border: 2px dashed var(--gold); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.zadm-add-grid { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: start; }
+.zadm-drop { height: 150px; border: 2px dashed var(--ink-soft); border-radius: 12px; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; background: #fff; font-weight: 800; color: var(--ink-soft); overflow: hidden; }
+.zadm-drop.has { border-style: solid; }
+.zadm-drop img { max-width: 100%; max-height: 100%; object-fit: contain; }
+@media (max-width: 560px) { .zadm-add-grid { grid-template-columns: 1fr; } .zadm-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .zadm-photo { height: 120px; } }
+.admin-panel .zadm-actions label.mini-btn, .admin-panel label.zadm-drop { font-family: inherit; font-size: 11px; color: var(--ink-mid); text-transform: none; letter-spacing: normal; }
+.admin-panel label.zadm-drop { font-size: 13px; color: var(--ink-soft); }

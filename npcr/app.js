@@ -7484,6 +7484,173 @@ function ContentTrash() {
   );
 }
 
+// ── Consola → Contenido: fotos del juego 这是什么？ (solo admin; la base también lo exige) ──
+// Achica la foto antes de subirla (lado mayor 1000 px, JPEG) para no gastar espacio.
+function shrinkPhoto(file, max) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo leer la foto')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('El archivo no es una foto válida')); };
+    img.src = url;
+  });
+}
+async function uploadZhePhoto(file) {
+  const blob = await shrinkPhoto(file, 1000);
+  const path = 'zhe/' + Date.now() + '-' + secureRandomChars('abcdefghijklmnopqrstuvwxyz0123456789', 6) + '.jpg';
+  const { error } = await db.storage.from('npcr-fotos').upload(path, blob, { contentType: 'image/jpeg' });
+  if (error) throw new Error(error.message);
+  return db.storage.from('npcr-fotos').getPublicUrl(path).data.publicUrl;
+}
+// Busca la palabra en los mazos HSK para traer pinyin, significado y la grabación original
+async function findHskWord(hanzi) {
+  for (const t of ['hsk1_words', 'hsk2_words']) {
+    const { data } = await db.from(t).select('hanzi,pinyin,es,audio').eq('hanzi', hanzi).limit(1);
+    if (data && data[0]) return data[0];
+  }
+  return null;
+}
+
+function ZheAdmin({ isSuper }) {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(null);           // id de la foto que se está guardando
+  const [edit, setEdit] = useState(null);           // { id, hanzi, pinyin, es, es_s }
+  const [filter, setFilter] = useState('todas');
+  const [add, setAdd] = useState(null);             // formulario de foto nueva
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+
+  const load = () => db.from('npcr_zhe_items').select('*').order('id').then(({ data, error }) => {
+    if (error) { setErr(error.message); setItems([]); return; }
+    setItems(data || []);
+  });
+  useEffect(() => { load(); }, []);
+
+  const save = async (it, patch, okText) => {
+    setBusy(it.id);
+    const { error } = await db.from('npcr_zhe_items').update(patch).eq('id', it.id);
+    setBusy(null);
+    if (error) { flash('err', '❌ ' + error.message); return false; }
+    setItems(list => list.map(x => x.id === it.id ? { ...x, ...patch } : x));
+    if (okText) flash('ok', okText);
+    return true;
+  };
+  const replacePhoto = async (it, file) => {
+    if (!file) return;
+    setBusy(it.id);
+    try {
+      const url = await uploadZhePhoto(file);
+      await save(it, { image: url, ...(it.image_orig ? {} : { image_orig: it.image }) }, '📷 Foto de ' + it.hanzi + ' cambiada.');
+    } catch (e) { setBusy(null); flash('err', '❌ ' + e.message + (/bucket|not found/i.test(e.message) ? ' — ¿Ejecutaste npcr_zhe_admin.sql?' : '')); }
+  };
+  const remove = async (it) => {
+    if (!window.confirm('¿Eliminar la foto de ' + it.hanzi + ' (' + it.es + ') del juego?\n\nSi solo querés que no aparezca, usá "Ocultar".')) return;
+    const { error } = await db.from('npcr_zhe_items').delete().eq('id', it.id);
+    if (error) { flash('err', '❌ ' + error.message); return; }
+    setItems(list => list.filter(x => x.id !== it.id));
+    flash('ok', '🗑 Foto eliminada (queda en Papelera e historial).');
+  };
+
+  const startAdd = () => setAdd({ hanzi: '', pinyin: '', es: '', es_s: '', audio: null, file: null, preview: null, found: null });
+  const lookup = async () => {
+    const h = (add.hanzi || '').trim(); if (!h) return;
+    const w = await findHskWord(h);
+    setAdd(a => ({ ...a, found: w ? 'si' : 'no', audio: w ? w.audio : null,
+      pinyin: a.pinyin || (w ? w.pinyin : ''), es: a.es || (w ? w.es : '') }));
+  };
+  const saveAdd = async () => {
+    const a = add;
+    if (!a.hanzi.trim() || !a.pinyin.trim() || !a.es.trim() || !a.es_s.trim() || !a.file) { flash('err', 'Completá la palabra, el pinyin, el significado, la frase y la foto.'); return; }
+    setBusy('new');
+    try {
+      const url = await uploadZhePhoto(a.file);
+      const id = Math.max(0, ...items.map(x => x.id)) + 1;
+      const row = { id, hanzi: a.hanzi.trim(), pinyin: a.pinyin.trim(), es: a.es.trim(), es_s: a.es_s.trim(), image: url, image_orig: url, audio: a.audio || null, hidden: false };
+      const { error } = await db.from('npcr_zhe_items').insert(row);
+      if (error) throw new Error(error.message);
+      setItems(list => [...list, row]); setAdd(null);
+      flash('ok', '✅ Foto de ' + row.hanzi + ' agregada al juego.');
+    } catch (e) { flash('err', '❌ ' + e.message); }
+    setBusy(null);
+  };
+
+  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + ' (¿ejecutaste npcr_zhe.sql?)');
+  if (!items) return html('p', { className: 'admin-note' }, 'Cargando fotos…');
+  const visible = items.filter(x => !x.hidden).length;
+  const list = items.filter(x => filter === 'todas' || (filter === 'ocultas') === !!x.hidden);
+  const inp = (val, on, ph, extra) => html('input', { value: val, placeholder: ph, onChange: e => on(e.target.value), style: { ...cmInput, width: '100%', ...(extra || {}) } });
+
+  return html('div', null,
+    html('div', { className: 'reg-toolbar', style: { marginBottom: 10 } },
+      [['todas', 'Todas (' + items.length + ')'], ['visibles', '👁 En el juego (' + visible + ')'], ['ocultas', '🚫 Ocultas (' + (items.length - visible) + ')']].map(([k, label]) =>
+        html('button', { key: k, className: 'report-tab' + (filter === k ? ' active' : ''), onClick: () => setFilter(k) }, label)),
+      !add && html('button', { className: 'primary-btn', style: { margin: '0 0 0 auto', width: 'auto', padding: '8px 14px' }, onClick: startAdd }, '+ Foto nueva'),
+    ),
+    visible < 4 && html('div', { className: 'admin-status err', style: { marginBottom: 10 } }, 'El juego necesita al menos 4 fotos visibles para funcionar.'),
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
+
+    add && html('div', { className: 'zadm-add' },
+      html('div', { className: 'report-h', style: { marginBottom: 8 } }, '➕ Foto nueva'),
+      html('div', { className: 'zadm-add-grid' },
+        html('label', { className: 'zadm-drop' + (add.preview ? ' has' : '') },
+          add.preview ? html('img', { src: add.preview, alt: '' }) : html('span', null, '📷', html('br'), 'Elegir foto'),
+          html('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: e => { const f = e.target.files[0]; if (f) setAdd(a => ({ ...a, file: f, preview: URL.createObjectURL(f) })); } })),
+        html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+          html('div', { style: { display: 'flex', gap: 6 } },
+            inp(add.hanzi, v => setAdd(a => ({ ...a, hanzi: v, found: null, audio: null })), 'Hanzi (ej: 眼睛)', { fontSize: 18, fontFamily: 'Noto Sans SC, sans-serif' }),
+            html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto', padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap' }, onClick: lookup, disabled: !add.hanzi.trim() }, '🔎 Buscar en HSK')),
+          add.found && html('div', { className: 'admin-note', style: { margin: 0 } }, add.found === 'si'
+            ? (add.audio ? '✅ Está en el HSK: se usa su grabación original.' : '✅ Está en el HSK (sin grabación).')
+            : 'No está en el HSK: se puede agregar igual, pero sin audio.'),
+          inp(add.pinyin, v => setAdd(a => ({ ...a, pinyin: v })), 'Pinyin (ej: yǎnjing)'),
+          inp(add.es, v => setAdd(a => ({ ...a, es: v })), 'Significado (ej: ojos)'),
+          inp(add.es_s, v => setAdd(a => ({ ...a, es_s: v })), 'Frase de la corrección (ej: Son ojos.)'),
+        )),
+      html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, disabled: busy === 'new', onClick: saveAdd }, busy === 'new' ? 'Subiendo…' : 'Agregar al juego'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setAdd(null) }, 'Cancelar'))),
+
+    html('div', { className: 'zadm-grid' }, list.map(it => {
+      const editing = edit && edit.id === it.id;
+      const changed = it.image_orig && it.image_orig !== it.image;
+      return html('div', { key: it.id, className: 'zadm-card' + (it.hidden ? ' off' : '') },
+        html('div', { className: 'zadm-photo' }, html('img', { src: it.image, alt: it.es, loading: 'lazy' }),
+          it.hidden && html('span', { className: 'zadm-tag' }, '🚫 Oculta'),
+          changed && !it.hidden && html('span', { className: 'zadm-tag new' }, 'Foto cambiada'),
+          busy === it.id && html('span', { className: 'zadm-busy' }, 'Guardando…')),
+        editing
+          ? html('div', { className: 'zadm-body' },
+              inp(edit.hanzi, v => setEdit(e => ({ ...e, hanzi: v })), 'Hanzi'),
+              inp(edit.pinyin, v => setEdit(e => ({ ...e, pinyin: v })), 'Pinyin'),
+              inp(edit.es, v => setEdit(e => ({ ...e, es: v })), 'Significado'),
+              inp(edit.es_s, v => setEdit(e => ({ ...e, es_s: v })), 'Frase de la corrección'),
+              html('div', { style: { display: 'flex', gap: 6 } },
+                html('button', { className: 'mini-btn', style: { background: 'var(--jade)', color: '#fff', borderColor: 'var(--jade)' },
+                  onClick: async () => { const { id, ...patch } = edit; if (Object.values(patch).some(v => !String(v).trim())) { flash('err', 'No puede quedar ningún campo vacío.'); return; } if (await save(it, patch, '✅ Guardado.')) setEdit(null); } }, 'Guardar'),
+                html('button', { className: 'mini-btn', onClick: () => setEdit(null) }, 'Cancelar')))
+          : html('div', { className: 'zadm-body' },
+              html('div', { className: 'zadm-h' }, html('span', { className: 'hanzi-font' }, it.hanzi), html(TonedPinyin, { text: it.pinyin, className: 'zadm-py' })),
+              html('div', { className: 'zadm-es' }, it.es, ' · ', html('i', null, it.es_s)),
+              html('div', { className: 'zadm-meta' }, it.audio ? '🔊 con audio del libro' : '🔇 sin audio')),
+        !editing && html('div', { className: 'zadm-actions' },
+          html('button', { className: 'mini-btn', disabled: busy === it.id, onClick: () => save(it, { hidden: !it.hidden }, it.hidden ? '👁 ' + it.hanzi + ' vuelve al juego.' : '🚫 ' + it.hanzi + ' ya no aparece en el juego.') }, it.hidden ? '👁 Mostrar' : '🚫 Ocultar'),
+          html('label', { className: 'mini-btn', style: { display: 'inline-flex', alignItems: 'center' } }, '📷 Cambiar foto',
+            html('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: e => { replacePhoto(it, e.target.files[0]); e.target.value = ''; } })),
+          changed && html('button', { className: 'mini-btn', disabled: busy === it.id, onClick: () => save(it, { image: it.image_orig }, '↩ Volvió la foto original de ' + it.hanzi + '.') }, '↩ Foto original'),
+          html('button', { className: 'mini-btn', onClick: () => setEdit({ id: it.id, hanzi: it.hanzi, pinyin: it.pinyin, es: it.es, es_s: it.es_s }) }, '✏️ Textos'),
+          isSuper && html('button', { className: 'mini-btn danger', onClick: () => remove(it) }, '🗑')));
+    })),
+  );
+}
+
 function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppConfigChange }) {
   const [showSimulacro, setShowSimulacro] = useState(false);
   const [session, setSession] = useState(null);
@@ -7967,6 +8134,12 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
 
             // ── Contenido: lecciones, módulos especiales y módulos de práctica ──
             isAdmin && showTab('contenido') && html(React.Fragment, null,
+            html('div', null,
+              html('label', null, '📷 Fotos de "Zhè shì shénme?" (这是什么？)'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } },
+                'Las fotos del juego de Mi aula. Ocultá las que confunden, cambiá una foto por otra (se achica sola) o agregá fotos nuevas. Si la palabra está en el HSK se usa su grabación original; si no, va sin audio.'),
+              html('details', { className: 'zadm-wrap' }, html('summary', null, 'Abrir fotos del juego'), html(ZheAdmin, { isSuper })),
+            ),
             html('p', { className: 'admin-note', style: { margin: 0 } },
               totalWords + ' palabras en ' + Object.keys(vocab).filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length + ' lecciones.'),
             html('div', null,

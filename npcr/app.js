@@ -884,6 +884,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   const tabs = [['alumnos', '👥 Alumnos'], ['resumen', '📊 Resumen'], ['ranking', '🏆 Ranking'], ['mapa', '🗺️ Mapa'], ['palabras', '🧩 Palabras difíciles'], ['tareas', '📋 Tareas'],
     ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ...(settings && settings.hsk2_enabled ? [['hsk2', '🎓 HSK 2']] : []),
     ...(aulaShown(settings, 'clases') ? [['clases', '📚 Clases']] : []),
+    ...(aulaShown(settings, 'quiz-vivo') ? [['quiz', '⚡ Quiz']] : []),
     ['bingo', '🎱 Bingo'], ['config', '⚙️ Configurar']];
 
   let body = null;
@@ -1017,6 +1018,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
 
   if (!err && rows !== null && !student && tab === 'hsk') body = html(HskClassReport, { key: 'hsk1', classId, level: 1, isSel, onSelect: pick });
   if (!err && rows !== null && !student && tab === 'hsk2') body = html(HskClassReport, { key: 'hsk2', classId, level: 2, isSel, onSelect: pick });
+  if (!err && rows !== null && !student && tab === 'quiz') body = html(QuizHost, { key: classId, classId });
   if (!err && rows !== null && !student && tab === 'clases') body = html(ClassPlans, { key: classId, classId, lessons, students: rows, vocab });
   if (!err && rows !== null && !student && tab === 'bingo') body = html(BingoHost, { key: classId, classId, className: cls ? cls.name : 'Clase', lessons, maxLesson: settings && settings.max_lesson ? Number(settings.max_lesson) : null });
 
@@ -1087,7 +1089,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     );
   }
 
-  const selBar = sel && !student && tab !== 'bingo' && tab !== 'config' && tab !== 'tareas' && tab !== 'palabras' && tab !== 'clases' && html('div', { className: 'sel-bar' },
+  const selBar = sel && !student && tab !== 'bingo' && tab !== 'config' && tab !== 'tareas' && tab !== 'palabras' && tab !== 'clases' && tab !== 'quiz' && html('div', { className: 'sel-bar' },
     html('span', { className: 'sel-dot' }, (sel.name || '?').trim().charAt(0).toUpperCase()),
     html('div', { className: 'sel-info' },
       html('b', null, sel.name),
@@ -1096,7 +1098,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     selRow && selRow.user_id && html('button', { className: 'mini-btn', onClick: () => setStudent(selRow) }, '📄 Ver ficha'),
     html('button', { className: 'sel-x', title: 'Dejar de resaltar', onClick: () => setSel(null) }, '✕'));
 
-  return html('main', { className: tab === 'bingo' && !student ? '' : 'wide', style: { paddingTop: 18, paddingBottom: 40 } },
+  return html('main', { className: (tab === 'bingo' || tab === 'quiz') && !student ? '' : 'wide', style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
       html('div', { style: { flex: 1, minWidth: 0 } },
@@ -1116,8 +1118,8 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
 
 // ═════════════════ Clases armadas por el lǎoshī (módulo de Mi aula, opt-in) ═════════════════
 // Cada clase es una lista de pasos: actividades de la app, explicaciones, listas de palabras
-// propias, preguntas propias y oraciones para ordenar. Se puede dar EN VIVO (el lǎoshī avanza
-// y los alumnos lo siguen) y guardar en una biblioteca compartida del equipo docente.
+// propias, preguntas propias, oraciones para ordenar y trazos. Se puede guardar en una
+// biblioteca compartida del equipo docente.
 // Módulo aparte: abre los juegos dentro de su propia pantalla y anota el avance en
 // npcr_plan_progress (npcr_clases_plan.sql), sin cambiar cómo funciona el resto.
 const PLAN_LESSON_MODES = [['match', 'Emparejar'], ['cards', 'Tarjetas'], ['quiz', 'Opción múltiple'], ['memoria', 'Memoria'], ['frases', 'Frases clave']];
@@ -1180,6 +1182,7 @@ function PlanQuizGame({ title, items, onBack, onFinish }) {
       html('span', { className: 'plan-count' }, (i + 1) + '/' + list.length)),
     html('div', { style: { padding: '0 16px' } },
       html('div', { className: 'plan-q hanzi-font' }, q.q),
+      q.img && html('img', { className: 'plan-q-img', src: q.img, alt: '' }),
       html('div', { className: 'plan-opts' }, q.opts.map((o, k) => html('button', { key: k,
         className: 'plan-opt hanzi-font' + (pick !== null && o === q.ok ? ' ok' : '') + (pick === o && o !== q.ok ? ' bad' : ''), onClick: () => choose(o) }, o))),
       pick !== null && html('button', { className: 'primary-btn', style: { marginTop: 14 }, onClick: next }, i + 1 < list.length ? 'Siguiente →' : 'Ver resultado')));
@@ -1273,7 +1276,7 @@ function PlanTrazos({ title, chars, vocab, onBack, onFinish }) {
     } });
 }
 
-// ── Lǎoshī: armar, publicar, dar en vivo y seguir las clases del aula ──
+// ── Lǎoshī: armar, publicar y seguir las clases del aula ──
 function ClassPlans({ classId, lessons, students, vocab }) {
   const [plans, setPlans] = useState(null);
   const [report, setReport] = useState([]);
@@ -1281,7 +1284,6 @@ function ClassPlans({ classId, lessons, students, vocab }) {
   const [msg, setMsg] = useState(null);
   const [edit, setEdit] = useState(null);       // clase que se está armando
   const [view, setView] = useState(null);       // id de la clase cuyo avance se mira
-  const [liveId, setLiveId] = useState(null);   // clase que se está dando en vivo
   const [lib, setLib] = useState(null);         // biblioteca abierta (lista)
   const [copyFor, setCopyFor] = useState(null); // clase a duplicar
   const [classes, setClasses] = useState([]);
@@ -1292,14 +1294,10 @@ function ClassPlans({ classId, lessons, students, vocab }) {
     db.from('npcr_class_plans').select('*').eq('class_id', classId).order('position').order('created_at').then(({ data, error }) => {
       if (error) { setErr(error.message); setPlans([]); return; }
       setPlans(data || []);
-      const live = (data || []).find(p => p.live_step);
-      if (live) setLiveId(id => id || live.id);
     });
     loadReport();
   };
   useEffect(() => { load(); db.from('classes').select('id,name,archived').order('created_at', { ascending: false }).then(({ data }) => setClasses((data || []).filter(c => !c.archived))); }, [classId]);
-  // En vivo: el avance de los alumnos se actualiza solo
-  useEffect(() => { if (!liveId) return; const t = setInterval(loadReport, 4000); return () => clearInterval(t); }, [liveId]);
 
   const active = (students || []).filter(r => r.user_id);
   const stOf = (pid, uid, sid) => report.find(x => x.plan_id === pid && x.student_id === uid && x.step_id === sid);
@@ -1354,21 +1352,13 @@ function ClassPlans({ classId, lessons, students, vocab }) {
     if (error) { flash('err', '❌ ' + error.message + (/relation|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_clases_plan.sql actualizado?' : '')); return; }
     flash('ok', '📤 "' + p.title + '" quedó en la biblioteca: cualquier lǎoshī la puede usar.');
   };
-  const goLive = async (p) => {
-    await Promise.all((plans || []).filter(x => x.live_step && x.id !== p.id).map(x => db.from('npcr_class_plans').update({ live_step: null }).eq('id', x.id)));
-    if (await update(p, { live_step: p.live_step || p.steps[0].id, live_at: new Date().toISOString(), ...(p.published ? {} : { published: true }) })) setLiveId(p.id);
-  };
+
 
   if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + (/relation|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_clases_plan.sql?' : ''));
   if (!plans) return html('p', { className: 'admin-note' }, 'Cargando clases…');
   if (edit) return html(PlanEditor, { edit, setEdit, lessons, vocab, onSave: save, onCancel: () => setEdit(null), msg });
   if (lib) return html(PlanLibrary, { onBack: () => setLib(null), onUse: async (it) => { if (await copyTo(it, classId, '')) { setLib(null); flash('ok', '📥 "' + it.title + '" se agregó a esta aula como borrador.'); } } });
 
-  const live = liveId && plans.find(p => p.id === liveId);
-  if (live && live.live_step) return html(PlanLiveHost, { plan: live, vocab, students: active, report, flash, msg,
-    onStep: (sid) => update(live, { live_step: sid, live_at: new Date().toISOString() }),
-    onEnd: async () => { if (await update(live, { live_step: null }, '⏹ Terminó la clase en vivo. Los alumnos pueden seguir haciendo los pasos a su ritmo.')) setLiveId(null); },
-    onExit: () => setLiveId(null) });
 
   const viewing = view && plans.find(p => p.id === view);
   if (viewing) return html('div', { className: 'report-card' },
@@ -1393,14 +1383,14 @@ function ClassPlans({ classId, lessons, students, vocab }) {
       html('div', { className: 'plan-head' }, html('div', { className: 'report-h', style: { margin: 0, flex: 1 } }, '📚 Clases del aula'),
         html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto', padding: '8px 12px' }, onClick: () => setLib(true) }, '📚 Biblioteca'),
         html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto', padding: '8px 14px' }, onClick: () => setEdit({ title: '', description: '', steps: [] }) }, '+ Nueva clase')),
-      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Armá una clase con pasos: actividades del libro y de la app, explicaciones, tus propias listas de palabras, preguntas y oraciones. Publicala para que la hagan a su ritmo, o dala 🔴 en vivo y los alumnos siguen tus pasos desde el celular.')),
+      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Armá una clase con pasos: actividades del libro y de la app, explicaciones, tus propias listas de palabras, preguntas y oraciones. Publicala y cada alumno la hace a su ritmo; acá ves cómo le va a cada uno.')),
     plans.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay clases armadas en esta aula. Creá una nueva o traé una de la 📚 Biblioteca.')
-    : html('div', { className: 'plan-list' }, plans.map((p, i) => html('div', { key: p.id, className: 'plan-card' + (p.published ? '' : ' draft') + (p.live_step ? ' live' : '') },
+    : html('div', { className: 'plan-list' }, plans.map((p, i) => html('div', { key: p.id, className: 'plan-card' + (p.published ? '' : ' draft') },
         html('div', { className: 'plan-card-top' },
           html('div', { style: { flex: 1, minWidth: 0 } },
             html('div', { className: 'plan-card-title' }, p.title),
             html('div', { className: 'plan-card-sub' }, p.steps.length + (p.steps.length === 1 ? ' paso' : ' pasos') + ' · ' + (p.published ? finished(p) + '/' + active.length + ' alumnos la completaron' : 'borrador: los alumnos todavía no la ven'))),
-          p.live_step ? html('span', { className: 'plan-badge live' }, '🔴 En vivo') : html('span', { className: 'plan-badge' + (p.published ? ' on' : '') }, p.published ? 'Publicada' : 'Borrador')),
+          html('span', { className: 'plan-badge' + (p.published ? ' on' : '') }, p.published ? 'Publicada' : 'Borrador')),
         p.description && html('div', { className: 'plan-card-desc' }, p.description),
         html('div', { className: 'plan-steps-mini' }, p.steps.map((s, k) => html('span', { key: s.id }, (k + 1) + '. ' + PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)))),
         copyFor === p.id && html('div', { className: 'plan-copy' }, 'Duplicar en: ',
@@ -1409,8 +1399,7 @@ function ClassPlans({ classId, lessons, students, vocab }) {
             classes.map(c => html('option', { key: c.id, value: c.id }, c.id === classId ? c.name + ' (esta aula)' : c.name))),
           html('button', { className: 'mini-btn', onClick: () => setCopyFor(null) }, 'Cancelar')),
         html('div', { className: 'plan-actions' },
-          html('button', { className: 'mini-btn live', onClick: () => p.live_step ? setLiveId(p.id) : goLive(p) }, p.live_step ? '🔴 Volver al vivo' : '🔴 Dar en vivo'),
-          html('button', { className: 'mini-btn' + (p.published ? '' : ' strong'), onClick: () => update(p, { published: !p.published, ...(p.published ? { live_step: null } : {}) }, p.published ? 'La clase volvió a borrador: los alumnos ya no la ven.' : '📢 Clase publicada: ya la ven los alumnos en Mi aula.') }, p.published ? '🙈 Despublicar' : '📢 Publicar'),
+          html('button', { className: 'mini-btn' + (p.published ? '' : ' strong'), onClick: () => update(p, { published: !p.published }, p.published ? 'La clase volvió a borrador: los alumnos ya no la ven.' : '📢 Clase publicada: ya la ven los alumnos en Mi aula.') }, p.published ? '🙈 Despublicar' : '📢 Publicar'),
           html('button', { className: 'mini-btn', onClick: () => setEdit({ id: p.id, title: p.title, description: p.description || '', steps: p.steps }) }, '✏️ Editar'),
           html('button', { className: 'mini-btn', onClick: () => setView(p.id) }, '📊 Avance'),
           html('button', { className: 'mini-btn', onClick: () => setCopyFor(p.id) }, '⧉ Duplicar'),
@@ -1464,33 +1453,6 @@ function PlanStepShow({ s, vocab, big }) {
   if (s.kind === 'quiz') return html('div', { className: 'plan-show-list' }, (s.items || []).map((it, k) => html('div', { key: k }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, it.q))));
   if (s.kind === 'orden') return html('div', { className: 'plan-show-list' }, (s.items || []).map((it, k) => html('div', { key: k }, (k + 1) + '. ' + (it.es || '…'))));
   return html('div', { className: 'plan-show-note' }, PLAN_KIND_ICON[s.kind] + ' Los alumnos hacen esta actividad en su celular.');
-}
-
-// Consola del lǎoshī durante la clase en vivo
-function PlanLiveHost({ plan, vocab, students, report, onStep, onEnd, onExit, msg }) {
-  const idx = Math.max(0, plan.steps.findIndex(s => s.id === plan.live_step));
-  const s = plan.steps[idx];
-  const st = (uid) => report.find(x => x.plan_id === plan.id && x.student_id === uid && x.step_id === s.id);
-  const nDone = students.filter(r => (st(r.user_id) || {}).done).length;
-  return html('div', { className: 'plan-live' },
-    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
-    html('div', { className: 'plan-live-top' },
-      html('span', { className: 'plan-badge live' }, '🔴 En vivo'), html('b', { style: { flex: 1, minWidth: 0 } }, plan.title),
-      html('button', { className: 'mini-btn', onClick: onExit, title: 'Volver a la lista sin terminar la clase en vivo' }, '← Clases'),
-      html('button', { className: 'mini-btn danger', onClick: onEnd }, '⏹ Terminar en vivo')),
-    html('div', { className: 'plan-live-dots' }, plan.steps.map((x, k) => html('button', { key: x.id, className: 'plan-live-dot' + (k === idx ? ' on' : '') + (k < idx ? ' past' : ''), title: planStepLabel(x), onClick: () => onStep(x.id) }, k + 1))),
-    html('div', { className: 'plan-live-stage' },
-      html('div', { className: 'plan-live-kicker' }, 'Paso ' + (idx + 1) + ' de ' + plan.steps.length),
-      html('div', { className: 'plan-live-title' }, PLAN_KIND_ICON[s.kind] + ' ' + (s.kind === 'texto' ? s.title : planStepLabel(s))),
-      html(PlanStepShow, { s, vocab, big: true })),
-    html('div', { className: 'plan-live-nav' },
-      html('button', { className: 'secondary-btn', disabled: idx === 0, onClick: () => onStep(plan.steps[idx - 1].id) }, '◀ Anterior'),
-      html('button', { className: 'primary-btn', disabled: idx === plan.steps.length - 1, onClick: () => onStep(plan.steps[idx + 1].id) }, 'Siguiente ▶')),
-    html('div', { className: 'report-card', style: { marginTop: 12 } },
-      html('div', { className: 'report-h' }, '👥 Este paso: ' + nDone + ' de ' + students.length + ' lo completaron'),
-      html('div', { className: 'plan-live-students' }, students.map(r => { const x = st(r.user_id);
-        return html('span', { key: r.user_id, className: 'plan-live-st' + (x && x.done ? ' done' : x ? ' try' : '') }, (x && x.done ? '✓ ' : x ? x.percent + '% ' : '· ') + r.display_name); })),
-      html('p', { className: 'admin-note', style: { margin: '8px 0 0' } }, 'Los alumnos que entran a 📚 Clases → "Entrar en vivo" pasan solos al paso que elegís. Se actualiza cada pocos segundos.')));
 }
 
 function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
@@ -1623,16 +1585,22 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
       adding === 'quiz' && html(React.Fragment, null,
         inp('title', 'Título del paso (ej: ¿Qué pedimos?)', { marginBottom: 8 }),
         draft.items.length > 0 && html('div', { className: 'plan-edit-steps', style: { marginBottom: 8 } }, draft.items.map((it, k) => html('div', { key: k, className: 'plan-edit-step' },
-          html('span', { style: { flex: 1, minWidth: 0 } }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, it.q), html('small', null, '✓ ' + it.ok + ' · ✕ ' + it.bad.join(' · '))),
+          html('span', { style: { flex: 1, minWidth: 0 } }, (k + 1) + '. ', it.img && '📷 ', html('span', { className: 'hanzi-font' }, it.q), html('small', null, '✓ ' + it.ok + ' · ✕ ' + it.bad.join(' · '))),
           html('button', { className: 'mini-btn danger', onClick: () => setDraft({ ...draft, items: draft.items.filter((_, j) => j !== k) }) }, '✕')))),
         html('div', { className: 'plan-q-form' },
           inp('q', 'Pregunta (ej: 你喝什么？ o ¿Cómo se dice "té"?)'),
+          html('div', { className: 'quiz-ed-photo' }, draft.img
+            ? html(React.Fragment, null, html('img', { src: draft.img, alt: '' }), html('button', { className: 'mini-btn danger', onClick: () => setDraft({ ...draft, img: null }) }, 'Quitar foto'))
+            : html('label', { className: 'mini-btn', style: { cursor: 'pointer' } }, draft.upl ? 'Subiendo…' : '📷 Agregar foto (opcional)',
+                html('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+                  setDraft(x => ({ ...x, upl: true }));
+                  uploadNpcrPhoto(f, 'clases').then(url => setDraft(x => ({ ...x, img: url, upl: false })), er => { setDraft(x => ({ ...x, upl: false })); setErr('❌ ' + er.message); }); } }))),
           inp('ok', '✓ Respuesta correcta', { borderColor: 'var(--jade)' }),
           html('div', { className: 'plan-q-bad' }, inp('b1', '✕ Incorrecta 1'), inp('b2', '✕ Incorrecta 2'), inp('b3', '✕ Incorrecta 3')),
           html('button', { className: 'mini-btn strong', style: { alignSelf: 'flex-start' }, onClick: () => {
             const bad = [draft.b1, draft.b2, draft.b3].map(x => (x || '').trim()).filter(Boolean);
-            if (!draft.q.trim() || !draft.ok.trim() || !bad.length) return setErr('Cada pregunta necesita el texto, la respuesta correcta y al menos una incorrecta.');
-            setErr(null); setDraft({ ...draft, items: [...draft.items, { q: draft.q.trim(), ok: draft.ok.trim(), bad }], q: '', ok: '', b1: '', b2: '', b3: '' });
+            if ((!draft.q.trim() && !draft.img) || !draft.ok.trim() || !bad.length) return setErr('Cada pregunta necesita el texto o una foto, la respuesta correcta y al menos una incorrecta.');
+            setErr(null); setDraft({ ...draft, items: [...draft.items, { q: draft.q.trim(), ok: draft.ok.trim(), bad, ...(draft.img ? { img: draft.img } : {}) }], q: '', ok: '', b1: '', b2: '', b3: '', img: null });
           } }, '+ Agregar pregunta'))),
       adding === 'orden' && html(React.Fragment, null,
         inp('title', 'Título del paso (opcional)', { marginBottom: 8 }),
@@ -1659,7 +1627,7 @@ function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
       html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: onCancel }, 'Cancelar')));
 }
 
-// ── Alumno: las clases publicadas de su aula, paso a paso (o siguiendo al lǎoshī en vivo) ──
+// ── Alumno: las clases publicadas de su aula, paso a paso ──
 function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onRecordCard, lessons, openLessons, appConfig, playerName, onLessonResult, onLog }) {
   const [plans, setPlans] = useState(null);
   const [prog, setProg] = useState([]);
@@ -1667,8 +1635,6 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
   const [openId, setOpenId] = useState(null);
   const [run, setRun] = useState(null);         // paso que se está haciendo
   const [runN, setRunN] = useState(0);
-  const [follow, setFollow] = useState(null);   // id de la clase en vivo que se está siguiendo
-  const [note, setNote] = useState(null);
   const loadPlans = () => db.from('npcr_class_plans').select('*').eq('class_id', classId).eq('published', true).order('position').order('created_at').then(({ data, error }) => {
     if (error) { setErr(error.message); setPlans([]); return; }
     setPlans(data || []);
@@ -1676,20 +1642,8 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
   useEffect(() => {
     loadPlans();
     db.from('npcr_plan_progress').select('plan_id,step_id,percent,done').then(({ data }) => setProg(data || []));
-    const t = setInterval(loadPlans, 5000);   // así se entera de la clase en vivo
-    return () => clearInterval(t);
   }, [classId]);
   useEffect(() => stopAudio, []);
-
-  // Siguiendo la clase en vivo: cuando el lǎoshī cambia de paso, se pasa solo
-  const livePlan = follow && plans && plans.find(p => p.id === follow);
-  const liveStep = livePlan && livePlan.live_step;
-  useEffect(() => {
-    if (!follow || !plans) return;
-    if (!liveStep) { setFollow(null); setRun(null); setNote('La clase en vivo terminó. Podés seguir haciendo los pasos a tu ritmo.'); return; }
-    const s = livePlan.steps.find(x => x.id === liveStep);
-    if (s && (!run || run.id !== s.id)) { stopAudio(); setOpenId(livePlan.id); setRun(s); setRunN(k => k + 1); }
-  }, [follow, liveStep]);
 
   const stOf = (pid, sid) => prog.find(x => x.plan_id === pid && x.step_id === sid);
   const nDone = (p) => p.steps.filter(s => (stOf(p.id, s.id) || {}).done).length;
@@ -1706,8 +1660,6 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
   if (err) return html(GameStatusScreen, { onBack, title: '📚 Clases', msg: '❌ ' + err + ' (¿ejecutaste npcr_clases_plan.sql?)' });
   if (!plans) return html(GameStatusScreen, { onBack, title: '📚 Clases', msg: '⏳ Cargando clases…' });
   const plan = openId && plans.find(p => p.id === openId);
-  const liveBar = follow && html('div', { className: 'plan-live-bar' }, '🔴 En vivo · tu lǎoshī va pasando los pasos',
-    html('button', { onClick: () => { setFollow(null); setNote(null); } }, 'Salir del vivo'));
 
   // Un paso en curso: se abre el juego de siempre, dentro de este módulo
   if (plan && run) {
@@ -1715,7 +1667,7 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
     const back = () => { stopAudio(); setRun(null); };
     const finish = (percent) => record(plan, s, percent);
     const key = 'plan-' + s.id + '-' + runN;
-    const wrap = (el) => follow ? html(React.Fragment, null, liveBar, el) : el;
+    const wrap = (el) => el;
     if (s.kind === 'texto') return wrap(html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
       html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: back }, '←'), html('h1', null, '📝 ' + s.title)),
       html('div', { style: { padding: '0 16px' } },
@@ -1764,46 +1716,472 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
     const n = nDone(plan);
     const next = plan.steps.find(s => !(stOf(plan.id, s.id) || {}).done);
     return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
-      liveBar,
-      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: () => { setOpenId(null); setFollow(null); } }, '←'),
+      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: () => setOpenId(null) }, '←'),
         html('div', { style: { flex: 1, minWidth: 0 } }, html('h1', null, plan.title),
           html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 2 } }, n + ' de ' + plan.steps.length + ' pasos hechos'))),
       html('div', { style: { padding: '0 16px' } },
-        note && html('div', { className: 'admin-status ok', style: { marginBottom: 10 } }, note),
-        plan.live_step && !follow && html('button', { className: 'plan-live-join', onClick: () => { setNote(null); setFollow(plan.id); } }, '🔴 Esta clase está en vivo · Entrar y seguir a mi lǎoshī'),
         plan.description && html('div', { className: 'plan-desc' }, plan.description),
         html('div', { className: 'plan-bar' }, html('i', { style: { width: (plan.steps.length ? n / plan.steps.length * 100 : 0) + '%' } })),
         n === plan.steps.length && plan.steps.length > 0 && html('div', { className: 'plan-win' }, '🎉 ¡Terminaste esta clase! Podés repetir cualquier paso para mejorar.'),
         html('div', { className: 'plan-path' }, plan.steps.map((s, i) => {
           const st = stOf(plan.id, s.id);
-          const isLive = plan.live_step === s.id;
-          return html('button', { key: s.id, className: 'plan-step' + (st && st.done ? ' done' : '') + (next && next.id === s.id ? ' next' : '') + (isLive ? ' live' : ''), onClick: () => { setRun(s); setRunN(k => k + 1); } },
+          return html('button', { key: s.id, className: 'plan-step' + (st && st.done ? ' done' : '') + (next && next.id === s.id ? ' next' : ''), onClick: () => { setRun(s); setRunN(k => k + 1); } },
             html('span', { className: 'plan-num' }, st && st.done ? '✓' : i + 1),
             html('span', { className: 'plan-step-main' },
               html('span', { className: 'plan-step-title' }, PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)),
-              html('span', { className: 'plan-step-sub' }, (isLive ? '🔴 Ahora en vivo · ' : '') + (st ? (st.done ? '¡Hecho! · ' + st.percent + '%' : 'Mejor resultado: ' + st.percent + '% · necesitás 70%') : next && next.id === s.id ? 'Seguí por acá' : 'Sin hacer'))),
+              html('span', { className: 'plan-step-sub' }, (st ? (st.done ? '¡Hecho! · ' + st.percent + '%' : 'Mejor resultado: ' + st.percent + '% · necesitás 70%') : next && next.id === s.id ? 'Seguí por acá' : 'Sin hacer'))),
             html('span', { className: 'plan-go' }, '→'));
         })),
         preview && html('p', { className: 'admin-note', style: { marginTop: 12 } }, '👁 Vista de profe: podés probar los pasos, pero tu avance no se guarda.')));
   }
 
-  // Lista de clases (la que está en vivo, primero)
-  const sorted = [...plans].sort((a, b) => (b.live_step ? 1 : 0) - (a.live_step ? 1 : 0));
+  // Lista de clases
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '📚 Clases')),
     html('div', { style: { padding: '0 16px' } },
-      note && html('div', { className: 'admin-status ok', style: { marginBottom: 10 } }, note),
       plans.length === 0 ? html('p', { className: 'admin-note' }, 'Tu lǎoshī todavía no publicó clases. Cuando lo haga, van a aparecer acá.')
-      : html('div', { className: 'plan-list' }, sorted.map(p => {
+      : html('div', { className: 'plan-list' }, plans.map(p => {
           const n = nDone(p);
-          return html('div', { key: p.id, className: 'plan-card student' + (n === p.steps.length && n ? ' complete' : '') + (p.live_step ? ' live' : ''), onClick: () => { setNote(null); setOpenId(p.id); } },
-            p.live_step && html('span', { className: 'plan-badge live', style: { alignSelf: 'flex-start' } }, '🔴 En vivo ahora'),
+          return html('div', { key: p.id, className: 'plan-card student' + (n === p.steps.length && n ? ' complete' : ''), onClick: () => setOpenId(p.id) },
             html('div', { className: 'plan-card-title' }, (n === p.steps.length && n ? '✅ ' : '📚 ') + p.title),
             p.description && html('div', { className: 'plan-card-desc' }, p.description),
             html('div', { className: 'plan-bar' }, html('i', { style: { width: (p.steps.length ? n / p.steps.length * 100 : 0) + '%' } })),
-            html('div', { className: 'plan-card-sub' }, n + ' de ' + p.steps.length + ' pasos' + (n === 0 ? ' · ¡Empezá!' : n < p.steps.length ? ' · Seguí' : ' · ¡Completa!')),
-            p.live_step && html('button', { className: 'plan-live-join', onClick: (e) => { e.stopPropagation(); setNote(null); setOpenId(p.id); setFollow(p.id); } }, '🔴 Entrar en vivo'));
+            html('div', { className: 'plan-card-sub' }, n + ' de ' + p.steps.length + ' pasos' + (n === 0 ? ' · ¡Empezá!' : n < p.steps.length ? ' · Seguí' : ' · ¡Completa!')));
         }))));
+}
+
+// ═════════════════ Quiz en vivo (tipo Kahoot) — módulo de Mi aula, opt-in ═════════════════
+// El lǎoshī proyecta la pregunta; los alumnos responden en el celular contra reloj.
+// Las respuestas correctas y los puntos viven en el servidor (npcr_quiz_vivo.sql).
+const QUIZ_COLORS = [
+  { bg: '#E21B3C', shape: '▲' }, { bg: '#1368CE', shape: '◆' }, { bg: '#D89E00', shape: '●' }, { bg: '#26890C', shape: '■' }];
+const QUIZ_TIMES = [10, 20, 30, 60];
+
+// Sonidos del quiz (sintetizados, sin voces): se apagan con el mismo 🔔 de la app
+function qTone(freq, start, dur, vol, type) {
+  if (!_soundOn) return;
+  try {
+    const ctx = _fxCtx || (_fxCtx = new (window.AudioContext || window.webkitAudioContext)());
+    if (ctx.state === 'suspended') ctx.resume();
+    const t = ctx.currentTime + start, osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = type || 'sine'; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(vol, t + 0.015); gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+const quizFx = {
+  tick: () => qTone(1200, 0, 0.06, 0.03, 'square'),
+  tickUrgent: () => { qTone(1500, 0, 0.08, 0.05, 'square'); qTone(1500, 0.12, 0.06, 0.03, 'square'); },
+  pop: () => { qTone(660, 0, 0.08, 0.05, 'triangle'); qTone(990, 0.05, 0.1, 0.04, 'triangle'); },
+  join: () => { qTone(523, 0, 0.12, 0.04, 'triangle'); qTone(784, 0.08, 0.18, 0.04, 'triangle'); },
+  start: () => [[392, 0], [523, 0.12], [659, 0.24], [784, 0.36]].forEach(([f, t]) => qTone(f, t, 0.25, 0.05, 'triangle')),
+  timeUp: () => { qTone(330, 0, 0.35, 0.06, 'sawtooth'); qTone(247, 0.18, 0.5, 0.05, 'sawtooth'); },
+  correct: () => [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.32]].forEach(([f, t]) => qTone(f, t, 0.35, 0.05, 'triangle')),
+  wrong: () => { qTone(311, 0, 0.25, 0.06, 'sawtooth'); qTone(233, 0.2, 0.45, 0.06, 'sawtooth'); },
+  reveal: () => { qTone(880, 0, 0.15, 0.04, 'triangle'); qTone(1175, 0.1, 0.3, 0.04, 'triangle'); },
+  fanfare: () => [[523, 0], [523, 0.15], [523, 0.3], [698, 0.45], [880, 0.75], [784, 1.0], [1047, 1.3]].forEach(([f, t]) => qTone(f, t, 0.4, 0.05, 'triangle')),
+  lobby: (k) => { const notes = [262, 330, 392, 330, 294, 349, 440, 349]; qTone(notes[k % 8], 0, 0.3, 0.025, 'triangle'); if (k % 4 === 0) qTone(131, 0, 0.5, 0.03, 'sine'); },
+};
+
+async function uploadNpcrPhoto(file, folder) {
+  const blob = await shrinkPhoto(file, 1000);
+  const path = folder + '/' + Date.now() + '-' + secureRandomChars('abcdefghijklmnopqrstuvwxyz0123456789', 6) + '.jpg';
+  const { error } = await db.storage.from('npcr-fotos').upload(path, blob, { contentType: 'image/jpeg' });
+  if (error) throw new Error(error.message + (/bucket|not found|security/i.test(error.message) ? ' — ¿Ejecutaste npcr_zhe_admin.sql y npcr_quiz_vivo.sql?' : ''));
+  return db.storage.from('npcr-fotos').getPublicUrl(path).data.publicUrl;
+}
+
+// Estado de la partida con consulta periódica; el reloj se corrige con la hora del servidor
+function useQuizState(gameId, everyMs) {
+  const [st, setSt] = useState(null);
+  const [err, setErr] = useState(null);
+  const off = React.useRef(0);
+  const refresh = () => gameId && db.rpc('npcr_quiz_state', { p_game: gameId }).then(({ data, error }) => {
+    if (error) { setErr(error.message); return; }
+    if (data && data.now) off.current = Date.parse(data.now) - Date.now();
+    setErr(null); setSt(data);
+  });
+  useEffect(() => { if (!gameId) return; refresh(); const t = setInterval(refresh, everyMs); return () => clearInterval(t); }, [gameId, everyMs]);
+  const left = () => {
+    if (!st || st.status !== 'question' || !st.current || !st.q_started_at) return 0;
+    return Math.max(0, st.current.time * 1000 - (Date.now() + off.current - Date.parse(st.q_started_at)));
+  };
+  return { st, err, refresh, left };
+}
+// Re-render frecuente para que el reloj se mueva suave
+function useTicker(on, ms) {
+  const [, setN] = useState(0);
+  useEffect(() => { if (!on) return; const t = setInterval(() => setN(n => n + 1), ms); return () => clearInterval(t); }, [on, ms]);
+}
+
+function QuizConfetti() {
+  return html('div', { className: 'quiz-confetti' }, Array.from({ length: 24 }, (_, i) =>
+    html('i', { key: i, style: { '--i': i, '--x': (i * 37 % 100) + '%', '--c': QUIZ_COLORS[i % 4].bg } })));
+}
+function QuizTimer({ left, total, big }) {
+  const sec = Math.ceil(left / 1000), frac = total ? left / (total * 1000) : 0;
+  return html('div', { className: 'quiz-timer' + (big ? ' big' : '') + (sec <= 5 ? ' urgent' : '') },
+    html('svg', { viewBox: '0 0 44 44' },
+      html('circle', { cx: 22, cy: 22, r: 19, className: 'quiz-timer-bg' }),
+      html('circle', { cx: 22, cy: 22, r: 19, className: 'quiz-timer-fg', style: { strokeDasharray: 119.4, strokeDashoffset: 119.4 * (1 - frac) } })),
+    html('span', null, sec));
+}
+
+// ── Aviso en Mi aula cuando el lǎoshī abre un quiz (solo si el módulo está activo) ──
+function QuizInvite({ classId, enabled, onJoin }) {
+  const [g, setG] = useState(null);
+  useEffect(() => {
+    if (!enabled || !classId) { setG(null); return; }
+    const look = () => db.rpc('npcr_quiz_active', { p_class: classId }).then(({ data }) => setG(data && data[0] ? data[0] : null));
+    look(); const t = setInterval(look, 8000); return () => clearInterval(t);
+  }, [classId, enabled]);
+  if (!g) return null;
+  return html('button', { className: 'quiz-invite', onClick: onJoin },
+    html('span', { className: 'quiz-invite-icon' }, '⚡'),
+    html('span', { style: { flex: 1, textAlign: 'left' } },
+      html('div', { className: 'quiz-invite-title' }, g.status === 'lobby' ? '¡Tu lǎoshī abrió un Quiz en vivo!' : '¡Quiz en vivo en juego!'),
+      html('div', { className: 'quiz-invite-sub' }, g.title + ' · tocá para entrar')),
+    html('span', { className: 'quiz-invite-go' }, 'Entrar →'));
+}
+
+// ── Lǎoshī: cuestionarios (compartidos con el equipo) y partida proyectada ──
+function QuizHost({ classId }) {
+  const [sets, setSets] = useState(null);
+  const [err, setErr] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const [gameId, setGameId] = useState(null);
+  const [me, setMe] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+  const load = () => db.from('npcr_quiz_sets').select('*').order('updated_at', { ascending: false }).then(({ data, error }) => {
+    if (error) { setErr(error.message); setSets([]); return; } setSets(data || []);
+  });
+  useEffect(() => {
+    load();
+    db.auth.getUser().then(({ data }) => setMe(data && data.user ? data.user.id : null));
+    db.rpc('npcr_quiz_active', { p_class: classId }).then(({ data }) => { if (data && data[0]) setGameId(data[0].id); });
+  }, [classId]);
+
+  const save = async () => {
+    const e = edit;
+    if (!e.title.trim()) return flash('err', 'Ponele un título al cuestionario.');
+    if (!e.questions.length) return flash('err', 'Agregá al menos una pregunta.');
+    let error;
+    if (e.id) ({ error } = await db.from('npcr_quiz_sets').update({ title: e.title.trim(), questions: e.questions, updated_at: new Date().toISOString() }).eq('id', e.id));
+    else {
+      const { data: { user } } = await db.auth.getUser();
+      const { data: pr } = await db.from('profiles').select('name').eq('id', user.id).maybeSingle();
+      ({ error } = await db.from('npcr_quiz_sets').insert({ title: e.title.trim(), questions: e.questions, author: (pr && pr.name) || user.email || null, created_by: user.id }));
+    }
+    if (error) return flash('err', '❌ ' + error.message);
+    setEdit(null); load(); flash('ok', '✅ Cuestionario guardado. Ya lo puede usar cualquier lǎoshī.');
+  };
+  const play = async (s) => {
+    setBusy(true);
+    const { data, error } = await db.rpc('npcr_quiz_create', { p_class: classId, p_set: s.id });
+    setBusy(false);
+    if (error) return flash('err', '❌ ' + error.message + (/function|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_quiz_vivo.sql?' : ''));
+    setGameId(data);
+  };
+  const remove = async (s) => {
+    if (!window.confirm('¿Eliminar el cuestionario "' + s.title + '"?')) return;
+    const { error } = await db.from('npcr_quiz_sets').delete().eq('id', s.id);
+    if (error) return flash('err', '❌ ' + error.message); load();
+  };
+
+  if (gameId) return html(QuizHostGame, { gameId, onClose: () => { setGameId(null); load(); } });
+  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + (/relation|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_quiz_vivo.sql?' : ''));
+  if (!sets) return html('p', { className: 'admin-note' }, 'Cargando cuestionarios…');
+  if (edit) return html(QuizEditor, { edit, setEdit, onSave: save, onCancel: () => setEdit(null), msg, flash });
+  return html('div', null,
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
+    html('div', { className: 'report-card' },
+      html('div', { className: 'plan-head' }, html('div', { className: 'report-h', style: { margin: 0, flex: 1 } }, '⚡ Quiz en vivo'),
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto', padding: '8px 14px' }, onClick: () => setEdit({ title: '', questions: [] }) }, '+ Nuevo cuestionario')),
+      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Proyectá la pantalla del aula: cada pregunta aparece en grande con su reloj, y los alumnos responden desde el celular (Mi aula → ⚡ Quiz en vivo). Suman puntos por acertar y por rapidez, con rachas, ranking y podio. Los cuestionarios se comparten con todo el equipo docente.')),
+    sets.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay cuestionarios. Creá el primero.')
+    : html('div', { className: 'plan-list' }, sets.map(s => html('div', { key: s.id, className: 'plan-card' },
+        html('div', { className: 'plan-card-title' }, '⚡ ' + s.title),
+        html('div', { className: 'plan-card-sub' }, s.questions.length + (s.questions.length === 1 ? ' pregunta' : ' preguntas') + (s.author ? ' · de ' + s.author : '') + (s.questions.some(q => q.img) ? ' · 📷 con fotos' : '')),
+        html('div', { className: 'plan-steps-mini' }, s.questions.slice(0, 6).map((q, k) => html('span', { key: k }, (k + 1) + '. ' + String(q.q || '📷').slice(0, 28))), s.questions.length > 6 && html('span', null, '…')),
+        html('div', { className: 'plan-actions' },
+          html('button', { className: 'mini-btn strong', disabled: busy, onClick: () => play(s) }, '▶ Jugar en esta aula'),
+          (s.created_by === me) && html('button', { className: 'mini-btn', onClick: () => setEdit({ id: s.id, title: s.title, questions: s.questions }) }, '✏️ Editar'),
+          html('button', { className: 'mini-btn', onClick: () => setEdit({ title: s.title + ' (copia)', questions: s.questions }) }, '⧉ Duplicar'),
+          (s.created_by === me) && html('button', { className: 'mini-btn danger', onClick: () => remove(s) }, '🗑'))))));
+}
+
+function QuizEditor({ edit, setEdit, onSave, onCancel, msg, flash }) {
+  const blank = { q: '', img: null, options: ['', '', '', ''], correct: 0, time: 20 };
+  const [d, setD] = useState(blank);
+  const [k, setK] = useState(null);        // índice que se está corrigiendo
+  const [up, setUp] = useState(false);
+  const qs = edit.questions;
+  const setQs = (list) => setEdit(e => ({ ...e, questions: list }));
+  const photo = async (file) => {
+    if (!file) return; setUp(true);
+    try { const url = await uploadNpcrPhoto(file, 'quiz'); setD(x => ({ ...x, img: url })); } catch (e) { flash('err', '❌ ' + e.message); }
+    setUp(false);
+  };
+  const addQ = () => {
+    const opts = d.options.map(o => o.trim());
+    const filled = opts.filter(Boolean);
+    if (!d.q.trim() && !d.img) return flash('err', 'Escribí la pregunta o poné una foto.');
+    if (filled.length < 2) return flash('err', 'Hacen falta al menos 2 opciones.');
+    if (!opts[d.correct]) return flash('err', 'Marcá cuál es la respuesta correcta (el círculo ✓ de una opción completa).');
+    const options = [], map = {};
+    opts.forEach((o, i) => { if (o) { map[i] = options.length; options.push(o); } });
+    const q = { q: d.q.trim(), img: d.img || null, options, correct: map[d.correct], time: d.time };
+    setQs(k === null ? [...qs, q] : qs.map((x, i) => i === k ? q : x));
+    setD({ ...blank, time: d.time }); setK(null);
+  };
+  const editQ = (i) => { const q = qs[i]; const o = [...q.options, '', '', '', ''].slice(0, 4); setD({ q: q.q, img: q.img, options: o, correct: q.correct, time: q.time || 20 }); setK(i); };
+  const move = (i, dd) => { const j = i + dd; if (j < 0 || j >= qs.length) return; const l = [...qs]; [l[i], l[j]] = [l[j], l[i]]; setQs(l); };
+  return html('div', { className: 'report-card' },
+    html('div', { className: 'plan-head' }, html('button', { className: 'mini-btn', onClick: onCancel }, '← Volver'), html('b', null, edit.id ? '✏️ Editar cuestionario' : '➕ Nuevo cuestionario')),
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { margin: '8px 0' } }, msg.text),
+    html('input', { value: edit.title, maxLength: 120, placeholder: 'Título (ej: Repaso lección 6 · Comidas)', onChange: e => setEdit({ ...edit, title: e.target.value }), style: { ...cmInput, width: '100%', margin: '10px 0', fontWeight: 700 } }),
+    qs.length > 0 && html('div', { className: 'plan-edit-steps' }, qs.map((q, i) => html('div', { key: i, className: 'plan-edit-step' + (k === i ? ' editing' : '') },
+      html('span', { className: 'plan-num' }, i + 1),
+      q.img && html('img', { src: q.img, alt: '', className: 'quiz-thumb' }),
+      html('span', { style: { flex: 1, minWidth: 0 } }, html('span', { className: 'hanzi-font' }, q.q || '📷 (solo foto)'),
+        html('small', null, q.options.map((o, j) => (j === q.correct ? '✓ ' : '') + o).join(' · ') + ' · ⏱ ' + (q.time || 20) + ' s')),
+      html('button', { className: 'mini-btn', onClick: () => editQ(i) }, '✏️'),
+      html('button', { className: 'mini-btn', disabled: i === 0, onClick: () => move(i, -1) }, '↑'),
+      html('button', { className: 'mini-btn', disabled: i === qs.length - 1, onClick: () => move(i, 1) }, '↓'),
+      html('button', { className: 'mini-btn danger', onClick: () => { setQs(qs.filter((_, j) => j !== i)); if (k === i) { setK(null); setD(blank); } } }, '✕')))),
+    html('div', { className: 'plan-add' },
+      html('div', { className: 'report-h', style: { margin: '0 0 8px' } }, k === null ? '➕ Pregunta ' + (qs.length + 1) : '✏️ Editando la pregunta ' + (k + 1)),
+      html('input', { value: d.q, maxLength: 160, placeholder: 'Pregunta (ej: 这是什么？ · ¿Cómo se dice "té"?)', onChange: e => setD({ ...d, q: e.target.value }), style: { ...cmInput, width: '100%', fontFamily: 'Outfit, Noto Sans SC, sans-serif', fontSize: 16 } }),
+      html('div', { className: 'quiz-ed-photo' },
+        d.img ? html(React.Fragment, null, html('img', { src: d.img, alt: '' }), html('button', { className: 'mini-btn danger', onClick: () => setD({ ...d, img: null }) }, 'Quitar foto'))
+        : html('label', { className: 'mini-btn', style: { cursor: 'pointer' } }, up ? 'Subiendo…' : '📷 Agregar foto (opcional)',
+            html('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: e => { photo(e.target.files[0]); e.target.value = ''; } }))),
+      html('div', { className: 'quiz-ed-opts' }, d.options.map((o, i) => html('div', { key: i, className: 'quiz-ed-opt', style: { '--c': QUIZ_COLORS[i].bg } },
+        html('span', { className: 'quiz-ed-shape' }, QUIZ_COLORS[i].shape),
+        html('input', { value: o, maxLength: 60, placeholder: 'Opción ' + (i + 1) + (i > 1 ? ' (opcional)' : ''), onChange: e => setD({ ...d, options: d.options.map((x, j) => j === i ? e.target.value : x) }) }),
+        html('button', { className: 'quiz-ed-ok' + (d.correct === i ? ' on' : ''), title: 'Marcar como correcta', onClick: () => setD({ ...d, correct: i }) }, '✓')))),
+      html('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 } },
+        html('span', { style: { fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)' } }, '⏱ Tiempo:'),
+        QUIZ_TIMES.map(t => html('button', { key: t, className: 'report-tab' + (d.time === t ? ' active' : ''), onClick: () => setD({ ...d, time: t }) }, t + ' s'))),
+      html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, disabled: up, onClick: addQ }, k === null ? 'Agregar pregunta' : 'Guardar pregunta'),
+        k !== null && html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => { setK(null); setD(blank); } }, 'Cancelar'))),
+    html('div', { style: { display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--paper-deep)', paddingTop: 12 } },
+      html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: onSave }, '💾 Guardar cuestionario'),
+      html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: onCancel }, 'Cancelar')));
+}
+
+// Pantalla para proyectar
+function QuizHostGame({ gameId, onClose }) {
+  const { st, err, refresh, left } = useQuizState(gameId, 1000);
+  const [board, setBoard] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const revealed = React.useRef(-1);
+  const lastSec = React.useRef(null);
+  const prevNames = React.useRef(0);
+  const prevStatus = React.useRef(null);
+  const live = st && st.status === 'question';
+  useTicker(live, 200);
+  const ms = left();
+  const call = async (fn) => { setBusy(true); const { error } = await db.rpc(fn, { p_game: gameId }); setBusy(false); if (error) alert(error.message); refresh(); };
+
+  // Sonidos y pasos automáticos
+  useEffect(() => {
+    if (!st) return;
+    if (st.status === 'lobby' && (st.names || []).length > prevNames.current) quizFx.join();
+    prevNames.current = (st.names || []).length;
+    if (st.status !== prevStatus.current) {
+      if (st.status === 'question') { quizFx.start(); setBoard(false); }
+      if (st.status === 'reveal') quizFx.reveal();
+      if (st.status === 'end') quizFx.fanfare();
+      prevStatus.current = st.status;
+    }
+  });
+  useEffect(() => {   // música de espera mientras entran
+    if (!st || st.status !== 'lobby') return;
+    let k = 0; const t = setInterval(() => quizFx.lobby(k++), 320); return () => clearInterval(t);
+  }, [st && st.status]);
+  useEffect(() => {   // reloj: tic-tac y al terminar (o cuando respondieron todos) se muestra la respuesta
+    if (!live) return;
+    const sec = Math.ceil(ms / 1000);
+    if (sec !== lastSec.current) { lastSec.current = sec; if (sec > 0 && sec <= 5) quizFx.tickUrgent(); else if (sec > 5 && sec % 2 === 0) quizFx.tick(); }
+    const all = st.players > 0 && st.answered >= st.players;
+    if ((ms <= 0 || all) && revealed.current !== st.q_index) {
+      revealed.current = st.q_index;
+      if (ms <= 0) quizFx.timeUp();
+      call('npcr_quiz_reveal');
+    }
+  });
+
+  if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err);
+  if (!st) return html('p', { className: 'admin-note' }, 'Abriendo el quiz…');
+  const cur = st.current, rv = st.reveal;
+  const top = html('div', { className: 'quiz-host-top' },
+    html('b', { style: { flex: 1, minWidth: 0 } }, '⚡ ' + st.title),
+    st.q_index >= 0 && st.status !== 'end' && html('span', { className: 'quiz-pill' }, 'Pregunta ' + (st.q_index + 1) + ' de ' + st.q_count),
+    html(SoundToggle, null),
+    st.status !== 'end' && html('button', { className: 'mini-btn danger', onClick: () => window.confirm('¿Terminar el quiz ahora?') && call('npcr_quiz_end') }, '⏹ Terminar'),
+    st.status === 'end' && html('button', { className: 'mini-btn', onClick: onClose }, '← Cuestionarios'));
+
+  if (st.status === 'lobby') return html('div', { className: 'quiz-host' }, top,
+    html('div', { className: 'quiz-lobby' },
+      html('div', { className: 'quiz-lobby-title' }, st.title),
+      html('div', { className: 'quiz-lobby-how' }, '📱 Entrá desde ', html('b', null, 'Mi aula → ⚡ Quiz en vivo')),
+      html('div', { className: 'quiz-lobby-count' }, html('b', null, st.players), st.players === 1 ? ' jugador' : ' jugadores'),
+      html('div', { className: 'quiz-names' }, (st.names || []).map((n, i) => html('span', { key: n + i, className: 'quiz-name', style: { '--c': QUIZ_COLORS[i % 4].bg } }, n))),
+      html('button', { className: 'quiz-big-btn', disabled: busy || !st.players, onClick: () => call('npcr_quiz_next') }, st.players ? '▶ Empezar' : 'Esperando jugadores…')));
+
+  if (st.status === 'question' || (st.status === 'reveal' && !board)) {
+    const isRv = st.status === 'reveal';
+    const max = isRv ? Math.max(1, ...rv.counts) : 1;
+    return html('div', { className: 'quiz-host' }, top,
+      html('div', { key: 'q' + st.q_index, className: 'quiz-q-card' },
+        html('div', { className: 'quiz-q-text hanzi-font' }, cur ? cur.q : ''),
+        html('div', { className: 'quiz-q-mid' },
+          !isRv && html(QuizTimer, { left: ms, total: cur.time, big: true }),
+          cur && cur.img ? html('img', { className: 'quiz-q-img', src: cur.img, alt: '' }) : html('div', { className: 'quiz-q-noimg' }),
+          !isRv ? html('div', { className: 'quiz-answered' }, html('b', null, st.answered), html('span', null, 'respuestas'))
+            : html('div', { className: 'quiz-answered' }, html('b', null, rv.counts.reduce((a, b) => a + b, 0)), html('span', null, 'respuestas')))),
+      isRv && html('div', { className: 'quiz-bars' }, cur.options.map((o, i) => html('div', { key: i, className: 'quiz-bar' + (i === rv.correct ? ' ok' : ' no'), style: { '--c': QUIZ_COLORS[i].bg } },
+        html('span', { className: 'quiz-bar-n' }, rv.counts[i] || 0),
+        html('i', { style: { height: (8 + (rv.counts[i] || 0) / max * 110) + 'px' } }),
+        html('span', { className: 'quiz-bar-s' }, QUIZ_COLORS[i].shape, i === rv.correct ? ' ✓' : '')))),
+      html('div', { className: 'quiz-opts host' }, (cur ? cur.options : []).map((o, i) => html('div', { key: i,
+        className: 'quiz-opt' + (isRv ? (i === rv.correct ? ' ok' : ' dim') : ''), style: { '--c': QUIZ_COLORS[i].bg } },
+        html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html('span', { className: 'quiz-opt-t hanzi-font' }, o), isRv && i === rv.correct && html('span', { className: 'quiz-ok-mark' }, '✓')))),
+      html('div', { className: 'quiz-host-nav' },
+        !isRv ? html('button', { className: 'quiz-big-btn alt', disabled: busy, onClick: () => { revealed.current = st.q_index; call('npcr_quiz_reveal'); } }, 'Mostrar respuesta')
+        : html('button', { className: 'quiz-big-btn', onClick: () => setBoard(true) }, '🏆 Ver ranking')));
+  }
+
+  if (st.status === 'reveal' && board) {
+    const b = (st.board || []).slice(0, 5);
+    const last = st.q_index + 1 >= st.q_count;
+    return html('div', { className: 'quiz-host' }, top,
+      html('div', { className: 'quiz-board-title' }, '🏆 Ranking'),
+      html('div', { className: 'quiz-board' }, b.map((p, i) => html('div', { key: p.name, className: 'quiz-board-row', style: { '--i': i } },
+        html('span', { className: 'quiz-board-pos' }, i + 1),
+        html('span', { className: 'quiz-board-name' }, p.name, p.streak >= 2 && html('span', { className: 'quiz-streak' }, '🔥 ' + p.streak)),
+        p.gain > 0 && html('span', { className: 'quiz-gain' }, '+' + p.gain),
+        html('span', { className: 'quiz-board-score' }, p.score)))),
+      html('div', { className: 'quiz-host-nav' },
+        html('button', { className: 'quiz-big-btn', disabled: busy, onClick: () => call('npcr_quiz_next') }, last ? '🏁 Ver podio' : 'Siguiente pregunta ▶')));
+  }
+
+  // Podio final
+  const b = st.board || [];
+  const pod = [b[1], b[0], b[2]];
+  return html('div', { className: 'quiz-host' }, top, html(QuizConfetti),
+    html('div', { className: 'quiz-board-title' }, '🎉 ¡Terminó el quiz!'),
+    html('div', { className: 'quiz-podium' }, pod.map((p, i) => p ? html('div', { key: i, className: 'quiz-pod p' + [2, 1, 3][i], style: { '--d': [0.6, 1.2, 0][i] + 's' } },
+      html('div', { className: 'quiz-pod-name' }, p.name), html('div', { className: 'quiz-pod-score' }, p.score + ' pts'),
+      html('div', { className: 'quiz-pod-block' }, ['🥈', '🥇', '🥉'][i])) : html('div', { key: i }))),
+    b.length > 3 && html('div', { className: 'quiz-board small' }, b.slice(3).map((p, i) => html('div', { key: p.name, className: 'quiz-board-row' },
+      html('span', { className: 'quiz-board-pos' }, i + 4), html('span', { className: 'quiz-board-name' }, p.name), html('span', { className: 'quiz-board-score' }, p.score)))),
+    html('div', { className: 'quiz-host-nav' }, html('button', { className: 'quiz-big-btn', onClick: onClose }, 'Listo')));
+}
+
+// ── Alumno: responde desde el celular ──
+function QuizPlayer({ classId, onBack }) {
+  const [gameId, setGameId] = useState(null);
+  const [joinErr, setJoinErr] = useState(null);
+  const [looking, setLooking] = useState(true);
+  useEffect(() => {
+    if (gameId) return;
+    const look = () => db.rpc('npcr_quiz_active', { p_class: classId }).then(async ({ data, error }) => {
+      setLooking(false);
+      if (error) { setJoinErr(error.message); return; }
+      const g = data && data[0]; if (!g) return;
+      const j = await db.rpc('npcr_quiz_join', { p_game: g.id });
+      if (j.error) setJoinErr(j.error.message); else { setJoinErr(null); setGameId(g.id); quizFx.join(); }
+    });
+    look(); const t = setInterval(look, 3000); return () => clearInterval(t);
+  }, [gameId, classId]);
+  if (!gameId) return html('main', { className: 'quiz-main', style: { paddingTop: 18 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '⚡ Quiz en vivo')),
+    html('div', { className: 'quiz-wait' },
+      html('div', { className: 'quiz-wait-icon' }, '⚡'),
+      html('b', null, looking ? 'Buscando…' : 'Todavía no hay un quiz abierto'),
+      html('span', null, joinErr ? '❌ ' + joinErr : 'Cuando tu lǎoshī lo abra, entrás solo. Dejá esta pantalla abierta.')));
+  return html(QuizPlayerGame, { gameId, onBack });
+}
+
+function QuizPlayerGame({ gameId, onBack }) {
+  const { st, err, refresh, left } = useQuizState(gameId, 1200);
+  const [sent, setSent] = useState(null);       // { q, choice }
+  const prev = React.useRef(null);
+  const lastSec = React.useRef(null);
+  const live = st && st.status === 'question';
+  useTicker(live, 200);
+  const ms = left();
+  useEffect(() => {
+    if (!st) return;
+    const key = st.status + st.q_index;
+    if (key !== prev.current) {
+      if (st.status === 'reveal' && st.me) { const l = st.me.last; if (l && l.correct) quizFx.correct(); else quizFx.wrong(); }
+      if (st.status === 'question') quizFx.start();
+      if (st.status === 'end') quizFx.fanfare();
+      prev.current = key;
+    }
+  });
+  useEffect(() => { if (!live) return; const sec = Math.ceil(ms / 1000); if (sec !== lastSec.current) { lastSec.current = sec; if (sec > 0 && sec <= 3 && !(st.me && st.me.answered)) quizFx.tick(); } });
+  const answer = async (i) => {
+    if (sent && sent.q === st.q_index) return;
+    setSent({ q: st.q_index, choice: i }); quizFx.pop();
+    const { error } = await db.rpc('npcr_quiz_answer', { p_game: gameId, p_choice: i });
+    if (error) setSent(null);
+    refresh();
+  };
+  if (err) return html(GameStatusScreen, { onBack, title: '⚡ Quiz en vivo', msg: '❌ ' + err });
+  if (!st) return html(GameStatusScreen, { onBack, title: '⚡ Quiz en vivo', msg: '⏳ Entrando…' });
+  const me = st.me || {};
+  const head = html('div', { className: 'quiz-p-head' },
+    html('button', { className: 'back-btn', onClick: onBack }, '←'),
+    html('span', { className: 'quiz-p-name' }, me.name || ''),
+    st.q_index >= 0 && st.status !== 'end' && html('span', { className: 'quiz-pill' }, (st.q_index + 1) + '/' + st.q_count),
+    html('span', { className: 'quiz-p-score' }, (me.score || 0) + ' pts'));
+  const wrapCls = 'quiz-main quiz-p';
+
+  if (st.status === 'lobby') return html('main', { className: wrapCls }, head,
+    html('div', { className: 'quiz-wait' }, html('div', { className: 'quiz-wait-icon bounce' }, '🎮'),
+      html('b', null, '¡Estás adentro!'), html('span', null, 'Buscá tu nombre en la pantalla del aula. Ya empieza…')));
+
+  if (st.status === 'question') {
+    const cur = st.current;
+    const done = me.answered || (sent && sent.q === st.q_index);
+    if (done) return html('main', { className: wrapCls }, head,
+      html('div', { className: 'quiz-wait' }, html('div', { className: 'quiz-spinner' }),
+        html('b', null, '¡Respuesta enviada!'), html('span', null, 'Esperá a que se termine el tiempo…')));
+    return html('main', { className: wrapCls }, head,
+      html('div', { className: 'quiz-p-bar' }, html('i', { style: { width: (cur.time ? ms / (cur.time * 1000) * 100 : 0) + '%' } })),
+      html('div', { className: 'quiz-p-q hanzi-font' }, cur.q),
+      cur.img && html('img', { className: 'quiz-p-img', src: cur.img, alt: '' }),
+      html('div', { className: 'quiz-opts' + (cur.options.length <= 2 ? ' two' : '') }, cur.options.map((o, i) => html('button', { key: i, className: 'quiz-opt btn', style: { '--c': QUIZ_COLORS[i].bg }, onClick: () => answer(i) },
+        html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html('span', { className: 'quiz-opt-t hanzi-font' }, o)))));
+  }
+
+  if (st.status === 'reveal') {
+    const l = me.last, cur = st.current;
+    const ok = l && l.correct;
+    return html('main', { className: wrapCls + (ok ? ' good' : ' bad') }, head,
+      html('div', { className: 'quiz-result' },
+        html('div', { className: 'quiz-result-icon' }, ok ? '✓' : l ? '✕' : '⏱'),
+        html('div', { className: 'quiz-result-t' }, ok ? '¡Correcto!' : l ? 'Incorrecto' : '¡Se acabó el tiempo!'),
+        ok && html('div', { className: 'quiz-result-pts' }, '+' + l.points),
+        ok && me.streak >= 2 && html('div', { className: 'quiz-result-streak' }, '🔥 Racha de ' + me.streak),
+        !ok && cur && st.reveal && html('div', { className: 'quiz-result-ans' }, 'Era: ', html('b', { className: 'hanzi-font' }, cur.options[st.reveal.correct])),
+        me.rank && html('div', { className: 'quiz-result-rank' }, 'Vas ' + me.rank + '° de ' + st.players)));
+  }
+
+  // Fin
+  const medal = me.rank === 1 ? '🥇' : me.rank === 2 ? '🥈' : me.rank === 3 ? '🥉' : '🎉';
+  return html('main', { className: wrapCls }, head, me.rank && me.rank <= 3 && html(QuizConfetti),
+    html('div', { className: 'quiz-wait' }, html('div', { className: 'quiz-wait-icon bounce' }, medal),
+      html('b', null, me.rank ? 'Terminaste ' + me.rank + '° de ' + st.players : '¡Terminó el quiz!'),
+      html('span', null, (me.score || 0) + ' puntos'),
+      html('button', { className: 'primary-btn', style: { marginTop: 14, width: 'auto' }, onClick: onBack }, 'Volver al aula')));
 }
 
 // ----------------- BrandAnimText -----------------
@@ -2294,6 +2672,8 @@ function App() {
       staffClasses, onPreviewClass: choosePreviewClass,
       bingoGame, onBingo: () => bingoGame && setScreen({ name: 'bingo', gameId: bingoGame.id }),
     });
+  } else if (screen.name === 'quiz-vivo' && aulaShown(classSettings, 'quiz-vivo') && myClasses && myClasses.length) {
+    content = html(QuizPlayer, { key: myClasses[0].class_id, classId: myClasses[0].class_id, onBack: () => setScreen({ name: 'clase' }) });
   } else if (screen.name === 'clases' && aulaShown(classSettings, 'clases') && myClasses && myClasses.length) {
     content = html(PlanModule, { key: myClasses[0].class_id, classId: myClasses[0].class_id, preview: !!myClasses[0].preview,
       vocab, sentences, cardState, onRecordCard: recordCard, lessons, openLessons, appConfig, playerName,
@@ -3111,6 +3491,7 @@ const AULA_ICONS = {
   award:    ['M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z', 'M8.2 13.9 7 22l5-3 5 3-1.2-8.1'],
   photo:    ['M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z', 'M3 16l5-5 4 4 3-3 6 6', 'M15.5 9.5h.01'],
   users:    ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M22 21v-2a4 4 0 0 0-3-3.9', 'M16 3.1a4 4 0 0 1 0 7.8'],
+  zap:      ['M13 2 3 14h9l-1 8 10-12h-9l1-8Z'],
   book:     ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z', 'M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5'],
   login:    ['M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4', 'M10 17l5-5-5-5', 'M15 12H3'],
   trash:    ['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14H6L5 6'],
@@ -3154,6 +3535,7 @@ function aulaActivitiesAll(settings, hardCount) {
   return [
     hskAct(1), hskAct(2),
     { id: 'clases', icon: 'book', tone: 'red', title: 'Clases', sub: 'Las clases que armó tu lǎoshī, paso a paso', optIn: true },
+    { id: 'quiz-vivo', icon: 'zap', tone: 'gold', title: 'Quiz en vivo', sub: 'Respondé desde el celular, ¡como un juego!', optIn: true },
     { id: 'refuerzo-clase', icon: 'layers', tone: 'purple', title: 'Refuerzo de clase', sub: hardCount ? hardCount + ' palabras que le cuestan al grupo' : 'Todavía sin datos del grupo', disabled: !hardCount },
     weekly.length > 0 && { id: 'semana', icon: 'star', tone: 'gold', title: (settings && settings.weekly_title) || 'Palabras de la semana', sub: weekly.length + (weekly.length === 1 ? ' palabra elegida' : ' palabras elegidas') + ' por tu lǎoshī' },
     { id: 'tonos', icon: 'music', tone: 'green', title: 'Tonos', sub: 'Escuchá y elegí el tono' },
@@ -3238,6 +3620,7 @@ function ClassHome({ cls, dailyCount, dailyDone, assignments, settings, hardCoun
     ),
     html('div', { style: { padding: '0 16px' } },
       html(BingoInvite, { game: bingoGame, onJoin: onBingo }),
+      html(QuizInvite, { classId: cls.class_id, enabled: aulaShown(settings, 'quiz-vivo'), onJoin: () => onActivity('quiz-vivo') }),
       !aulaHidden(settings, 'entrenamiento') && html('h2', { className: 'section-title' }, 'Hoy'),
       !aulaHidden(settings, 'entrenamiento') && html('button', { className: 'class-training-card' + (dailyDone ? ' done' : ''), onClick: onTraining },
         html(AulaIcon, { name: dailyDone ? 'check' : 'target', tone: 'white', size: 52 }),
@@ -3391,6 +3774,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
       html(PanelLectura, { playerName }),
 
       myClasses && myClasses.length > 0 && html(BingoInvite, { game: bingoGame, onJoin: onBingo }),
+      myClasses && myClasses.length > 0 && html(QuizInvite, { classId: myClasses[0].class_id, enabled: aulaShown(classSettings, 'quiz-vivo'), onJoin: () => onActivity('quiz-vivo') }),
       myClasses && myClasses.length > 0 && html(ClassBox, { cls: myClasses[0], dailyCount, dailyDone, assignments, settings: classSettings, hardCount, onOpen: onOpenClass, onTraining, onProgress, onActivity, staffClasses, onPreviewClass }),
       (!myClasses || !myClasses.length) && staffClasses && staffClasses.length > 0 && html('button', { className: 'aula-preview-show', onClick: () => onPreviewClass('') }, '👁 Ver "Mi aula" como alumno'),
 

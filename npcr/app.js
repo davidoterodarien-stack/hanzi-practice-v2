@@ -778,6 +778,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   const [settings, setSettings] = useState({ max_lesson: '', weekly_title: '', weekly_words: [] });
   const [pickLesson, setPickLesson] = useState('1');
   const [savedMsg, setSavedMsg] = useState(null);
+  const [sel, setSel] = useState(null);   // alumno resaltado: { uid, name }
 
   useEffect(() => {
     db.from('classes').select('id,name').order('created_at', { ascending: false }).then(({ data, error }) => {
@@ -817,6 +818,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   useEffect(() => {
     if (!classId) return;
     setRows(null); setStudent(null); setErr(null);
+    if (!reloadKey) setSel(null);
     Promise.all([db.rpc('npcr_class_report', { p_class: classId }), db.rpc('npcr_class_hard_words', { p_class: classId })])
       .then(([r, h]) => {
         if (r.error) { setErr(r.error.message); setRows([]); return; }
@@ -869,6 +871,16 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   const th = (key, label, title) => html('th', { title, onClick: () => setSort(s => ({ key, dir: s.key === key ? -s.dir : -1 })), className: sort.key === key ? 'sorted' : '' },
     label + (sort.key === key ? (sort.dir < 0 ? ' ▼' : ' ▲') : ''));
 
+  const isSel = (r) => !!sel && (sel.uid ? r.user_id === sel.uid : !r.user_id && r.display_name === sel.name);
+  const pick = (r) => setSel(isSel(r) ? null : { uid: r.user_id || null, name: r.display_name });
+  const selRow = sel && (rows || []).find(isSel);
+  // Al cambiar de pestaña, la fila del alumno resaltado queda a la vista
+  useEffect(() => {
+    if (!sel) return;
+    const t = setTimeout(() => { const el = document.querySelector('.sel-row'); if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, 60);
+    return () => clearTimeout(t);
+  }, [tab, !!sel]);
+
   const tabs = [['alumnos', '👥 Alumnos'], ['resumen', '📊 Resumen'], ['ranking', '🏆 Ranking'], ['mapa', '🗺️ Mapa'], ['palabras', '🧩 Palabras difíciles'], ['tareas', '📋 Tareas'],
     ...(settings && settings.hsk1_enabled ? [['hsk', '🎓 HSK 1']] : []), ...(settings && settings.hsk2_enabled ? [['hsk2', '🎓 HSK 2']] : []),
     ['bingo', '🎱 Bingo'], ['config', '⚙️ Configurar']];
@@ -881,13 +893,14 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     body = html('div', { className: 'report-card' },
       html('div', { className: 'report-h' }, '👥 Alumnos de la clase'),
       html('p', { className: 'admin-note', style: { marginTop: 0 } },
-        'Agregá a cada alumno con su nombre: la app le genera un código personal. Tocá el código para copiarlo, 📤 para copiar la invitación, 🔄 para darle un código nuevo y el nombre para ver su ficha.'),
+        'Agregá a cada alumno con su nombre: la app le genera un código personal. Tocá el código para copiarlo, 📤 para copiar la invitación, 🔄 para darle un código nuevo y "Ver ficha" para ver su avance. Tocá un alumno para resaltarlo: queda marcado en todas las pestañas.'),
       flashMsg && html('div', { className: 'admin-status ' + (flashMsg.type === 'ok' ? 'ok' : 'err'), style: { marginBottom: 10, cursor: 'pointer' }, onClick: () => setFlashMsg(null) }, flashMsg.msg),
       html(ClassStudents, {
         cls: { id: classId, name: cls ? cls.name : '' },
         flash: (type, msg) => setFlashMsg({ type, msg }),
         onChanged: () => setReloadKey(k => k + 1),
         onOpen: (r) => { const row = (rows || []).find(x => x.seat_id === r.id); if (row) setStudent(row); },
+        isSel, onSelect: pick,
       }),
     );
   }
@@ -918,31 +931,31 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     );
   } else if (tab === 'ranking') {
     body = html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
-      html('table', { className: 'rank-table' },
+      html('table', { className: 'rank-table cardify' },
         html('thead', null, html('tr', null,
           html('th', null, '#'), th('display_name', 'Alumno'), th('mastery', 'Dominio', 'Promedio de las lecciones: 60% tarjetas + 40% juegos'),
           th('words_learned', 'Aprendidas', 'Palabras en caja 3+ del repaso espaciado'), th('acc_7d', 'Precisión', 'Promedio de resultados de los últimos 7 días'),
           th('sessions_7d', 'Sesiones', 'Sesiones de práctica en 7 días'), th('daily_7d', 'Entren.', 'Entrenamientos diarios en 7 días'),
           th('streak_days', 'Racha'), th('words_struggling', 'Dificult.', 'Palabras con errores repetidos'), th('last_activity', 'Última vez'))),
-        html('tbody', null, sortedRows.map((r, i) => html('tr', { key: r.seat_id, onClick: () => setStudent(r), className: r.user_id ? '' : 'pending' },
-          html('td', { style: { fontWeight: 800, color: 'var(--ink-soft)' } }, r.user_id ? (i + 1) : '—'),
-          html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap' } }, r.display_name, !r.user_id && html('span', { style: { fontSize: 10, color: 'var(--ink-soft)', fontWeight: 700 } }, ' · sin activar')),
-          html('td', null, html(MasteryPill, { value: r.user_id ? r.mastery : null, small: true })),
-          html('td', null, r.user_id ? r.words_learned : '—'),
-          html('td', null, r.acc_7d == null ? '—' : html(MasteryPill, { value: r.acc_7d, small: true })),
-          html('td', null, r.user_id ? r.sessions_7d : '—'),
-          html('td', null, r.user_id ? r.daily_7d + '/7' : '—'),
-          html('td', null, r.user_id ? '🔥 ' + r.streak_days : '—'),
-          html('td', { style: { color: r.words_struggling >= 8 ? 'var(--lacquer)' : 'inherit', fontWeight: 700 } }, r.user_id ? r.words_struggling : '—'),
-          html('td', { style: { whiteSpace: 'nowrap', fontSize: 12 } }, r.user_id ? timeAgo(r.last_activity || r.last_seen) : '—'),
+        html('tbody', null, sortedRows.map((r, i) => html('tr', { key: r.seat_id, onClick: () => pick(r), onDoubleClick: () => setStudent(r), className: (r.user_id ? '' : 'pending') + (isSel(r) ? ' sel-row' : '') },
+          html('td', { className: 'cell-rank', 'data-l': '#', style: { fontWeight: 800, color: 'var(--ink-soft)' } }, r.user_id ? (i + 1) : '—'),
+          html('td', { className: 'cell-name', style: { fontWeight: 800, whiteSpace: 'nowrap' } }, r.display_name, !r.user_id && html('span', { style: { fontSize: 10, color: 'var(--ink-soft)', fontWeight: 700 } }, ' · sin activar')),
+          html('td', { 'data-l': 'Dominio' }, html(MasteryPill, { value: r.user_id ? r.mastery : null, small: true })),
+          html('td', { 'data-l': 'Aprendidas' }, r.user_id ? r.words_learned : '—'),
+          html('td', { 'data-l': 'Precisión' }, r.acc_7d == null ? '—' : html(MasteryPill, { value: r.acc_7d, small: true })),
+          html('td', { 'data-l': 'Sesiones' }, r.user_id ? r.sessions_7d : '—'),
+          html('td', { 'data-l': 'Entren.' }, r.user_id ? r.daily_7d + '/7' : '—'),
+          html('td', { 'data-l': 'Racha' }, r.user_id ? '🔥 ' + r.streak_days : '—'),
+          html('td', { 'data-l': 'Dificult.', style: { color: r.words_struggling >= 8 ? 'var(--lacquer)' : 'inherit', fontWeight: 700 } }, r.user_id ? r.words_struggling : '—'),
+          html('td', { 'data-l': 'Última vez', style: { whiteSpace: 'nowrap', fontSize: 12 } }, r.user_id ? timeAgo(r.last_activity || r.last_seen) : '—'),
         )))),
-      html('p', { className: 'admin-note', style: { padding: '8px 12px', margin: 0 } }, 'Tocá un encabezado para ordenar y un alumno para ver su ficha.'),
+      html('p', { className: 'admin-note', style: { padding: '8px 12px', margin: 0 } }, 'Tocá un encabezado para ordenar y un alumno para resaltarlo; su ficha se abre desde la barra de arriba.'),
     );
   } else if (tab === 'mapa') {
     body = html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
       html('table', { className: 'heat-table' },
         html('thead', null, html('tr', null, html('th', null, 'Alumno'), lessons.map(l => html('th', { key: l }, 'L' + l)))),
-        html('tbody', null, active.map(r => html('tr', { key: r.seat_id, onClick: () => setStudent(r) },
+        html('tbody', null, active.map(r => html('tr', { key: r.seat_id, onClick: () => pick(r), onDoubleClick: () => setStudent(r), className: isSel(r) ? 'sel-row' : '' },
           html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap', textAlign: 'left' } }, r.display_name),
           lessons.map(l => { const v = (r.lessons || {})[l]; const c = masteryColor(v); return html('td', { key: l, style: { background: c.bg, color: c.fg } }, v ? v : ''); }),
         )))),
@@ -1001,8 +1014,8 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     );
   }
 
-  if (!err && rows !== null && !student && tab === 'hsk') body = html(HskClassReport, { key: 'hsk1', classId, level: 1 });
-  if (!err && rows !== null && !student && tab === 'hsk2') body = html(HskClassReport, { key: 'hsk2', classId, level: 2 });
+  if (!err && rows !== null && !student && tab === 'hsk') body = html(HskClassReport, { key: 'hsk1', classId, level: 1, isSel, onSelect: pick });
+  if (!err && rows !== null && !student && tab === 'hsk2') body = html(HskClassReport, { key: 'hsk2', classId, level: 2, isSel, onSelect: pick });
   if (!err && rows !== null && !student && tab === 'bingo') body = html(BingoHost, { key: classId, classId, className: cls ? cls.name : 'Clase', lessons, maxLesson: settings && settings.max_lesson ? Number(settings.max_lesson) : null });
 
   if (!err && rows !== null && !student && tab === 'config') {
@@ -1072,7 +1085,16 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     );
   }
 
-  return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+  const selBar = sel && !student && tab !== 'bingo' && tab !== 'config' && tab !== 'tareas' && tab !== 'palabras' && html('div', { className: 'sel-bar' },
+    html('span', { className: 'sel-dot' }, (sel.name || '?').trim().charAt(0).toUpperCase()),
+    html('div', { className: 'sel-info' },
+      html('b', null, sel.name),
+      html('small', null, !selRow || !selRow.user_id ? 'Sin activar todavía'
+        : 'Dominio ' + (selRow.mastery || 0) + '% · ' + (selRow.sessions_7d || 0) + ' sesiones en 7 días · ' + (selRow.last_activity || selRow.last_seen ? 'última vez ' + timeAgo(selRow.last_activity || selRow.last_seen) : 'sin actividad'))),
+    selRow && selRow.user_id && html('button', { className: 'mini-btn', onClick: () => setStudent(selRow) }, '📄 Ver ficha'),
+    html('button', { className: 'sel-x', title: 'Dejar de resaltar', onClick: () => setSel(null) }, '✕'));
+
+  return html('main', { className: tab === 'bingo' && !student ? '' : 'wide', style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
       html('div', { style: { flex: 1, minWidth: 0 } },
@@ -1084,6 +1106,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     html('div', { style: { padding: '0 16px' } },
       classes && classes.length === 0 && html('p', { className: 'admin-note' }, 'Todavía no hay clases. Creá una en ⚙ Administrar → Mis clases.'),
       !student && classId && html('div', { className: 'report-tabs' }, tabs.map(([k, label]) => html('button', { key: k, className: 'report-tab' + (tab === k ? ' active' : ''), onClick: () => setTab(k) }, label))),
+      classId && selBar,
       classId && body,
     ),
   );
@@ -4450,7 +4473,7 @@ function Hsk1WordList({ words, cardState, keyOf, onBack }) {
 }
 
 // Reporte HSK de la clase (para el profe)
-function HskClassReport({ classId, level }) {
+function HskClassReport({ classId, level, isSel, onSelect }) {
   const T = 'hsk' + level;
   const [lv, setLv] = useState(null);
   const [rows, setRows] = useState(null);
@@ -4472,6 +4495,7 @@ function HskClassReport({ classId, level }) {
   const passing = withSim.filter(r => r.last_sim >= 120).length;
   const cell = (v) => v === undefined || v === null ? html('td', { className: 'hsk-cell none' }, '—')
     : html('td', { className: 'hsk-cell ' + (v >= 80 ? 'ok' : v >= 60 ? 'mid' : 'low') }, v + '%');
+  const cellL = (k, v) => { const c = cell(v); return React.cloneElement(c, { 'data-l': lv.sections[k].short }); };
   return html('div', null,
     html('div', { className: 'report-card' },
       html('div', { className: 'report-h' }, '🎓 Preparación ' + lv.name),
@@ -4479,18 +4503,19 @@ function HskClassReport({ classId, level }) {
         withSim.length ? passing + ' de ' + withSim.length + ' alumnos aprobarían según su último simulacro (120/200).' : 'Todavía nadie hizo un simulacro.'),
     ),
     html(ScrollX, { arrows: 'top' },
-      html('table', { className: 'rank-table hsk-report' },
+      html('table', { className: 'rank-table hsk-report cardify' },
         html('thead', null, html('tr', null,
           html('th', null, 'Alumno'), html('th', null, 'Palabras'), html('th', null, 'Último simulacro'), html('th', null, 'Mejor'),
           HSK_ORDER.map(k => html('th', { key: k, title: lv.sections[k].title + ' · ' + lv.sections[k].sub }, lv.sections[k].short)), html('th', null, 'Prácticas'))),
-        html('tbody', null, rows.map((r, k) => html('tr', { key: k, style: r.user_id ? null : { opacity: 0.45 } },
-          html('td', { style: { fontWeight: 700 } }, r.display_name),
-          html('td', null, r.words_seen + (nWords ? '/' + nWords : ''), html('div', { style: { fontSize: 11, color: 'var(--ink-soft)' } }, r.words_learned + ' aprendidas')),
-          html('td', null, r.last_sim === null ? '—' : html('span', { className: 'hsk-sim ' + (r.last_sim >= 120 ? 'pass' : 'fail') }, r.last_sim),
+        html('tbody', null, rows.map((r, k) => html('tr', { key: k, style: r.user_id ? null : { opacity: 0.45 },
+            className: isSel && isSel(r) ? 'sel-row' : '', onClick: onSelect ? () => onSelect(r) : undefined },
+          html('td', { className: 'cell-name', style: { fontWeight: 700 } }, r.display_name),
+          html('td', { 'data-l': 'Palabras' }, r.words_seen + (nWords ? '/' + nWords : ''), html('div', { style: { fontSize: 11, color: 'var(--ink-soft)' } }, r.words_learned + ' aprendidas')),
+          html('td', { 'data-l': 'Último simulacro' }, r.last_sim === null ? '—' : html('span', { className: 'hsk-sim ' + (r.last_sim >= 120 ? 'pass' : 'fail') }, r.last_sim),
             r.last_sim !== null && html('div', { style: { fontSize: 11, color: 'var(--ink-soft)' } }, 'E ' + (r.last_listening || 0) + ' · L ' + (r.last_reading || 0))),
-          html('td', null, r.best_sim === null ? '—' : r.best_sim),
-          HSK_ORDER.map(k => html(React.Fragment, { key: k }, cell((r.sections || {})[k]))),
-          html('td', null, r.practices)))),
+          html('td', { 'data-l': 'Mejor' }, r.best_sim === null ? '—' : r.best_sim),
+          HSK_ORDER.map(k => html(React.Fragment, { key: k }, cellL(k, (r.sections || {})[k]))),
+          html('td', { 'data-l': 'Prácticas' }, r.practices)))),
       )),
   );
 }
@@ -6951,7 +6976,7 @@ function copyText(text, onDone) {
   else { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); done(); }
 }
 
-function ClassStudents({ cls, onCount, flash, onOpen, onChanged }) {
+function ClassStudents({ cls, onCount, flash, onOpen, onChanged, isSel, onSelect }) {
   const [rows, setRows] = useState(null);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -7028,21 +7053,23 @@ function ClassStudents({ cls, onCount, flash, onOpen, onChanged }) {
           rows.map(r => {
             const active = !!r.user_id;
             const p = r.profile;
-            return html('div', { key: r.kind + r.id, style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, background: 'var(--paper)', borderRadius: 12, padding: '10px 12px' } },
+            const on = !!(isSel && isSel(r));
+            return html('div', { key: r.kind + r.id, className: 'stu-row' + (on ? ' sel-row' : ''), onClick: onSelect ? (e) => { if (!e.target.closest('button, .stu-code, .stu-file')) onSelect(r); } : undefined,
+                style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, borderRadius: 12, padding: '10px 12px', cursor: onSelect ? 'pointer' : 'default' } },
               html('div', { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14,
                 background: active ? 'var(--jade-light)' : 'var(--paper-deep)', color: active ? 'var(--jade-dark)' : 'var(--ink-soft)' } },
                 (r.display_name || '?').trim().charAt(0).toUpperCase()),
-              html('div', { style: { flex: '1 1 150px', minWidth: 0, cursor: onOpen ? 'pointer' : 'default' }, title: onOpen ? 'Ver ficha del alumno' : '', onClick: () => onOpen && onOpen(r) },
+              html('div', { style: { flex: '1 1 150px', minWidth: 0 } },
                 html('div', { style: { fontWeight: 800, fontSize: 14, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.display_name),
                 html('div', { style: { fontSize: 11, fontWeight: 700, color: 'var(--ink-soft)', marginTop: 2 } },
                   !active ? '⏳ Sin activar todavía'
                   : '✅ Activo · ' + (p && p.last_seen ? 'entró ' + timeAgo(p.last_seen) : 'sin actividad') + (p && p.streak_days ? ' · 🔥 ' + p.streak_days : '')
                     + (r.kind === 'loose' ? ' · sin código' : '')),
-                onOpen && r.kind === 'seat' && html('div', { style: { fontSize: 11, fontWeight: 800, color: 'var(--gold-dark)', marginTop: 2 } }, 'Ver ficha →'),
+                onOpen && r.kind === 'seat' && html('div', { className: 'stu-file', title: 'Ver ficha del alumno', onClick: () => onOpen(r), style: { display: 'inline-block', fontSize: 11, fontWeight: 800, color: 'var(--gold-dark)', marginTop: 2, cursor: 'pointer' } }, 'Ver ficha →'),
               ),
               html('div', { style: { display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto' } },
               r.kind === 'seat' && html('span', {
-                title: 'Tocá para copiar el código',
+                className: 'stu-code', title: 'Tocá para copiar el código',
                 onClick: () => copyText(r.code, () => flash('ok', '📋 Código ' + r.code + ' copiado.')),
                 style: { fontFamily: 'monospace', fontWeight: 800, fontSize: 13, letterSpacing: 0.5, background: 'var(--gold-light)', padding: '4px 8px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap' },
               }, r.code),
@@ -7582,6 +7609,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   const [activityError, setActivityError] = useState(null);
   const [regFilter, setRegFilter] = useState('todos'); // todos | codigo | libre
   const [regSearch, setRegSearch] = useState('');
+  const [regSel, setRegSel] = useState(null);   // alumno resaltado en el registro
   // Pasar el progreso de un invitado a un alumno con código (npcr_merge_accounts)
   const [mergeFrom, setMergeFrom] = useState(null);
   const [mergeTo, setMergeTo] = useState('');
@@ -7901,7 +7929,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
     );
   }
 
-  return html('main', { style: { paddingTop: '18px' } },
+  return html('main', { className: ['aulas', 'equipo', 'alumnos', 'ingresos'].includes(tab) ? 'wide' : '', style: { paddingTop: '18px' } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
       html('h1', null, 'Administrar'),
@@ -8137,7 +8165,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
             // ── Registro de alumnos (con y sin código) ──
             isAdmin && showTab('alumnos') && html('div', null,
               html('label', null, '👥 Registro de alumnos'),
-              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Todos los que entraron a la app, con código de aula o solo con su nombre: primera y última vez, visitas, sesiones de práctica y hasta qué lección llegaron.'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Todos los que entraron a la app, con código de aula o solo con su nombre: primera y última vez, visitas, sesiones de práctica y hasta qué lección llegaron. Tocá un alumno para resaltarlo.'),
               !showActivityLog
                 ? html('button', { className: 'secondary-btn', onClick: loadActivityLog }, 'Ver registro')
                 : (() => {
@@ -8166,21 +8194,22 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                       !activityError && rows.length === 0
                         ? html('p', { className: 'admin-note' }, activityLog.length ? 'Ningún alumno coincide con el filtro.' : 'Sin registros todavía.')
                         : html(ScrollX, { arrows: 'top' },
-                            html('table', { className: 'rank-table' },
+                            html('table', { className: 'rank-table cardify' },
                               html('thead', null, html('tr', null,
                                 ['Alumno', 'Aula', 'Primera vez', 'Última vez', 'Visitas', 'Sesiones', 'Prom. 7 días', 'Hasta lección'].map(h => html('th', { key: h, style: { cursor: 'default' } }, h)))),
-                              html('tbody', null, rows.map(r => html('tr', { key: r.user_id, style: { cursor: 'default' } },
-                                html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap' } },
+                              html('tbody', null, rows.map(r => html('tr', { key: r.user_id, className: regSel === r.user_id ? 'sel-row' : '',
+                                  onClick: (e) => { if (!e.target.closest('button')) setRegSel(regSel === r.user_id ? null : r.user_id); } },
+                                html('td', { className: 'cell-name', style: { fontWeight: 800, whiteSpace: 'nowrap' } },
                                   r.name || html('span', { style: { fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-soft)' }, title: 'Abrió la app pero no escribió su nombre' }, 'Sin nombre'),
                                   html('span', { className: 'reg-badge' + (r.has_code ? ' code' : '') }, r.has_code ? 'código' : 'libre')),
-                                html('td', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '')
+                                html('td', { 'data-l': 'Aula', style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '')
                                   : html('button', { className: 'mini-btn', title: 'Pasar el progreso de este invitado a un alumno con código', onClick: () => { setMergeFrom(r); setMergeTo(''); setMergeMsg(null); } }, '↪ Pasar a un alumno')),
-                                html('td', { style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
-                                html('td', { style: { fontSize: 12, whiteSpace: 'nowrap' } }, timeAgo(r.last_seen)),
-                                html('td', null, r.visits),
-                                html('td', null, r.sessions),
-                                html('td', null, r.avg_7d == null ? '—' : html(MasteryPill, { value: r.avg_7d, small: true })),
-                                html('td', null, r.max_lesson ? 'L' + r.max_lesson : '—'),
+                                html('td', { 'data-l': 'Primera vez', style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
+                                html('td', { 'data-l': 'Última vez', style: { fontSize: 12, whiteSpace: 'nowrap' } }, timeAgo(r.last_seen)),
+                                html('td', { 'data-l': 'Visitas' }, r.visits),
+                                html('td', { 'data-l': 'Sesiones' }, r.sessions),
+                                html('td', { 'data-l': 'Prom. 7 días' }, r.avg_7d == null ? '—' : html(MasteryPill, { value: r.avg_7d, small: true })),
+                                html('td', { 'data-l': 'Hasta lección' }, r.max_lesson ? 'L' + r.max_lesson : '—'),
                               ))),
                             ),
                           ),

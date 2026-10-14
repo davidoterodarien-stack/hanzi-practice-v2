@@ -1699,3 +1699,48 @@ main.tz-main { padding-bottom: 8px !important; }
 @keyframes bpPop { from { transform: scale(.4) rotate(-6deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
 @keyframes bpBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes bpFall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(380px) rotate(240deg); opacity: 0; } }
+/* ── Pantallas de supervisión: ancho completo en la compu ── */
+@media (min-width: 860px) { main.wide { max-width: 1600px; } }
+@media (min-width: 1200px) { main.wide { max-width: 1600px; } }
+
+/* ── Alumno resaltado (de a uno) ── */
+.stu-row { background: var(--paper); border: 2px solid transparent; transition: background .15s, border-color .15s; }
+.stu-row.sel-row { background: var(--gold-light); border-color: var(--gold); }
+.rank-table tbody tr.sel-row td { background: var(--gold-light); }
+.rank-table tbody tr.sel-row td:first-child { box-shadow: inset 5px 0 0 var(--lacquer); }
+.heat-table tbody tr.sel-row td:first-child { background: var(--gold-light); box-shadow: inset 5px 0 0 var(--lacquer); border-radius: 6px; }
+.heat-table tbody tr.sel-row td { outline: 2px solid var(--gold); outline-offset: -2px; }
+.sel-bar { position: sticky; top: 8px; z-index: 30; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 10px 8px 8px;
+  background: var(--gold-light); border: 2px solid var(--gold); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.sel-dot { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: var(--lacquer); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+.sel-info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.sel-info b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-info small { font-size: 11px; font-weight: 700; color: var(--ink-mid); }
+.sel-x { width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; border: none; background: #fff; color: var(--ink); font-weight: 900; cursor: pointer; }
+
+/* Mapa: el nombre queda fijo al desplazar de costado */
+.heat-table td:first-child, .heat-table th:first-child { position: sticky; left: 0; z-index: 1; background: #fff; }
+.heat-table th:first-child { background: var(--paper); }
+
+/* ── Celular: cada alumno es una tarjeta, sin deslizar de costado ── */
+@media (max-width: 640px) {
+  .rank-table.cardify thead { display: none; }
+  .rank-table.cardify, .rank-table.cardify tbody { display: block; }
+  .rank-table.cardify tbody tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; padding: 10px; margin: 8px 0;
+    border: 2px solid var(--paper-deep); border-radius: 14px; background: #fff; }
+  .rank-table.cardify tbody tr:hover { background: #fff; }
+  .rank-table.cardify td { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px; border: none; border-radius: 10px; background: #F6F1E7 !important; font-size: 13px; text-align: left !important; white-space: normal !important; min-width: 0; }
+  .rank-table.cardify td::before { content: attr(data-l); font-size: 10px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; }
+  .rank-table.cardify td.cell-name { grid-column: 1 / -1; order: -2; background: none !important; padding: 0 2px 2px; font-size: 16px; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; }
+  .rank-table.cardify td.cell-name::before { display: none; }
+  .rank-table.cardify td.cell-rank { order: -1; }
+  .rank-table.cardify tbody tr.sel-row { border-color: var(--gold); background: var(--gold-light); box-shadow: inset 5px 0 0 var(--lacquer); }
+  .rank-table.cardify tbody tr.sel-row td { background: #fff !important; }
+  .rank-table.cardify tbody tr.sel-row td.cell-name { background: none !important; box-shadow: none; }
+  .rank-table.cardify tbody tr.sel-row td:first-child { box-shadow: none; }
+  .sel-bar { top: 4px; flex-wrap: wrap; }
+  .sel-info { flex: 1 1 calc(100% - 90px); order: 1; }
+  .sel-dot { order: 0; }
+  .sel-x { order: 2; }
+  .sel-bar .mini-btn { order: 3; margin-left: 44px; }
+}

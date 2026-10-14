@@ -1017,7 +1017,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
 
   if (!err && rows !== null && !student && tab === 'hsk') body = html(HskClassReport, { key: 'hsk1', classId, level: 1, isSel, onSelect: pick });
   if (!err && rows !== null && !student && tab === 'hsk2') body = html(HskClassReport, { key: 'hsk2', classId, level: 2, isSel, onSelect: pick });
-  if (!err && rows !== null && !student && tab === 'clases') body = html(ClassPlans, { key: classId, classId, lessons, students: rows });
+  if (!err && rows !== null && !student && tab === 'clases') body = html(ClassPlans, { key: classId, classId, lessons, students: rows, vocab });
   if (!err && rows !== null && !student && tab === 'bingo') body = html(BingoHost, { key: classId, classId, className: cls ? cls.name : 'Clase', lessons, maxLesson: settings && settings.max_lesson ? Number(settings.max_lesson) : null });
 
   if (!err && rows !== null && !student && tab === 'config') {
@@ -1115,43 +1115,134 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
 }
 
 // ═════════════════ Clases armadas por el lǎoshī (módulo de Mi aula, opt-in) ═════════════════
-// Cada clase es una lista de pasos que reutilizan las actividades de la app.
+// Cada clase es una lista de pasos: actividades de la app, explicaciones, listas de palabras
+// propias, preguntas propias y oraciones para ordenar. Se puede dar EN VIVO (el lǎoshī avanza
+// y los alumnos lo siguen) y guardar en una biblioteca compartida del equipo docente.
 // Módulo aparte: abre los juegos dentro de su propia pantalla y anota el avance en
 // npcr_plan_progress (npcr_clases_plan.sql), sin cambiar cómo funciona el resto.
 const PLAN_LESSON_MODES = [['match', 'Emparejar'], ['cards', 'Tarjetas'], ['quiz', 'Opción múltiple'], ['memoria', 'Memoria'], ['frases', 'Frases clave']];
+const PLAN_WORD_MODES = [['cards', 'Tarjetas'], ['match', 'Emparejar'], ['quiz', 'Opción múltiple'], ['memoria', 'Memoria']];
 const PLAN_GAMES = [['frase', 'Completá la frase'], ['orden', 'Ordená la oración'], ['audio', 'Reconocer por audio'], ['dialogo', 'Diálogos'],
   ['modal', 'Verbos modales'], ['tiempo', 'Expresiones de tiempo'], ['clas', 'Clasificadores'], ['zhe', 'Zhè shì shénme?'], ['tonos', 'Tonos'], ['dictado', 'Dictado 听写']];
-const PLAN_KIND_ICON = { lesson: '📖', game: '🎮', texto: '📝' };
+const PLAN_KIND_ICON = { lesson: '📖', game: '🎮', texto: '📝', words: '🔤', quiz: '❓', orden: '🔀' };
+const planModeName = (list, m) => (list.find(x => x[0] === m) || [])[1] || m;
 function planStepLabel(s) {
-  if (s.kind === 'lesson') return 'Lección ' + s.lesson + ' · ' + ((PLAN_LESSON_MODES.find(m => m[0] === s.mode) || [])[1] || s.mode);
-  if (s.kind === 'game') return (PLAN_GAMES.find(g => g[0] === s.game) || [])[1] || s.game;
+  if (s.kind === 'lesson') return 'Lección ' + s.lesson + ' · ' + planModeName(PLAN_LESSON_MODES, s.mode);
+  if (s.kind === 'game') return planModeName(PLAN_GAMES, s.game);
+  if (s.kind === 'words') return (s.title || (s.words || []).slice(0, 4).map(w => w.hanzi).join(' ') + ((s.words || []).length > 4 ? '…' : '')) + ' · ' + planModeName(PLAN_WORD_MODES, s.mode);
+  const n = (s.items || []).length;
+  if (s.kind === 'quiz') return (s.title || 'Preguntas') + ' · ' + n + (n === 1 ? ' pregunta' : ' preguntas');
+  if (s.kind === 'orden') return (s.title || 'Ordená las oraciones') + ' · ' + n + (n === 1 ? ' oración' : ' oraciones');
   return s.title || 'Explicación';
 }
 const planNewId = () => secureRandomChars('abcdefghijklmnopqrstuvwxyz0123456789', 8);
+const planWordsOf = (vocab, list) => (list || []).map(x => { const w = (vocab[x.lesson] || []).find(v => v.hanzi === x.hanzi); return w ? { ...w, _lesson: x.lesson } : null; }).filter(Boolean);
 
-// ── Lǎoshī: armar, publicar y seguir las clases del aula ──
-function ClassPlans({ classId, lessons, students }) {
+// ── Juegos propios del módulo: preguntas de opción múltiple y oraciones para ordenar ──
+function PlanResult({ title, percent, wrong, onAgain, onBack }) {
+  return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, title)),
+    html('div', { style: { padding: '0 16px', textAlign: 'center' } },
+      html('div', { className: 'plan-score' + (percent >= 70 ? ' ok' : '') }, percent + '%'),
+      html('div', { style: { fontWeight: 800, margin: '6px 0 14px' } }, percent >= 70 ? '¡Muy bien! Paso hecho ✓' : 'Necesitás 70% para completar el paso. ¡Probá de nuevo!'),
+      wrong.length > 0 && html('div', { className: 'plan-wrong' }, html('b', null, 'Para repasar:'), wrong.map((w, i) => html('div', { key: i }, w))),
+      html('div', { style: { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 14 } },
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: onAgain }, '↻ Otra vez'),
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: onBack }, 'Volver a la clase'))));
+}
+function PlanQuizGame({ title, items, onBack, onFinish }) {
+  const build = () => shuffle(items).map(it => ({ ...it, opts: shuffle([it.ok, ...(it.bad || []).filter(Boolean)]) }));
+  const [list, setList] = useState(build);
+  const [i, setI] = useState(0);
+  const [pick, setPick] = useState(null);
+  const [wrong, setWrong] = useState([]);
+  const [done, setDone] = useState(null);
+  const q = list[i];
+  const choose = (o) => { if (pick !== null) return; setPick(o); if (o === q.ok) playCorrect(); else { playWrong(); setWrong(w => [...w, q.q + ' → ' + q.ok]); } };
+  const next = () => {
+    if (i + 1 < list.length) { setI(i + 1); setPick(null); return; }
+    const p = Math.round((list.length - wrong.length) / list.length * 100);
+    setDone(p); onFinish(p, wrong);
+  };
+  if (done !== null) return html(PlanResult, { title, percent: done, wrong, onBack, onAgain: () => { setList(build()); setI(0); setPick(null); setWrong([]); setDone(null); } });
+  return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', { style: { flex: 1 } }, title),
+      html('span', { className: 'plan-count' }, (i + 1) + '/' + list.length)),
+    html('div', { style: { padding: '0 16px' } },
+      html('div', { className: 'plan-q hanzi-font' }, q.q),
+      html('div', { className: 'plan-opts' }, q.opts.map((o, k) => html('button', { key: k,
+        className: 'plan-opt hanzi-font' + (pick !== null && o === q.ok ? ' ok' : '') + (pick === o && o !== q.ok ? ' bad' : ''), onClick: () => choose(o) }, o))),
+      pick !== null && html('button', { className: 'primary-btn', style: { marginTop: 14 }, onClick: next }, i + 1 < list.length ? 'Siguiente →' : 'Ver resultado')));
+}
+function PlanOrderGame({ title, items, onBack, onFinish }) {
+  const tok = (zh) => zh.trim().split(/\s+/);
+  const build = () => shuffle(items).map(it => ({ ...it, pool: shuffle(tok(it.zh).map((t, k) => ({ t, k }))) }));
+  const [list, setList] = useState(build);
+  const [i, setI] = useState(0);
+  const [chosen, setChosen] = useState([]);
+  const [checked, setChecked] = useState(null);
+  const [wrong, setWrong] = useState([]);
+  const [done, setDone] = useState(null);
+  const q = list[i];
+  const answer = tok(q.zh).join('');
+  const check = () => {
+    const ok = chosen.map(c => c.t).join('') === answer;
+    setChecked(ok);
+    if (ok) playCorrect(); else { playWrong(); setWrong(w => [...w, tok(q.zh).join(' ') + (q.es ? ' · ' + q.es : '')]); }
+  };
+  const next = () => {
+    if (i + 1 < list.length) { setI(i + 1); setChosen([]); setChecked(null); return; }
+    const p = Math.round((list.length - wrong.length) / list.length * 100);
+    setDone(p); onFinish(p, wrong);
+  };
+  if (done !== null) return html(PlanResult, { title, percent: done, wrong, onBack, onAgain: () => { setList(build()); setI(0); setChosen([]); setChecked(null); setWrong([]); setDone(null); } });
+  return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', { style: { flex: 1 } }, title),
+      html('span', { className: 'plan-count' }, (i + 1) + '/' + list.length)),
+    html('div', { style: { padding: '0 16px' } },
+      q.es && html('div', { className: 'plan-order-es' }, q.es),
+      html('div', { className: 'plan-order-line' + (checked === true ? ' ok' : checked === false ? ' bad' : '') },
+        chosen.length === 0 ? html('span', { className: 'plan-order-ph' }, 'Tocá las palabras en orden') :
+        chosen.map((c, k) => html('button', { key: c.k, className: 'plan-chip hanzi-font', disabled: checked !== null, onClick: () => setChosen(chosen.filter(x => x.k !== c.k)) }, c.t))),
+      html('div', { className: 'plan-order-pool' }, q.pool.filter(c => !chosen.some(x => x.k === c.k)).map(c =>
+        html('button', { key: c.k, className: 'plan-chip hanzi-font', disabled: checked !== null, onClick: () => setChosen([...chosen, c]) }, c.t))),
+      checked === false && html('div', { className: 'plan-order-fix' }, 'Era: ', html('b', { className: 'hanzi-font' }, tok(q.zh).join(' '))),
+      checked === null
+        ? html('button', { className: 'primary-btn', style: { marginTop: 14 }, disabled: chosen.length !== q.pool.length, onClick: check }, 'Comprobar')
+        : html('button', { className: 'primary-btn', style: { marginTop: 14 }, onClick: next }, i + 1 < list.length ? 'Siguiente →' : 'Ver resultado')));
+}
+
+// ── Lǎoshī: armar, publicar, dar en vivo y seguir las clases del aula ──
+function ClassPlans({ classId, lessons, students, vocab }) {
   const [plans, setPlans] = useState(null);
   const [report, setReport] = useState([]);
   const [err, setErr] = useState(null);
   const [msg, setMsg] = useState(null);
   const [edit, setEdit] = useState(null);       // clase que se está armando
   const [view, setView] = useState(null);       // id de la clase cuyo avance se mira
+  const [liveId, setLiveId] = useState(null);   // clase que se está dando en vivo
+  const [lib, setLib] = useState(null);         // biblioteca abierta (lista)
   const [copyFor, setCopyFor] = useState(null); // clase a duplicar
   const [classes, setClasses] = useState([]);
   const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
 
+  const loadReport = () => db.rpc('npcr_plan_report', { p_class: classId }).then(({ data }) => setReport(data || []));
   const load = () => {
     db.from('npcr_class_plans').select('*').eq('class_id', classId).order('position').order('created_at').then(({ data, error }) => {
       if (error) { setErr(error.message); setPlans([]); return; }
       setPlans(data || []);
+      const live = (data || []).find(p => p.live_step);
+      if (live) setLiveId(id => id || live.id);
     });
-    db.rpc('npcr_plan_report', { p_class: classId }).then(({ data }) => setReport(data || []));
+    loadReport();
   };
   useEffect(() => { load(); db.from('classes').select('id,name,archived').order('created_at', { ascending: false }).then(({ data }) => setClasses((data || []).filter(c => !c.archived))); }, [classId]);
+  // En vivo: el avance de los alumnos se actualiza solo
+  useEffect(() => { if (!liveId) return; const t = setInterval(loadReport, 4000); return () => clearInterval(t); }, [liveId]);
 
   const active = (students || []).filter(r => r.user_id);
-  const doneOf = (p, uid) => p.steps.filter(s => report.some(x => x.plan_id === p.id && x.student_id === uid && x.step_id === s.id && x.done)).length;
+  const stOf = (pid, uid, sid) => report.find(x => x.plan_id === pid && x.student_id === uid && x.step_id === sid);
+  const doneOf = (p, uid) => p.steps.filter(s => (stOf(p.id, uid, s.id) || {}).done).length;
   const finished = (p) => p.steps.length ? active.filter(r => doneOf(p, r.user_id) === p.steps.length).length : 0;
 
   const save = async () => {
@@ -1168,8 +1259,8 @@ function ClassPlans({ classId, lessons, students }) {
   };
   const update = async (p, patch, ok) => {
     const { error } = await db.from('npcr_class_plans').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', p.id);
-    if (error) { flash('err', '❌ ' + error.message); return; }
-    load(); if (ok) flash('ok', ok);
+    if (error) { flash('err', '❌ ' + error.message); return false; }
+    load(); if (ok) flash('ok', ok); return true;
   };
   const remove = async (p) => {
     if (!window.confirm('¿Eliminar la clase "' + p.title + '"?\n\nSe borra también el avance de los alumnos en esta clase.')) return;
@@ -1183,18 +1274,40 @@ function ClassPlans({ classId, lessons, students }) {
     setPlans(list);
     await Promise.all(list.map((p, k) => db.from('npcr_class_plans').update({ position: k }).eq('id', p.id)));
   };
-  const duplicate = async (p, target) => {
-    const { error } = await db.from('npcr_class_plans').insert({ class_id: target, title: p.title + (target === classId ? ' (copia)' : ''), description: p.description,
-      steps: p.steps.map(s => ({ ...s, id: planNewId() })), published: false, position: target === classId ? plans.length : 999 });
-    setCopyFor(null);
-    if (error) { flash('err', '❌ ' + error.message); return; }
+  const copyTo = async (src, target, suffix) => {
+    const { error } = await db.from('npcr_class_plans').insert({ class_id: target, title: src.title + (suffix || ''), description: src.description || null,
+      steps: src.steps.map(s => ({ ...s, id: planNewId() })), published: false, position: target === classId ? (plans || []).length : 999 });
+    if (error) { flash('err', '❌ ' + error.message); return false; }
     if (target === classId) load();
-    flash('ok', '⧉ Copia creada como borrador' + (target === classId ? '.' : ' en "' + ((classes.find(c => c.id === target) || {}).name || 'la otra aula') + '".'));
+    return true;
+  };
+  const duplicate = async (p, target) => {
+    setCopyFor(null);
+    if (await copyTo(p, target, target === classId ? ' (copia)' : ''))
+      flash('ok', '⧉ Copia creada como borrador' + (target === classId ? '.' : ' en "' + ((classes.find(c => c.id === target) || {}).name || 'la otra aula') + '".'));
+  };
+  const toLibrary = async (p) => {
+    const { data: { user } } = await db.auth.getUser();
+    const { data: me } = await db.from('profiles').select('name').eq('id', user.id).maybeSingle();
+    const { error } = await db.from('npcr_plan_library').insert({ title: p.title, description: p.description || null, steps: p.steps, author: (me && me.name) || user.email || null, created_by: user.id });
+    if (error) { flash('err', '❌ ' + error.message + (/relation|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_clases_plan.sql actualizado?' : '')); return; }
+    flash('ok', '📤 "' + p.title + '" quedó en la biblioteca: cualquier lǎoshī la puede usar.');
+  };
+  const goLive = async (p) => {
+    await Promise.all((plans || []).filter(x => x.live_step && x.id !== p.id).map(x => db.from('npcr_class_plans').update({ live_step: null }).eq('id', x.id)));
+    if (await update(p, { live_step: p.live_step || p.steps[0].id, live_at: new Date().toISOString(), ...(p.published ? {} : { published: true }) })) setLiveId(p.id);
   };
 
   if (err) return html('div', { className: 'admin-status err' }, '❌ ' + err + (/relation|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_clases_plan.sql?' : ''));
   if (!plans) return html('p', { className: 'admin-note' }, 'Cargando clases…');
-  if (edit) return html(PlanEditor, { edit, setEdit, lessons, onSave: save, onCancel: () => setEdit(null), msg });
+  if (edit) return html(PlanEditor, { edit, setEdit, lessons, vocab, onSave: save, onCancel: () => setEdit(null), msg });
+  if (lib) return html(PlanLibrary, { onBack: () => setLib(null), onUse: async (it) => { if (await copyTo(it, classId, '')) { setLib(null); flash('ok', '📥 "' + it.title + '" se agregó a esta aula como borrador.'); } } });
+
+  const live = liveId && plans.find(p => p.id === liveId);
+  if (live && live.live_step) return html(PlanLiveHost, { plan: live, vocab, students: active, report, flash, msg,
+    onStep: (sid) => update(live, { live_step: sid, live_at: new Date().toISOString() }),
+    onEnd: async () => { if (await update(live, { live_step: null }, '⏹ Terminó la clase en vivo. Los alumnos pueden seguir haciendo los pasos a su ritmo.')) setLiveId(null); },
+    onExit: () => setLiveId(null) });
 
   const viewing = view && plans.find(p => p.id === view);
   if (viewing) return html('div', { className: 'report-card' },
@@ -1202,17 +1315,14 @@ function ClassPlans({ classId, lessons, students }) {
     active.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay alumnos activos en esta aula.')
     : html(ScrollX, { arrows: 'top' }, html('table', { className: 'heat-table plan-table' },
         html('thead', null, html('tr', null, html('th', null, 'Alumno'), viewing.steps.map((s, i) => html('th', { key: s.id, title: planStepLabel(s) }, (i + 1) + '. ' + PLAN_KIND_ICON[s.kind])), html('th', null, 'Total'))),
-        html('tbody', null, active.map(r => {
-          const n = doneOf(viewing, r.user_id);
-          return html('tr', { key: r.user_id },
-            html('td', { style: { textAlign: 'left', whiteSpace: 'nowrap' } }, r.display_name),
-            viewing.steps.map(s => {
-              const x = report.find(y => y.plan_id === viewing.id && y.student_id === r.user_id && y.step_id === s.id);
-              const c = !x ? { bg: 'var(--paper)', fg: 'var(--ink-soft)' } : x.done ? { bg: 'var(--jade-light)', fg: 'var(--jade-dark)' } : { bg: 'var(--gold-light)', fg: 'var(--gold-dark)' };
-              return html('td', { key: s.id, style: { background: c.bg, color: c.fg }, title: planStepLabel(s) + (x ? ' · ' + x.percent + '% · ' + x.attempts + (x.attempts === 1 ? ' intento' : ' intentos') : ' · sin hacer') }, x ? (x.done ? '✓' : x.percent + '%') : '·');
-            }),
-            html('td', { style: { fontWeight: 900 } }, n + '/' + viewing.steps.length));
-        })))),
+        html('tbody', null, active.map(r => html('tr', { key: r.user_id },
+          html('td', { style: { textAlign: 'left', whiteSpace: 'nowrap' } }, r.display_name),
+          viewing.steps.map(s => {
+            const x = stOf(viewing.id, r.user_id, s.id);
+            const c = !x ? { bg: 'var(--paper)', fg: 'var(--ink-soft)' } : x.done ? { bg: 'var(--jade-light)', fg: 'var(--jade-dark)' } : { bg: 'var(--gold-light)', fg: 'var(--gold-dark)' };
+            return html('td', { key: s.id, style: { background: c.bg, color: c.fg }, title: planStepLabel(s) + (x ? ' · ' + x.percent + '% · ' + x.attempts + (x.attempts === 1 ? ' intento' : ' intentos') : ' · sin hacer') }, x ? (x.done ? '✓' : x.percent + '%') : '·');
+          }),
+          html('td', { style: { fontWeight: 900 } }, doneOf(viewing, r.user_id) + '/' + viewing.steps.length)))))),
     html('div', { className: 'plan-legend' }, viewing.steps.map((s, i) => html('span', { key: s.id }, (i + 1) + '. ' + PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)))),
     html('p', { className: 'admin-note', style: { margin: '8px 0 0' } }, '✓ hecho (70% o más) · % mejor resultado hasta ahora · · todavía no lo hizo.'));
 
@@ -1220,15 +1330,16 @@ function ClassPlans({ classId, lessons, students }) {
     msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
     html('div', { className: 'report-card' },
       html('div', { className: 'plan-head' }, html('div', { className: 'report-h', style: { margin: 0, flex: 1 } }, '📚 Clases del aula'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto', padding: '8px 12px' }, onClick: () => setLib(true) }, '📚 Biblioteca'),
         html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto', padding: '8px 14px' }, onClick: () => setEdit({ title: '', description: '', steps: [] }) }, '+ Nueva clase')),
-      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Armá una clase con pasos: actividades de una lección, juegos de la app o una explicación. Los alumnos la ven en Mi aula cuando la publicás, y acá ves cómo le va a cada uno.')),
-    plans.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay clases armadas en esta aula.')
-    : html('div', { className: 'plan-list' }, plans.map((p, i) => html('div', { key: p.id, className: 'plan-card' + (p.published ? '' : ' draft') },
+      html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Armá una clase con pasos: actividades del libro y de la app, explicaciones, tus propias listas de palabras, preguntas y oraciones. Publicala para que la hagan a su ritmo, o dala 🔴 en vivo y los alumnos siguen tus pasos desde el celular.')),
+    plans.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay clases armadas en esta aula. Creá una nueva o traé una de la 📚 Biblioteca.')
+    : html('div', { className: 'plan-list' }, plans.map((p, i) => html('div', { key: p.id, className: 'plan-card' + (p.published ? '' : ' draft') + (p.live_step ? ' live' : '') },
         html('div', { className: 'plan-card-top' },
           html('div', { style: { flex: 1, minWidth: 0 } },
             html('div', { className: 'plan-card-title' }, p.title),
             html('div', { className: 'plan-card-sub' }, p.steps.length + (p.steps.length === 1 ? ' paso' : ' pasos') + ' · ' + (p.published ? finished(p) + '/' + active.length + ' alumnos la completaron' : 'borrador: los alumnos todavía no la ven'))),
-          html('span', { className: 'plan-badge' + (p.published ? ' on' : '') }, p.published ? 'Publicada' : 'Borrador')),
+          p.live_step ? html('span', { className: 'plan-badge live' }, '🔴 En vivo') : html('span', { className: 'plan-badge' + (p.published ? ' on' : '') }, p.published ? 'Publicada' : 'Borrador')),
         p.description && html('div', { className: 'plan-card-desc' }, p.description),
         html('div', { className: 'plan-steps-mini' }, p.steps.map((s, k) => html('span', { key: s.id }, (k + 1) + '. ' + PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)))),
         copyFor === p.id && html('div', { className: 'plan-copy' }, 'Duplicar en: ',
@@ -1237,29 +1348,119 @@ function ClassPlans({ classId, lessons, students }) {
             classes.map(c => html('option', { key: c.id, value: c.id }, c.id === classId ? c.name + ' (esta aula)' : c.name))),
           html('button', { className: 'mini-btn', onClick: () => setCopyFor(null) }, 'Cancelar')),
         html('div', { className: 'plan-actions' },
-          html('button', { className: 'mini-btn' + (p.published ? '' : ' strong'), onClick: () => update(p, { published: !p.published }, p.published ? 'La clase volvió a borrador: los alumnos ya no la ven.' : '📢 Clase publicada: ya la ven los alumnos en Mi aula.') }, p.published ? '🙈 Despublicar' : '📢 Publicar'),
+          html('button', { className: 'mini-btn live', onClick: () => p.live_step ? setLiveId(p.id) : goLive(p) }, p.live_step ? '🔴 Volver al vivo' : '🔴 Dar en vivo'),
+          html('button', { className: 'mini-btn' + (p.published ? '' : ' strong'), onClick: () => update(p, { published: !p.published, ...(p.published ? { live_step: null } : {}) }, p.published ? 'La clase volvió a borrador: los alumnos ya no la ven.' : '📢 Clase publicada: ya la ven los alumnos en Mi aula.') }, p.published ? '🙈 Despublicar' : '📢 Publicar'),
           html('button', { className: 'mini-btn', onClick: () => setEdit({ id: p.id, title: p.title, description: p.description || '', steps: p.steps }) }, '✏️ Editar'),
           html('button', { className: 'mini-btn', onClick: () => setView(p.id) }, '📊 Avance'),
           html('button', { className: 'mini-btn', onClick: () => setCopyFor(p.id) }, '⧉ Duplicar'),
+          html('button', { className: 'mini-btn', onClick: () => toLibrary(p) }, '📤 A la biblioteca'),
           html('button', { className: 'mini-btn', disabled: i === 0, onClick: () => move(i, -1), title: 'Subir' }, '↑'),
           html('button', { className: 'mini-btn', disabled: i === plans.length - 1, onClick: () => move(i, 1), title: 'Bajar' }, '↓'),
           html('button', { className: 'mini-btn danger', onClick: () => remove(p) }, '🗑'))))),
   );
 }
 
-function PlanEditor({ edit, setEdit, lessons, onSave, onCancel, msg }) {
-  const [adding, setAdding] = useState(null);   // 'lesson' | 'game' | 'texto'
+// Biblioteca compartida: clases que guardó cualquier lǎoshī, para traerlas al aula
+function PlanLibrary({ onBack, onUse }) {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState(null);
+  const [me, setMe] = useState(null);
+  const [q, setQ] = useState('');
+  const load = () => db.from('npcr_plan_library').select('*').order('created_at', { ascending: false }).then(({ data, error }) => {
+    if (error) { setErr(error.message); setItems([]); return; } setItems(data || []);
+  });
+  useEffect(() => { load(); db.auth.getUser().then(({ data }) => setMe(data && data.user ? data.user.id : null)); }, []);
+  const remove = async (it) => {
+    if (!window.confirm('¿Sacar "' + it.title + '" de la biblioteca?\n\nLas aulas que ya la usaron conservan su copia.')) return;
+    const { error } = await db.from('npcr_plan_library').delete().eq('id', it.id);
+    if (error) { setErr(error.message); return; } load();
+  };
+  const list = (items || []).filter(it => !q.trim() || (it.title + ' ' + (it.description || '') + ' ' + (it.author || '')).toLowerCase().includes(q.trim().toLowerCase()));
+  return html('div', { className: 'report-card' },
+    html('div', { className: 'plan-head' }, html('button', { className: 'mini-btn', onClick: onBack }, '← Clases'), html('b', { style: { flex: 1 } }, '📚 Biblioteca de clases'),
+      html('input', { value: q, onChange: e => setQ(e.target.value), placeholder: 'Buscar…', style: { ...cmInput, flex: '0 1 200px' } })),
+    html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Clases que guardó el equipo docente con "📤 A la biblioteca". "Usar en esta aula" trae una copia como borrador, para adaptarla sin cambiar la original.'),
+    err && html('div', { className: 'admin-status err' }, '❌ ' + err + (/relation|does not exist/.test(err) ? ' — ¿Ejecutaste npcr_clases_plan.sql actualizado?' : '')),
+    !items ? html('p', { className: 'admin-note' }, 'Cargando…')
+    : list.length === 0 ? html('p', { className: 'admin-note' }, items.length ? 'Ninguna clase coincide con la búsqueda.' : 'La biblioteca todavía está vacía.')
+    : html('div', { className: 'plan-list' }, list.map(it => html('div', { key: it.id, className: 'plan-card' },
+        html('div', { className: 'plan-card-title' }, it.title),
+        html('div', { className: 'plan-card-sub' }, it.steps.length + ' pasos' + (it.author ? ' · de ' + it.author : '') + ' · ' + new Date(it.created_at).toLocaleDateString('es-AR')),
+        it.description && html('div', { className: 'plan-card-desc' }, it.description),
+        html('div', { className: 'plan-steps-mini' }, it.steps.map((s, k) => html('span', { key: k }, (k + 1) + '. ' + PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)))),
+        html('div', { className: 'plan-actions' },
+          html('button', { className: 'mini-btn strong', onClick: () => onUse(it) }, '📥 Usar en esta aula'),
+          it.created_by === me && html('button', { className: 'mini-btn danger', onClick: () => remove(it) }, '🗑 Sacar'))))));
+}
+
+// Lo que se proyecta del paso actual (explicación, palabras, preguntas…)
+function PlanStepShow({ s, vocab, big }) {
+  if (s.kind === 'texto') return html('div', { className: 'plan-text' + (big ? ' big' : '') }, s.text);
+  if (s.kind === 'words') return html('div', { className: 'plan-show-words' }, planWordsOf(vocab, s.words).map(w => html('div', { key: w._lesson + w.hanzi, className: 'plan-show-word' },
+    html('div', { className: 'hanzi-font' }, w.hanzi), html(TonedPinyin, { text: w.pinyin }), html('small', null, w.es))));
+  if (s.kind === 'quiz') return html('div', { className: 'plan-show-list' }, (s.items || []).map((it, k) => html('div', { key: k }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, it.q))));
+  if (s.kind === 'orden') return html('div', { className: 'plan-show-list' }, (s.items || []).map((it, k) => html('div', { key: k }, (k + 1) + '. ' + (it.es || '…'))));
+  return html('div', { className: 'plan-show-note' }, PLAN_KIND_ICON[s.kind] + ' Los alumnos hacen esta actividad en su celular.');
+}
+
+// Consola del lǎoshī durante la clase en vivo
+function PlanLiveHost({ plan, vocab, students, report, onStep, onEnd, onExit, msg }) {
+  const idx = Math.max(0, plan.steps.findIndex(s => s.id === plan.live_step));
+  const s = plan.steps[idx];
+  const st = (uid) => report.find(x => x.plan_id === plan.id && x.student_id === uid && x.step_id === s.id);
+  const nDone = students.filter(r => (st(r.user_id) || {}).done).length;
+  return html('div', { className: 'plan-live' },
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
+    html('div', { className: 'plan-live-top' },
+      html('span', { className: 'plan-badge live' }, '🔴 En vivo'), html('b', { style: { flex: 1, minWidth: 0 } }, plan.title),
+      html('button', { className: 'mini-btn', onClick: onExit, title: 'Volver a la lista sin terminar la clase en vivo' }, '← Clases'),
+      html('button', { className: 'mini-btn danger', onClick: onEnd }, '⏹ Terminar en vivo')),
+    html('div', { className: 'plan-live-dots' }, plan.steps.map((x, k) => html('button', { key: x.id, className: 'plan-live-dot' + (k === idx ? ' on' : '') + (k < idx ? ' past' : ''), title: planStepLabel(x), onClick: () => onStep(x.id) }, k + 1))),
+    html('div', { className: 'plan-live-stage' },
+      html('div', { className: 'plan-live-kicker' }, 'Paso ' + (idx + 1) + ' de ' + plan.steps.length),
+      html('div', { className: 'plan-live-title' }, PLAN_KIND_ICON[s.kind] + ' ' + (s.kind === 'texto' ? s.title : planStepLabel(s))),
+      html(PlanStepShow, { s, vocab, big: true })),
+    html('div', { className: 'plan-live-nav' },
+      html('button', { className: 'secondary-btn', disabled: idx === 0, onClick: () => onStep(plan.steps[idx - 1].id) }, '◀ Anterior'),
+      html('button', { className: 'primary-btn', disabled: idx === plan.steps.length - 1, onClick: () => onStep(plan.steps[idx + 1].id) }, 'Siguiente ▶')),
+    html('div', { className: 'report-card', style: { marginTop: 12 } },
+      html('div', { className: 'report-h' }, '👥 Este paso: ' + nDone + ' de ' + students.length + ' lo completaron'),
+      html('div', { className: 'plan-live-students' }, students.map(r => { const x = st(r.user_id);
+        return html('span', { key: r.user_id, className: 'plan-live-st' + (x && x.done ? ' done' : x ? ' try' : '') }, (x && x.done ? '✓ ' : x ? x.percent + '% ' : '· ') + r.display_name); })),
+      html('p', { className: 'admin-note', style: { margin: '8px 0 0' } }, 'Los alumnos que entran a 📚 Clases → "Entrar en vivo" pasan solos al paso que elegís. Se actualiza cada pocos segundos.')));
+}
+
+function PlanEditor({ edit, setEdit, lessons, vocab, onSave, onCancel, msg }) {
+  const [adding, setAdding] = useState(null);   // tipo de paso que se está agregando
   const [draft, setDraft] = useState({});
+  const [err, setErr] = useState(null);
   const steps = edit.steps;
   const setSteps = (s) => setEdit(e => ({ ...e, steps: s }));
   const moveStep = (i, d) => { const j = i + d; if (j < 0 || j >= steps.length) return; const s = [...steps]; [s[i], s[j]] = [s[j], s[i]]; setSteps(s); };
-  const start = (kind) => { setAdding(kind); setDraft(kind === 'lesson' ? { lesson: lessons[0], modes: ['cards'] } : kind === 'game' ? { game: 'frase' } : { title: '', text: '' }); };
-  const addStep = () => {
-    if (adding === 'lesson') { if (!draft.modes.length) return; setSteps([...steps, ...draft.modes.map(m => ({ id: planNewId(), kind: 'lesson', lesson: draft.lesson, mode: m }))]); }
-    else if (adding === 'game') setSteps([...steps, { id: planNewId(), kind: 'game', game: draft.game }]);
-    else { if (!draft.title.trim() || !draft.text.trim()) return; setSteps([...steps, { id: planNewId(), kind: 'texto', title: draft.title.trim(), text: draft.text.trim() }]); }
-    setAdding(null);
+  const start = (kind) => {
+    setErr(null); setAdding(kind);
+    setDraft(kind === 'lesson' ? { lesson: lessons[0], modes: ['cards'] } : kind === 'game' ? { game: 'frase' }
+      : kind === 'words' ? { title: '', mode: 'cards', words: [], pick: lessons[0] }
+      : kind === 'quiz' ? { title: '', items: [], q: '', ok: '', b1: '', b2: '', b3: '' }
+      : kind === 'orden' ? { title: '', items: [], zh: '', es: '' } : { title: '', text: '' });
   };
+  const addStep = () => {
+    const d = draft;
+    if (adding === 'lesson') { if (!d.modes.length) return setErr('Marcá al menos una actividad.'); setSteps([...steps, ...d.modes.map(m => ({ id: planNewId(), kind: 'lesson', lesson: d.lesson, mode: m }))]); }
+    else if (adding === 'game') setSteps([...steps, { id: planNewId(), kind: 'game', game: d.game }]);
+    else if (adding === 'words') {
+      if (d.words.length < (d.mode === 'cards' ? 1 : 4)) return setErr(d.mode === 'cards' ? 'Elegí al menos una palabra.' : 'Para este juego hacen falta al menos 4 palabras.');
+      setSteps([...steps, { id: planNewId(), kind: 'words', title: d.title.trim() || null, mode: d.mode, words: d.words }]);
+    }
+    else if (adding === 'quiz') { if (!d.items.length) return setErr('Agregá al menos una pregunta.'); setSteps([...steps, { id: planNewId(), kind: 'quiz', title: d.title.trim() || 'Preguntas', items: d.items }]); }
+    else if (adding === 'orden') { if (!d.items.length) return setErr('Agregá al menos una oración.'); setSteps([...steps, { id: planNewId(), kind: 'orden', title: d.title.trim() || 'Ordená las oraciones', items: d.items }]); }
+    else { if (!d.title.trim() || !d.text.trim()) return setErr('Completá el título y el texto.'); setSteps([...steps, { id: planNewId(), kind: 'texto', title: d.title.trim(), text: d.text.trim() }]); }
+    setAdding(null); setErr(null);
+  };
+  const inp = (key, ph, extra) => html('input', { value: draft[key] || '', placeholder: ph, maxLength: 200, onChange: e => setDraft({ ...draft, [key]: e.target.value }), style: { ...cmInput, width: '100%', ...(extra || {}) } });
+  const hasW = (l, h) => draft.words.some(x => x.lesson === l && x.hanzi === h);
+  const togW = (l, h) => setDraft({ ...draft, words: hasW(l, h) ? draft.words.filter(x => !(x.lesson === l && x.hanzi === h)) : [...draft.words, { lesson: l, hanzi: h }] });
+
   return html('div', { className: 'report-card' },
     html('div', { className: 'plan-head' }, html('button', { className: 'mini-btn', onClick: onCancel }, '← Volver'), html('b', null, edit.id ? '✏️ Editar clase' : '➕ Nueva clase')),
     msg && html('div', { className: 'admin-status ' + msg.type, style: { margin: '8px 0' } }, msg.text),
@@ -1276,8 +1477,12 @@ function PlanEditor({ edit, setEdit, lessons, onSave, onCancel, msg }) {
     !adding && html('div', { className: 'plan-add-btns' },
       html('button', { className: 'secondary-btn', onClick: () => start('lesson') }, '📖 Lección del libro'),
       html('button', { className: 'secondary-btn', onClick: () => start('game') }, '🎮 Actividad de la app'),
+      html('button', { className: 'secondary-btn', onClick: () => start('words') }, '🔤 Mis palabras'),
+      html('button', { className: 'secondary-btn', onClick: () => start('quiz') }, '❓ Mis preguntas'),
+      html('button', { className: 'secondary-btn', onClick: () => start('orden') }, '🔀 Ordenar oraciones'),
       html('button', { className: 'secondary-btn', onClick: () => start('texto') }, '📝 Explicación')),
     adding && html('div', { className: 'plan-add' },
+      html('div', { className: 'report-h', style: { margin: '0 0 8px' } }, { lesson: '📖 Lección del libro', game: '🎮 Actividad de la app', words: '🔤 Mis palabras', quiz: '❓ Mis preguntas', orden: '🔀 Ordenar oraciones', texto: '📝 Explicación' }[adding]),
       adding === 'lesson' && html(React.Fragment, null,
         html('select', { value: draft.lesson, onChange: e => setDraft({ ...draft, lesson: e.target.value }), style: { ...cmInput, width: '100%', marginBottom: 8 } },
           lessons.map(l => html('option', { key: l, value: l }, (LESSON_THEMES[l] && LESSON_THEMES[l].name ? 'L' + l + ' · ' + LESSON_THEMES[l].name : 'Lección ' + l)))),
@@ -1286,18 +1491,58 @@ function PlanEditor({ edit, setEdit, lessons, onSave, onCancel, msg }) {
         html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Cada actividad marcada se agrega como un paso. Frases clave solo funciona en lecciones que tienen frases.')),
       adding === 'game' && html('select', { value: draft.game, onChange: e => setDraft({ ...draft, game: e.target.value }), style: { ...cmInput, width: '100%' } },
         PLAN_GAMES.map(([g, label]) => html('option', { key: g, value: g }, label))),
+      adding === 'words' && html(React.Fragment, null,
+        inp('title', 'Título (opcional, ej: Comidas y bebidas)', { marginBottom: 8 }),
+        html('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' } },
+          html('span', { style: { fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)' } }, 'Juego:'),
+          PLAN_WORD_MODES.map(([m, label]) => html('button', { key: m, className: 'report-tab' + (draft.mode === m ? ' active' : ''), onClick: () => setDraft({ ...draft, mode: m }) }, label))),
+        draft.words.length > 0 && html('div', { className: 'word-pick-selected' },
+          draft.words.map(x => html('button', { key: x.lesson + x.hanzi, className: 'word-pick on', onClick: () => togW(x.lesson, x.hanzi), title: 'Quitar' }, x.hanzi + ' ✕'))),
+        html('select', { value: draft.pick, onChange: e => setDraft({ ...draft, pick: e.target.value }), style: { ...cmInput, width: '100%', margin: '8px 0' } },
+          lessons.map(l => html('option', { key: l, value: l }, 'Palabras de la lección ' + l))),
+        html('div', { className: 'word-pick-grid' }, (vocab[draft.pick] || []).map(w => html('button', { key: w.hanzi, className: 'word-pick' + (hasW(draft.pick, w.hanzi) ? ' on' : ''), onClick: () => togW(draft.pick, w.hanzi), title: w.pinyin + ' · ' + w.es },
+          html('span', { className: 'hanzi-font' }, w.hanzi), html('small', null, (w.es || '').slice(0, 14))))),
+        html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, draft.words.length + ' elegidas. Podés mezclar palabras de distintas lecciones; se usan con su audio del libro.')),
+      adding === 'quiz' && html(React.Fragment, null,
+        inp('title', 'Título del paso (ej: ¿Qué pedimos?)', { marginBottom: 8 }),
+        draft.items.length > 0 && html('div', { className: 'plan-edit-steps', style: { marginBottom: 8 } }, draft.items.map((it, k) => html('div', { key: k, className: 'plan-edit-step' },
+          html('span', { style: { flex: 1, minWidth: 0 } }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, it.q), html('small', null, '✓ ' + it.ok + ' · ✕ ' + it.bad.join(' · '))),
+          html('button', { className: 'mini-btn danger', onClick: () => setDraft({ ...draft, items: draft.items.filter((_, j) => j !== k) }) }, '✕')))),
+        html('div', { className: 'plan-q-form' },
+          inp('q', 'Pregunta (ej: 你喝什么？ o ¿Cómo se dice "té"?)'),
+          inp('ok', '✓ Respuesta correcta', { borderColor: 'var(--jade)' }),
+          html('div', { className: 'plan-q-bad' }, inp('b1', '✕ Incorrecta 1'), inp('b2', '✕ Incorrecta 2'), inp('b3', '✕ Incorrecta 3')),
+          html('button', { className: 'mini-btn strong', style: { alignSelf: 'flex-start' }, onClick: () => {
+            const bad = [draft.b1, draft.b2, draft.b3].map(x => (x || '').trim()).filter(Boolean);
+            if (!draft.q.trim() || !draft.ok.trim() || !bad.length) return setErr('Cada pregunta necesita el texto, la respuesta correcta y al menos una incorrecta.');
+            setErr(null); setDraft({ ...draft, items: [...draft.items, { q: draft.q.trim(), ok: draft.ok.trim(), bad }], q: '', ok: '', b1: '', b2: '', b3: '' });
+          } }, '+ Agregar pregunta'))),
+      adding === 'orden' && html(React.Fragment, null,
+        inp('title', 'Título del paso (opcional)', { marginBottom: 8 }),
+        draft.items.length > 0 && html('div', { className: 'plan-edit-steps', style: { marginBottom: 8 } }, draft.items.map((it, k) => html('div', { key: k, className: 'plan-edit-step' },
+          html('span', { style: { flex: 1, minWidth: 0 } }, (k + 1) + '. ', html('span', { className: 'hanzi-font' }, it.zh), it.es && html('small', null, it.es)),
+          html('button', { className: 'mini-btn danger', onClick: () => setDraft({ ...draft, items: draft.items.filter((_, j) => j !== k) }) }, '✕')))),
+        html('div', { className: 'plan-q-form' },
+          inp('zh', 'Oración con las palabras separadas por espacios (ej: 我 要 一杯 茶)', { fontFamily: 'Noto Sans SC, sans-serif' }),
+          inp('es', 'Traducción (se muestra como pista, opcional)'),
+          html('button', { className: 'mini-btn strong', style: { alignSelf: 'flex-start' }, onClick: () => {
+            const parts = (draft.zh || '').trim().split(/\s+/).filter(Boolean);
+            if (parts.length < 2) return setErr('Separá la oración en al menos 2 partes con espacios: así se arman las fichas para ordenar.');
+            setErr(null); setDraft({ ...draft, items: [...draft.items, { zh: parts.join(' '), es: (draft.es || '').trim() || null }], zh: '', es: '' });
+          } }, '+ Agregar oración'))),
       adding === 'texto' && html(React.Fragment, null,
-        html('input', { value: draft.title, maxLength: 80, placeholder: 'Título (ej: Cómo se usa 的)', onChange: e => setDraft({ ...draft, title: e.target.value }), style: { ...cmInput, width: '100%', marginBottom: 8 } }),
+        inp('title', 'Título (ej: Cómo se usa 的)', { marginBottom: 8 }),
         html('textarea', { value: draft.text, maxLength: 2000, rows: 5, placeholder: 'Texto de la explicación. Podés escribir en chino y en español.', onChange: e => setDraft({ ...draft, text: e.target.value }), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'inherit' } })),
+      err && html('div', { className: 'admin-status err', style: { marginTop: 8 } }, err),
       html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
-        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: addStep }, 'Agregar paso'),
-        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setAdding(null) }, 'Cancelar'))),
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: addStep }, 'Agregar paso a la clase'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => { setAdding(null); setErr(null); } }, 'Cancelar'))),
     html('div', { style: { display: 'flex', gap: 8, marginTop: 16, borderTop: '1px solid var(--paper-deep)', paddingTop: 12 } },
       html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: onSave }, edit.id ? '💾 Guardar cambios' : '💾 Guardar clase'),
       html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: onCancel }, 'Cancelar')));
 }
 
-// ── Alumno: las clases publicadas de su aula, paso a paso ──
+// ── Alumno: las clases publicadas de su aula, paso a paso (o siguiendo al lǎoshī en vivo) ──
 function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onRecordCard, lessons, openLessons, appConfig, playerName, onLessonResult, onLog }) {
   const [plans, setPlans] = useState(null);
   const [prog, setProg] = useState([]);
@@ -1305,15 +1550,29 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
   const [openId, setOpenId] = useState(null);
   const [run, setRun] = useState(null);         // paso que se está haciendo
   const [runN, setRunN] = useState(0);
-  const load = () => {
-    db.from('npcr_class_plans').select('*').eq('class_id', classId).eq('published', true).order('position').order('created_at').then(({ data, error }) => {
-      if (error) { setErr(error.message); setPlans([]); return; }
-      setPlans(data || []);
-    });
+  const [follow, setFollow] = useState(null);   // id de la clase en vivo que se está siguiendo
+  const [note, setNote] = useState(null);
+  const loadPlans = () => db.from('npcr_class_plans').select('*').eq('class_id', classId).eq('published', true).order('position').order('created_at').then(({ data, error }) => {
+    if (error) { setErr(error.message); setPlans([]); return; }
+    setPlans(data || []);
+  });
+  useEffect(() => {
+    loadPlans();
     db.from('npcr_plan_progress').select('plan_id,step_id,percent,done').then(({ data }) => setProg(data || []));
-  };
-  useEffect(() => { load(); }, [classId]);
+    const t = setInterval(loadPlans, 5000);   // así se entera de la clase en vivo
+    return () => clearInterval(t);
+  }, [classId]);
   useEffect(() => stopAudio, []);
+
+  // Siguiendo la clase en vivo: cuando el lǎoshī cambia de paso, se pasa solo
+  const livePlan = follow && plans && plans.find(p => p.id === follow);
+  const liveStep = livePlan && livePlan.live_step;
+  useEffect(() => {
+    if (!follow || !plans) return;
+    if (!liveStep) { setFollow(null); setRun(null); setNote('La clase en vivo terminó. Podés seguir haciendo los pasos a tu ritmo.'); return; }
+    const s = livePlan.steps.find(x => x.id === liveStep);
+    if (s && (!run || run.id !== s.id)) { stopAudio(); setOpenId(livePlan.id); setRun(s); setRunN(k => k + 1); }
+  }, [follow, liveStep]);
 
   const stOf = (pid, sid) => prog.find(x => x.plan_id === pid && x.step_id === sid);
   const nDone = (p) => p.steps.filter(s => (stOf(p.id, s.id) || {}).done).length;
@@ -1330,34 +1589,53 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
   if (err) return html(GameStatusScreen, { onBack, title: '📚 Clases', msg: '❌ ' + err + ' (¿ejecutaste npcr_clases_plan.sql?)' });
   if (!plans) return html(GameStatusScreen, { onBack, title: '📚 Clases', msg: '⏳ Cargando clases…' });
   const plan = openId && plans.find(p => p.id === openId);
+  const liveBar = follow && html('div', { className: 'plan-live-bar' }, '🔴 En vivo · tu lǎoshī va pasando los pasos',
+    html('button', { onClick: () => { setFollow(null); setNote(null); } }, 'Salir del vivo'));
 
   // Un paso en curso: se abre el juego de siempre, dentro de este módulo
   if (plan && run) {
     const s = run;
     const back = () => { stopAudio(); setRun(null); };
-    const finish = (percent, missed, total) => record(plan, s, percent);
+    const finish = (percent) => record(plan, s, percent);
     const key = 'plan-' + s.id + '-' + runN;
-    if (s.kind === 'texto') return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
+    const wrap = (el) => follow ? html(React.Fragment, null, liveBar, el) : el;
+    if (s.kind === 'texto') return wrap(html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
       html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: back }, '←'), html('h1', null, '📝 ' + s.title)),
       html('div', { style: { padding: '0 16px' } },
-        html('div', { className: 'plan-text' }, s.text),
-        html('button', { className: 'primary-btn', style: { marginTop: 16 }, onClick: () => { record(plan, s, 100); back(); } }, '✓ Listo, lo leí')));
-    if (s.kind === 'lesson') return html(PlayScreen, { key, vocab, sentences, lessonId: s.lesson, mode: s.mode, cardState, onRecordCard,
+        html(PlanStepShow, { s, vocab }),
+        html('button', { className: 'primary-btn', style: { marginTop: 16 }, onClick: () => { record(plan, s, 100); back(); } }, '✓ Listo, lo leí'))));
+    if (s.kind === 'lesson') return wrap(html(PlayScreen, { key, vocab, sentences, lessonId: s.lesson, mode: s.mode, cardState, onRecordCard,
       onBack: back, onHome: back, onFinish: (percent, missed) => { onLessonResult(s.lesson, s.mode, percent, missed); finish(percent); },
-      nextAction: null, savedResult: null, onSaveResult: () => {}, onClearResult: () => {} });
+      nextAction: null, savedResult: null, onSaveResult: () => {}, onClearResult: () => {} }));
+    if (s.kind === 'words') {
+      const words = planWordsOf(vocab, s.words);
+      const title = s.title || 'Palabras de la clase';
+      const onFin = (percent, missed, total) => { onLog('prueba', null, 'clase-palabras', percent, total == null ? words.length : total, (missed || []).length); finish(percent); };
+      const common = { key, lessonId: 'plan', onBack: back, onHome: back, onFinish: onFin, nextAction: null, savedResult: null, onSaveResult: () => {}, onClearResult: () => {} };
+      if (s.mode === 'cards') return wrap(html(FlashcardGame, { ...common, words: [], cardState, onRecordCard, deckBuilder: () => shuffle(words), title: '🔤 ' + title,
+        emptyTitle: 'Sin palabras', emptySub: 'Esta lista no tiene palabras.' }));
+      if (s.mode === 'match') return wrap(html(MatchGame, { ...common, words }));
+      if (s.mode === 'quiz') return wrap(html(QuizGame, { ...common, words }));
+      return wrap(html(MemoryGame, { ...common, words }));
+    }
+    if (s.kind === 'quiz' || s.kind === 'orden') {
+      const G = s.kind === 'quiz' ? PlanQuizGame : PlanOrderGame;
+      return wrap(html(G, { key, title: s.title, items: s.items || [], onBack: back,
+        onFinish: (percent, wrong) => { onLog('prueba', null, 'clase-' + s.kind, percent, (s.items || []).length, (wrong || []).length); finish(percent); } }));
+    }
     const gp = { key, onBack: back, playerName, priorMissed: [],
       onFinish: (percent, missed, total) => { onLog('prueba', null, s.game, percent, total == null ? null : total, (missed || []).length); finish(percent); } };
     const allWords = lessons.filter(id => !String(id).startsWith('mod-')).flatMap(id => vocab[id] || []);
-    if (s.game === 'frase') return html(ClasificadorGame, { ...gp, tipo: 'frase' });
-    if (s.game === 'clas') return html(ClasificadorGame, { ...gp, tipo: 'clasificador' });
-    if (s.game === 'modal') return html(ClasificadorGame, { ...gp, tipo: 'modal' });
-    if (s.game === 'tiempo') return html(ClasificadorGame, { ...gp, tipo: 'tiempo' });
-    if (s.game === 'dialogo') return html(DialogoGame, gp);
-    if (s.game === 'orden') return html(OrdenGame, gp);
-    if (s.game === 'zhe') return html(ZheGame, { ...gp, zheConfig: appConfig.zhe_config });
-    if (s.game === 'audio') return html(AudioGame, { ...gp, allWords });
-    if (s.game === 'tonos') return html(ToneGame, { ...gp, vocab, lessons: openLessons });
-    if (s.game === 'dictado') return html(DictationGame, { ...gp, vocab, lessons: openLessons });
+    if (s.game === 'frase') return wrap(html(ClasificadorGame, { ...gp, tipo: 'frase' }));
+    if (s.game === 'clas') return wrap(html(ClasificadorGame, { ...gp, tipo: 'clasificador' }));
+    if (s.game === 'modal') return wrap(html(ClasificadorGame, { ...gp, tipo: 'modal' }));
+    if (s.game === 'tiempo') return wrap(html(ClasificadorGame, { ...gp, tipo: 'tiempo' }));
+    if (s.game === 'dialogo') return wrap(html(DialogoGame, gp));
+    if (s.game === 'orden') return wrap(html(OrdenGame, gp));
+    if (s.game === 'zhe') return wrap(html(ZheGame, { ...gp, zheConfig: appConfig.zhe_config }));
+    if (s.game === 'audio') return wrap(html(AudioGame, { ...gp, allWords }));
+    if (s.game === 'tonos') return wrap(html(ToneGame, { ...gp, vocab, lessons: openLessons }));
+    if (s.game === 'dictado') return wrap(html(DictationGame, { ...gp, vocab, lessons: openLessons }));
     return html(GameStatusScreen, { onBack: back, title: '📚 Clases', msg: 'Esta actividad no está disponible.' });
   }
 
@@ -1366,37 +1644,45 @@ function PlanModule({ classId, preview, onBack, vocab, sentences, cardState, onR
     const n = nDone(plan);
     const next = plan.steps.find(s => !(stOf(plan.id, s.id) || {}).done);
     return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
-      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: () => setOpenId(null) }, '←'),
+      liveBar,
+      html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: () => { setOpenId(null); setFollow(null); } }, '←'),
         html('div', { style: { flex: 1, minWidth: 0 } }, html('h1', null, plan.title),
           html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700, marginTop: 2 } }, n + ' de ' + plan.steps.length + ' pasos hechos'))),
       html('div', { style: { padding: '0 16px' } },
+        note && html('div', { className: 'admin-status ok', style: { marginBottom: 10 } }, note),
+        plan.live_step && !follow && html('button', { className: 'plan-live-join', onClick: () => { setNote(null); setFollow(plan.id); } }, '🔴 Esta clase está en vivo · Entrar y seguir a mi lǎoshī'),
         plan.description && html('div', { className: 'plan-desc' }, plan.description),
         html('div', { className: 'plan-bar' }, html('i', { style: { width: (plan.steps.length ? n / plan.steps.length * 100 : 0) + '%' } })),
         n === plan.steps.length && plan.steps.length > 0 && html('div', { className: 'plan-win' }, '🎉 ¡Terminaste esta clase! Podés repetir cualquier paso para mejorar.'),
         html('div', { className: 'plan-path' }, plan.steps.map((s, i) => {
           const st = stOf(plan.id, s.id);
-          return html('button', { key: s.id, className: 'plan-step' + (st && st.done ? ' done' : '') + (next && next.id === s.id ? ' next' : ''), onClick: () => { setRun(s); setRunN(k => k + 1); } },
+          const isLive = plan.live_step === s.id;
+          return html('button', { key: s.id, className: 'plan-step' + (st && st.done ? ' done' : '') + (next && next.id === s.id ? ' next' : '') + (isLive ? ' live' : ''), onClick: () => { setRun(s); setRunN(k => k + 1); } },
             html('span', { className: 'plan-num' }, st && st.done ? '✓' : i + 1),
             html('span', { className: 'plan-step-main' },
               html('span', { className: 'plan-step-title' }, PLAN_KIND_ICON[s.kind] + ' ' + planStepLabel(s)),
-              html('span', { className: 'plan-step-sub' }, st ? (st.done ? '¡Hecho! · ' + st.percent + '%' : 'Mejor resultado: ' + st.percent + '% · necesitás 70%') : next && next.id === s.id ? 'Seguí por acá' : 'Sin hacer')),
+              html('span', { className: 'plan-step-sub' }, (isLive ? '🔴 Ahora en vivo · ' : '') + (st ? (st.done ? '¡Hecho! · ' + st.percent + '%' : 'Mejor resultado: ' + st.percent + '% · necesitás 70%') : next && next.id === s.id ? 'Seguí por acá' : 'Sin hacer'))),
             html('span', { className: 'plan-go' }, '→'));
         })),
         preview && html('p', { className: 'admin-note', style: { marginTop: 12 } }, '👁 Vista de profe: podés probar los pasos, pero tu avance no se guarda.')));
   }
 
-  // Lista de clases
+  // Lista de clases (la que está en vivo, primero)
+  const sorted = [...plans].sort((a, b) => (b.live_step ? 1 : 0) - (a.live_step ? 1 : 0));
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '📚 Clases')),
     html('div', { style: { padding: '0 16px' } },
+      note && html('div', { className: 'admin-status ok', style: { marginBottom: 10 } }, note),
       plans.length === 0 ? html('p', { className: 'admin-note' }, 'Tu lǎoshī todavía no publicó clases. Cuando lo haga, van a aparecer acá.')
-      : html('div', { className: 'plan-list' }, plans.map(p => {
+      : html('div', { className: 'plan-list' }, sorted.map(p => {
           const n = nDone(p);
-          return html('button', { key: p.id, className: 'plan-card student' + (n === p.steps.length && n ? ' complete' : ''), onClick: () => setOpenId(p.id) },
+          return html('div', { key: p.id, className: 'plan-card student' + (n === p.steps.length && n ? ' complete' : '') + (p.live_step ? ' live' : ''), onClick: () => { setNote(null); setOpenId(p.id); } },
+            p.live_step && html('span', { className: 'plan-badge live', style: { alignSelf: 'flex-start' } }, '🔴 En vivo ahora'),
             html('div', { className: 'plan-card-title' }, (n === p.steps.length && n ? '✅ ' : '📚 ') + p.title),
             p.description && html('div', { className: 'plan-card-desc' }, p.description),
             html('div', { className: 'plan-bar' }, html('i', { style: { width: (p.steps.length ? n / p.steps.length * 100 : 0) + '%' } })),
-            html('div', { className: 'plan-card-sub' }, n + ' de ' + p.steps.length + ' pasos' + (n === 0 ? ' · ¡Empezá!' : n < p.steps.length ? ' · Seguí' : ' · ¡Completa!')));
+            html('div', { className: 'plan-card-sub' }, n + ' de ' + p.steps.length + ' pasos' + (n === 0 ? ' · ¡Empezá!' : n < p.steps.length ? ' · Seguí' : ' · ¡Completa!')),
+            p.live_step && html('button', { className: 'plan-live-join', onClick: (e) => { e.stopPropagation(); setNote(null); setOpenId(p.id); setFollow(p.id); } }, '🔴 Entrar en vivo'));
         }))));
 }
 

@@ -1772,3 +1772,15 @@ main.tz-main { padding-bottom: 8px !important; }
 @media (max-width: 560px) { .zadm-add-grid { grid-template-columns: 1fr; } .zadm-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .zadm-photo { height: 120px; } }
 .admin-panel .zadm-actions label.mini-btn, .admin-panel label.zadm-drop { font-family: inherit; font-size: 11px; color: var(--ink-mid); text-transform: none; letter-spacing: normal; }
 .admin-panel label.zadm-drop { font-size: 13px; color: var(--ink-soft); }
+/* ── Registro: conexiones (solo superadmin) ── */
+.ip-panel { background: #F1F6FF; border: 2px solid var(--blue); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; }
+.ip-panel-h { display: flex; align-items: center; gap: 6px; font-weight: 700; margin-bottom: 8px; }
+.ip-panel-h .sel-x { margin-left: auto; }
+.ip-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.ip-item { background: #fff; border-radius: 10px; padding: 8px 10px; border: 1px solid var(--paper-deep); }
+.ip-main { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-weight: 800; }
+.ip-main code, .ip-code { font-family: monospace; font-size: 13px; background: var(--paper); padding: 1px 6px; border-radius: 6px; }
+.ip-main span { font-size: 12px; color: var(--ink-mid); }
+.ip-sub { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+.ip-same { font-size: 12px; font-weight: 800; color: var(--lacquer-dark); margin-top: 4px; }
+.ip-more { font-size: 11px; font-weight: 800; color: var(--blue-dark); }

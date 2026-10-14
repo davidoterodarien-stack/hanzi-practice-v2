@@ -7771,8 +7771,14 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
       if (error) { setActivityError(error.message); setActivityLog([]); }
       else setActivityLog(data || []);
     });
+    // IP y dispositivo de cada conexión: solo el superadmin (la base también lo exige)
+    if (isSuper) db.rpc('npcr_presence_ips_all').then(({ data, error }) => {
+      if (error) { setIpErr(error.message); setIpRows([]); } else { setIpErr(null); setIpRows(data || []); }
+    });
     setShowActivityLog(true);
   };
+  const [ipRows, setIpRows] = useState(null);
+  const [ipErr, setIpErr] = useState(null);
   const [activityError, setActivityError] = useState(null);
   const [regFilter, setRegFilter] = useState('todos'); // todos | codigo | libre
   const [regSearch, setRegSearch] = useState('');
@@ -8334,7 +8340,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
             // ── Registro de alumnos (con y sin código) ──
             isAdmin && showTab('alumnos') && html('div', null,
               html('label', null, '👥 Registro de alumnos'),
-              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Todos los que entraron a la app, con código de aula o solo con su nombre: primera y última vez, visitas, sesiones de práctica y hasta qué lección llegaron. Tocá un alumno para resaltarlo.'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Todos los que entraron a la app, con código de aula o solo con su nombre: primera y última vez, visitas, sesiones de práctica y hasta qué lección llegaron. Tocá un alumno para resaltarlo' + (isSuper ? ' y ver desde dónde se conectó.' : '.')),
               !showActivityLog
                 ? html('button', { className: 'secondary-btn', onClick: loadActivityLog }, 'Ver registro')
                 : (() => {
@@ -8342,6 +8348,27 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                     const q = regSearch.trim().toLowerCase();
                     const rows = activityLog.filter(r => (regFilter === 'todos' || (regFilter === 'codigo') === !!r.has_code) && (!q || String(r.name || '').toLowerCase().includes(q)));
                     const nCode = activityLog.filter(r => r.has_code).length;
+                    // Conexiones por cuenta y por IP (solo superadmin)
+                    const ipsOf = {}, usersOfIp = {};
+                    (isSuper && ipRows ? ipRows : []).forEach(x => {
+                      (ipsOf[x.user_id] = ipsOf[x.user_id] || []).push(x);
+                      (usersOfIp[x.ip] = usersOfIp[x.ip] || new Set()).add(x.user_id);
+                    });
+                    const nameOf = (id) => { const a = activityLog.find(x => x.user_id === id); return a ? (a.name || 'Sin nombre') : 'alguien del equipo docente'; };
+                    const selReg = regSel && activityLog.find(x => x.user_id === regSel);
+                    const ipPanel = isSuper && selReg && html('div', { className: 'ip-panel' },
+                      html('div', { className: 'ip-panel-h' }, '🌐 Conexiones de ', html('b', null, selReg.name || 'Sin nombre'),
+                        html('button', { className: 'sel-x', title: 'Cerrar', onClick: () => setRegSel(null) }, '✕')),
+                      ipErr ? html('div', { className: 'admin-status err' }, '❌ ' + ipErr + (/function|does not exist/.test(ipErr) ? ' — ¿Ejecutaste npcr_ips.sql?' : ''))
+                      : !(ipsOf[selReg.user_id] || []).length ? html('p', { className: 'admin-note', style: { margin: 0 } }, 'Todavía no hay conexiones registradas: se anotan desde que se corrió npcr_ips.sql, la próxima vez que esta cuenta abra la app.')
+                      : html('div', { className: 'ip-list' }, ipsOf[selReg.user_id].map(x => {
+                          const others = [...(usersOfIp[x.ip] || [])].filter(u => u !== selReg.user_id);
+                          return html('div', { key: x.ip + x.device, className: 'ip-item' },
+                            html('div', { className: 'ip-main' }, html('code', null, x.ip), html('span', null, x.device)),
+                            html('div', { className: 'ip-sub' }, 'Primera vez ' + fmt(x.first_seen) + ' · última ' + timeAgo(x.last_seen) + ' · ' + x.hits + (x.hits === 1 ? ' visita' : ' visitas')),
+                            others.length > 0 && html('div', { className: 'ip-same' }, '👥 Misma IP que: ' + others.map(nameOf).join(', ')));
+                        })),
+                      html('p', { className: 'admin-note', style: { margin: '8px 0 0', fontSize: 11 } }, 'Solo lo ve el superadmin. La misma IP suele ser la misma casa, escuela o red del celular; no identifica a una persona con certeza. Se guarda 90 días.'));
                     return html('div', null,
                       html('div', { className: 'reg-toolbar' },
                         [['todos', 'Todos (' + activityLog.length + ')'], ['codigo', '🎓 Con código (' + nCode + ')'], ['libre', 'Solo nombre (' + (activityLog.length - nCode) + ')']].map(([k, label]) =>
@@ -8359,13 +8386,14 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                         html('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
                           html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, disabled: !mergeTo, onClick: doMerge }, 'Pasar progreso'),
                           html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => { setMergeFrom(null); setMergeTo(''); } }, 'Cancelar'))),
+                      ipPanel,
                       activityError && html('div', { className: 'admin-status err' }, '❌ ' + activityError + (/function|does not exist/.test(activityError) ? ' — ¿Ejecutaste npcr_registro.sql?' : '')),
                       !activityError && rows.length === 0
                         ? html('p', { className: 'admin-note' }, activityLog.length ? 'Ningún alumno coincide con el filtro.' : 'Sin registros todavía.')
                         : html(ScrollX, { arrows: 'top' },
                             html('table', { className: 'rank-table cardify' },
                               html('thead', null, html('tr', null,
-                                ['Alumno', 'Aula', 'Primera vez', 'Última vez', 'Visitas', 'Sesiones', 'Prom. 7 días', 'Hasta lección'].map(h => html('th', { key: h, style: { cursor: 'default' } }, h)))),
+                                ['Alumno', 'Aula', 'Primera vez', 'Última vez', 'Visitas', 'Sesiones', 'Prom. 7 días', 'Hasta lección', ...(isSuper ? ['Conexión'] : [])].map(h => html('th', { key: h, style: { cursor: 'default' } }, h)))),
                               html('tbody', null, rows.map(r => html('tr', { key: r.user_id, className: regSel === r.user_id ? 'sel-row' : '',
                                   onClick: (e) => { if (!e.target.closest('button')) setRegSel(regSel === r.user_id ? null : r.user_id); } },
                                 html('td', { className: 'cell-name', style: { fontWeight: 800, whiteSpace: 'nowrap' } },
@@ -8379,6 +8407,12 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                                 html('td', { 'data-l': 'Sesiones' }, r.sessions),
                                 html('td', { 'data-l': 'Prom. 7 días' }, r.avg_7d == null ? '—' : html(MasteryPill, { value: r.avg_7d, small: true })),
                                 html('td', { 'data-l': 'Hasta lección' }, r.max_lesson ? 'L' + r.max_lesson : '—'),
+                                isSuper && html('td', { 'data-l': 'Conexión', style: { fontSize: 12, whiteSpace: 'nowrap' } }, (() => {
+                                  const l = ipsOf[r.user_id];
+                                  if (!l || !l.length) return '—';
+                                  return html(React.Fragment, null, html('code', { className: 'ip-code' }, l[0].ip), ' ', html('span', { style: { color: 'var(--ink-soft)' } }, l[0].device.split(' · ')[0]),
+                                    l.length > 1 && html('span', { className: 'ip-more' }, ' +' + (l.length - 1)));
+                                })()),
                               ))),
                             ),
                           ),

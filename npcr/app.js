@@ -3108,7 +3108,8 @@ function App() {
     playerName && html('button', { className: 'sidebar-signout', onClick: handleSignOut }, '🚪 ' + playerName + ' · Salir'),
   );
 
-  return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content), needsName && html(NameRequired, { onSave: saveName }));
+  return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content), needsName && html(NameRequired, { onSave: saveName }),
+    !needsName && studentId && html(UserNotices, { studentId, currentName: profile && profile.name, onName: (name) => setProfile(p => ({ ...(p || {}), name })) }));
 }
 
 // ----------------- PanelLectura -----------------
@@ -3723,6 +3724,49 @@ function StudentCodeCard({ myClasses, onActivateCode, notice, onDismissNotice })
     ),
     msg,
   );
+}
+
+// Avisos personales que manda la consola a una sola cuenta (npcr_avisos.sql).
+// "Pedir nombre": ventana para escribir (o confirmar) el nombre, que se guarda en la base.
+function UserNotices({ studentId, currentName, onName }) {
+  const [list, setList] = useState([]);
+  const [name, setName] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!studentId) return;
+    const look = () => db.rpc('npcr_my_notices').then(({ data, error }) => { if (!error) setList(data || []); });
+    look(); const t = setInterval(look, 60000); return () => clearInterval(t);
+  }, [studentId]);
+  const n = list[0];
+  useEffect(() => { if (n && n.kind === 'ask_name') { setName(validStudentName(currentName) ? currentName : ''); setErr(''); } }, [n && n.id]);
+  if (!n) return null;
+  const done = async (e) => {
+    if (e) e.preventDefault();
+    if (n.kind === 'ask_name' && !validStudentName(name)) { setErr('Escribí tu nombre real (al menos 2 letras).'); return; }
+    setBusy(true);
+    const { error } = await db.rpc('npcr_notice_done', { p_id: n.id, p_name: n.kind === 'ask_name' ? name.trim() : null });
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    if (n.kind === 'ask_name') onName(name.trim());
+    setList(l => l.slice(1));
+  };
+  return html('div', { className: 'name-modal-overlay' },
+    html('div', { className: 'name-modal' },
+      html('div', { className: 'name-modal-hanzi hanzi-font' }, n.kind === 'ask_name' ? '你好！' : '📩'),
+      n.kind === 'ask_name'
+        ? html(React.Fragment, null,
+            html('h2', { className: 'name-modal-title' }, '¿Cómo te llamás?'),
+            html('p', { className: 'name-modal-sub' }, n.text || 'Tu lǎoshī necesita saber quién sos. Escribí tu nombre y apellido para seguir.'),
+            html('form', { onSubmit: done },
+              html('input', { className: 'name-modal-input', value: name, autoFocus: true, maxLength: 40, placeholder: 'Nombre y apellido', onChange: e => { setName(e.target.value); setErr(''); } }),
+              err && html('div', { className: 'admin-status err', style: { marginTop: 8 } }, err),
+              html('button', { type: 'submit', className: 'primary-btn', style: { width: '100%', marginTop: 12 }, disabled: busy }, busy ? 'Guardando…' : 'Continuar')))
+        : html(React.Fragment, null,
+            html('h2', { className: 'name-modal-title' }, 'Mensaje de tu lǎoshī'),
+            html('p', { className: 'name-modal-sub', style: { whiteSpace: 'pre-wrap' } }, n.text || ''),
+            err && html('div', { className: 'admin-status err', style: { marginTop: 8 } }, err),
+            html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 12 }, disabled: busy, onClick: () => done() }, 'Entendido'))));
 }
 
 function NameRequired({ onSave }) {
@@ -8856,6 +8900,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
       else setActivityLog(data || []);
     });
     // IP y dispositivo de cada conexión: solo el superadmin (la base también lo exige)
+    loadNotices();
     if (isSuper) db.rpc('npcr_presence_ips_all').then(({ data, error }) => {
       if (error) { setIpErr(error.message); setIpRows([]); } else { setIpErr(null); setIpRows(data || []); }
     });
@@ -8863,6 +8908,16 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   };
   const [ipRows, setIpRows] = useState(null);
   const [ipErr, setIpErr] = useState(null);
+  const [notices, setNotices] = useState({});   // avisos "pedir nombre" que todavía no respondieron
+  const loadNotices = () => db.rpc('npcr_pending_notices').then(({ data, error }) => {
+    if (error) return; const m = {}; (data || []).forEach(n => { if (n.kind === 'ask_name') m[n.user_id] = n.created_at; }); setNotices(m);
+  });
+  const askName = async (r) => {
+    const { error } = await db.rpc('npcr_send_notice', { p_user: r.user_id, p_kind: 'ask_name', p_text: null });
+    if (error) { setMergeMsg({ type: 'err', msg: '❌ ' + error.message + (/function|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_avisos.sql?' : '') }); return; }
+    setNotices(m => ({ ...m, [r.user_id]: new Date().toISOString() }));
+    setMergeMsg({ type: 'ok', msg: '✉️ Listo: a esa persona le va a aparecer una ventana para escribir su nombre (al abrir la app, o en menos de un minuto si la tiene abierta).' });
+  };
   const [activityError, setActivityError] = useState(null);
   const [regFilter, setRegFilter] = useState('todos'); // todos | codigo | libre
   const [regSearch, setRegSearch] = useState('');
@@ -9484,7 +9539,11 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                                   r.name || html('span', { style: { fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-soft)' }, title: 'Abrió la app pero no escribió su nombre' }, 'Sin nombre'),
                                   html('span', { className: 'reg-badge' + (r.has_code ? ' code' : '') }, r.has_code ? 'código' : 'libre')),
                                 html('td', { 'data-l': 'Aula', className: 'cell-wide', style: { fontSize: 12, whiteSpace: 'nowrap' } }, r.has_code ? (r.class_name || '—') + (r.code ? ' · ' + r.code : '')
-                                  : html('button', { className: 'mini-btn', title: 'Pasar el progreso de este invitado a un alumno con código', onClick: () => { setMergeFrom(r); setMergeTo(''); setMergeMsg(null); } }, '↪ Pasar a un alumno')),
+                                  : html('span', { style: { display: 'inline-flex', gap: 4, flexWrap: 'wrap' } },
+                                      html('button', { className: 'mini-btn', title: 'Pasar el progreso de este invitado a un alumno con código', onClick: () => { setMergeFrom(r); setMergeTo(''); setMergeMsg(null); } }, '↪ Pasar a un alumno'),
+                                      notices[r.user_id]
+                                        ? html('span', { className: 'mini-btn', style: { cursor: 'default', background: 'var(--gold-light)' }, title: 'Enviado ' + timeAgo(notices[r.user_id]) + '. Desaparece cuando lo responda.' }, '✉️ Nombre pedido')
+                                        : html('button', { className: 'mini-btn', title: 'Le aparece una ventana para que escriba su nombre', onClick: () => askName(r) }, '✉️ Pedir nombre'))),
                                 html('td', { 'data-l': 'Primera vez', className: 'cell-wide', style: { fontSize: 12, color: 'var(--ink-soft)', whiteSpace: 'nowrap' } }, fmt(r.first_seen)),
                                 html('td', { 'data-l': 'Última vez', style: { fontSize: 12, whiteSpace: 'nowrap' } }, timeAgo(r.last_seen)),
                                 html('td', { 'data-l': 'Visitas' }, r.visits),

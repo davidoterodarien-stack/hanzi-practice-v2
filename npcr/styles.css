@@ -2030,3 +2030,8 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
   .quiz-bars { gap: 8px; }
   .quiz-bar { width: 50px; }
 }
+/* Invitados: contenido para alumnos con código */
+.guest-locked { opacity: .55; filter: grayscale(.6); }
+.prueba-card.guest-locked .mode-sub { color: var(--lacquer-dark); font-weight: 800; }
+.guest-lock .guest-lock-icon { font-size: 54px; text-align: center; animation: quizBounce 1.2s ease-in-out infinite; }
+.guest-lock .name-modal-sub { font-size: 15px; font-weight: 700; color: var(--ink-mid); }

@@ -2621,7 +2621,14 @@ function App() {
   };
 
   const regularLessons = lessons.filter(id => !String(id).startsWith('mod-'));
-  const maxLesson = classSettings && classSettings.max_lesson ? Number(classSettings.max_lesson) : null;
+  // Invitado = sin aula ni código y no es del equipo docente. Su límite sale de npcr_app_config.
+  const isGuest = !isStaffUser && myClasses !== null && !(myClasses && myClasses.length);
+  const guestMax = appConfig.guest_max_lesson != null && !isNaN(Number(appConfig.guest_max_lesson)) ? Number(appConfig.guest_max_lesson) : null;
+  const guestLimited = isGuest && guestMax != null;
+  const guestText = appConfig.guest_lock_text || 'Pedile un código de alumno a tu lǎoshī para poder acceder a este contenido.';
+  const [guestLock, setGuestLock] = useState(false);
+  useEffect(() => { if (!guestLimited) setGuestLock(false); }, [guestLimited]);
+  const maxLesson = guestLimited ? guestMax : (classSettings && classSettings.max_lesson ? Number(classSettings.max_lesson) : null);
   const isLocked = (id) => !isStaffUser && maxLesson != null && !isNaN(parseFloat(id)) && parseFloat(id) > maxLesson;
   const openLessons = regularLessons.filter(id => !isLocked(id));
   const dailyDeckSize = useMemo(() => buildDailyDeck(vocab, openLessons, cardState).length, [vocab, cardState, lessons.length, maxLesson]);
@@ -2647,6 +2654,7 @@ function App() {
       modulesList: appConfig.modules_list,
       maxLesson,
       onSelectLesson: (id) => {
+        if (guestLimited && (isLocked(id) || !vocab[id])) { setGuestLock(true); return; }
         if (isLocked(id)) { window.alert('🔒 Tu lǎoshī habilitó hasta la lección ' + maxLesson + '. ¡Esta llega pronto!'); return; }
         setScreen({ name: 'lesson', lessonId: id });
         if (studentId) db.from('activity_log')
@@ -2663,6 +2671,7 @@ function App() {
       onChangeName: handleSignOut,
       streak: profile ? (profile.streak_days || 0) : 0,
       assignments, myClasses, onActivateCode: activateStudentCode, codeNotice, onDismissNotice: () => setCodeNotice(null),
+      guestLimited, onGuestLock: () => setGuestLock(true),
       dailyCount: dailyDeckSize, dailyDone: dailyDoneDay === todayLocal(),
       onOpenClass: () => setScreen({ name: 'clase' }),
       onTraining: () => setScreen({ name: 'entrenamiento' }),
@@ -2765,6 +2774,7 @@ function App() {
     });
   } else if (screen.name === 'practica') {
     content = html(PracticaHub, {
+      guestLimited, onGuestLock: () => setGuestLock(true),
       modulesList: appConfig.modules_list,
       pruebaProgress: progress.prueba || {},
       onBack: () => setScreen({ name: 'home' }),
@@ -2835,6 +2845,8 @@ function App() {
       onFinish: (percent, missed, total) => logActivity('lesson', null, 'dificiles', percent, total, (missed || []).length),
       nextAction: null, savedResult: null, onSaveResult: () => {}, onClearResult: () => {},
     });
+  } else if (screen.name === 'prueba' && guestLimited) {
+    content = html(GameStatusScreen, { onBack: () => setScreen({ name: 'home' }), title: '🔒 Contenido para alumnos', msg: guestText });
   } else if (screen.name === 'prueba') {
     const onPruebaFinish = (percent, missed) => {
       logActivity('prueba', null, screen.game, percent, null, (missed || []).length);
@@ -3109,6 +3121,7 @@ function App() {
   );
 
   return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content), needsName && html(NameRequired, { onSave: saveName }),
+    guestLock && guestLimited && html(GuestLockModal, { text: guestText, onClose: () => setGuestLock(false), myClasses, onActivateCode: activateStudentCode }),
     !needsName && studentId && html(UserNotices, { studentId, currentName: profile && profile.name, onName: (name) => setProfile(p => ({ ...(p || {}), name })) }));
 }
 
@@ -3194,7 +3207,7 @@ const MODULES_LIST_DEFAULT = [
   { id: 'escritura', icon: '✍️', cls: 'clas',  title: 'Práctica de escritura',  sub: 'Escribí el hanzi desde cero · nivel progresivo', active: true },
 ];
 
-function PracticaHub({ modulesList, pruebaProgress, onBack, onPrueba }) {
+function PracticaHub({ modulesList, pruebaProgress, onBack, onPrueba, guestLimited, onGuestLock }) {
   return html('main', { style: { paddingTop: 18, paddingBottom: 40 } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
@@ -3209,13 +3222,13 @@ function PracticaHub({ modulesList, pruebaProgress, onBack, onPrueba }) {
           .filter(g => g.active !== false && !LESSON_THEMES['mod-' + g.id]?.hidden).map(g => {
           const best = pruebaProgress[g.id] || 0;
           const hasStar = best >= 80;
-          return html('button', { key: g.id, className: 'prueba-card', onClick: () => onPrueba(g.id) },
+          return html('button', { key: g.id, className: 'prueba-card' + (guestLimited ? ' guest-locked' : ''), onClick: () => guestLimited ? onGuestLock() : onPrueba(g.id) },
             html('div', { className: 'prueba-icon ' + g.cls }, g.icon),
             html('div', { style: { flex: 1 } },
               html('div', { className: 'mode-title' }, g.title),
-              html('div', { className: 'mode-sub' }, best > 0 ? '⭐ Mejor: ' + best + '%' : g.sub),
+              html('div', { className: 'mode-sub' }, guestLimited ? '🔒 Solo alumnos con código' : best > 0 ? '⭐ Mejor: ' + best + '%' : g.sub),
             ),
-            hasStar && html('div', { style: { fontSize: 20 } }, '⭐'),
+            guestLimited ? html('div', { style: { fontSize: 20 } }, '🔒') : hasStar && html('div', { style: { fontSize: 20 } }, '⭐'),
           );
         })
       ),
@@ -3769,6 +3782,17 @@ function UserNotices({ studentId, currentName, onName }) {
             html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 12 }, disabled: busy, onClick: () => done() }, 'Entendido'))));
 }
 
+// Invitados (sin aula ni código): contenido bloqueado. El texto viene de la configuración.
+function GuestLockModal({ text, onClose, myClasses, onActivateCode }) {
+  return html('div', { className: 'name-modal-overlay', onClick: (e) => { if (e.target === e.currentTarget) onClose(); } },
+    html('div', { className: 'name-modal guest-lock' },
+      html('div', { className: 'guest-lock-icon' }, '🔒'),
+      html('h2', { className: 'name-modal-title' }, 'Contenido para alumnos'),
+      html('p', { className: 'name-modal-sub' }, text),
+      html(StudentCodeCard, { myClasses, onActivateCode, notice: null, onDismissNotice: () => {} }),
+      html('button', { className: 'secondary-btn', style: { width: '100%', marginTop: 10 }, onClick: onClose }, 'Cerrar')));
+}
+
 function NameRequired({ onSave }) {
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
@@ -3792,7 +3816,11 @@ function NameRequired({ onSave }) {
   );
 }
 
-function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass, bingoGame, onBingo }) {
+function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass, bingoGame, onBingo, guestLimited, onGuestLock }) {
+  // Invitados: la base no les manda las lecciones bloqueadas, pero se muestran con candado (desde los temas)
+  const gridIds = guestLimited
+    ? [...new Set([...lessons, ...Object.keys(LESSON_THEMES).filter(k => /^\d+(\.\d+)?$/.test(k))])].sort(lessonCompare)
+    : lessons;
   const regularCount = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').length;
   return html(React.Fragment, null,
     playerName && html('div', { className: 'greeting-bar' },
@@ -3841,13 +3869,13 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
 
       html('h2', { className: 'section-title' }, 'Elegí una lección'),
       html('div', { className: 'lesson-grid' },
-        lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros' && !LESSON_THEMES[id]?.hidden).map(id => {
-          const words = vocab[id];
+        gridIds.filter(id => id !== 'mod-paises' && id !== 'mod-numeros' && !LESSON_THEMES[id]?.hidden).map(id => {
+          const words = vocab[id] || [];
           const theme = LESSON_THEMES[id] || { name: 'Lección ' + id, icon: words[0]?.hanzi?.[0] || '汉' };
           const lp = progress.lessons[id] || {};
           const best = Math.round(((lp.match || 0) + (lp.cards || 0) + (lp.quiz || 0)) / 3);
           const stars = [lp.match || 0, lp.cards || 0, lp.quiz || 0].filter(v => v >= 80).length;
-          const locked = maxLesson != null && parseFloat(id) > maxLesson;
+          const locked = (maxLesson != null && parseFloat(id) > maxLesson) || (guestLimited && !vocab[id]);
           return html('button', {
             key: id,
             className: 'lesson-card' + (locked ? ' locked' : ''),
@@ -3857,7 +3885,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
             !locked && stars > 0 && html('div', { className: 'seal hanzi-font' }, stars === 3 ? '✓' : stars),
             html('div', { className: 'hanzi-big hanzi-font' }, theme.icon),
             html('div', { className: 'lesson-name' }, 'Lección ' + id),
-            html('div', { className: 'lesson-meta' }, theme.name + ' · ' + words.length + ' palabras'),
+            html('div', { className: 'lesson-meta' }, theme.name + ' · ' + (guestLimited && locked ? '🔒 Solo alumnos' : words.length + ' palabras')),
             html('div', { className: 'progress-track' },
               html('div', { className: 'progress-fill', style: { width: best + '%' } })
             ),
@@ -3866,7 +3894,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
       ),
 
       // ── Módulos especiales ──
-      vocab['mod-paises'] && !LESSON_THEMES['mod-paises']?.hidden && html(React.Fragment, null,
+      (vocab['mod-paises'] || guestLimited) && !LESSON_THEMES['mod-paises']?.hidden && html(React.Fragment, null,
         html('h2', { className: 'section-title' }, 'Aprende los países'),
         html('button', {
           style: {
@@ -3875,6 +3903,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
             padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
             boxShadow: 'var(--shadow-paper)',
           },
+          className: !vocab['mod-paises'] ? 'guest-locked' : undefined,
           onClick: () => onSelectLesson('mod-paises'),
         },
           html('div', { className: 'hanzi-font', style: { fontSize: 36, color: 'var(--lacquer)', minWidth: 44 } }, '国'),
@@ -3887,7 +3916,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
         ),
       ),
 
-      vocab['mod-numeros'] && !LESSON_THEMES['mod-numeros']?.hidden && html(React.Fragment, null,
+      (vocab['mod-numeros'] || guestLimited) && !LESSON_THEMES['mod-numeros']?.hidden && html(React.Fragment, null,
         html('h2', { className: 'section-title' }, 'Aprende los números'),
         html('button', {
           style: {
@@ -3896,6 +3925,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
             padding: '14px 18px', cursor: 'pointer', textAlign: 'left',
             boxShadow: 'var(--shadow-paper)',
           },
+          className: !vocab['mod-numeros'] ? 'guest-locked' : undefined,
           onClick: () => onSelectLesson('mod-numeros'),
         },
           html('div', { className: 'hanzi-font', style: { fontSize: 36, color: 'var(--lacquer)', minWidth: 44 } }, '数'),
@@ -3911,13 +3941,13 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
           .filter(g => g.active !== false && !LESSON_THEMES['mod-' + g.id]?.hidden).map(g => {
           const best = pruebaProgress[g.id] || 0;
           const hasStar = best >= 80;
-          return html('button', { key: g.id, className: 'prueba-card', onClick: () => onPrueba(g.id) },
+          return html('button', { key: g.id, className: 'prueba-card' + (guestLimited ? ' guest-locked' : ''), onClick: () => guestLimited ? onGuestLock() : onPrueba(g.id) },
             html('div', { className: 'prueba-icon ' + g.cls }, g.icon),
             html('div', { style: { flex: 1 } },
               html('div', { className: 'mode-title' }, g.title),
-              html('div', { className: 'mode-sub' }, best > 0 ? '⭐ Mejor: ' + best + '%' : g.sub),
+              html('div', { className: 'mode-sub' }, guestLimited ? '🔒 Solo alumnos con código' : best > 0 ? '⭐ Mejor: ' + best + '%' : g.sub),
             ),
-            hasStar && html('div', { style: { fontSize: 20 } }, '⭐'),
+            guestLimited ? html('div', { style: { fontSize: 20 } }, '🔒') : hasStar && html('div', { style: { fontSize: 20 } }, '⭐'),
           );
         })
       ),

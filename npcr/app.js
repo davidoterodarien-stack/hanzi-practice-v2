@@ -2958,6 +2958,7 @@ function App() {
       onFinish: onPruebaFinish,
       playerName,
       priorMissed: (progress.prueba || {})[screen.game + '_missed'] || [],
+      maxLesson: isStaffUser ? null : maxLesson,   // el equipo docente ve todo, como en las lecciones
     };
     if (screen.game === 'frase') content = html(ClasificadorGame, { ...gameProps, tipo: 'frase' });
     else if (screen.game === 'clas') content = html(ClasificadorGame, { ...gameProps, tipo: 'clasificador' });
@@ -2967,12 +2968,12 @@ function App() {
     else if (screen.game === 'zhe') content = html(ZheGame, { ...gameProps, zheConfig: appConfig.zhe_config });
     else if (screen.game === 'orden') content = html(OrdenGame, gameProps);
     else if (screen.game === 'audio') {
-      const allWords = lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').flatMap(id => vocab[id]);
+      const allWords = openLessons.flatMap(id => vocab[id] || []);
       content = html(AudioGame, { ...gameProps, allWords });
     }
     else if (screen.game === 'escritura') {
       const allVocab = {};
-      lessons.filter(id => id !== 'mod-paises' && id !== 'mod-numeros').forEach(id => { allVocab[id] = vocab[id] || []; });
+      openLessons.forEach(id => { allVocab[id] = vocab[id] || []; });
       content = html(HanziWriteGame, { ...gameProps, vocab: allVocab, writeConfig: appConfig.write_game_config, keyboardHint: appConfig.keyboard_hint_text });
     }
   }
@@ -6822,14 +6823,27 @@ function ModuleQuestionsEditor({ modId }) {
   const [addDraft, setAddDraft] = useState({});
   const [msg, setMsg] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // id a eliminar
+  const [lessonFilter, setLessonFilter] = useState('');      // '' = todas
+  const [counts, setCounts] = useState({});
+  const lessonOpts = Object.keys(LESSON_THEMES).filter(l => /^\d+(\.\d+)?$/.test(l)).sort(lessonCompare);
 
   const loadRows = () => {
     let q = db.from(cfg.table).select('*').eq('active', true);
     if (cfg.hasTipo && activeTipo) q = q.eq('tipo', activeTipo);
-    q.order('id', { ascending: true }).then(({ data }) => setRows((data || []).map(nfcRow)));
+    q.order('id', { ascending: true }).then(({ data }) => {
+      const all = (data || []).map(nfcRow);
+      const c = {}; all.forEach(r => { const k = r.lesson == null ? '' : String(r.lesson); c[k] = (c[k] || 0) + 1; }); setCounts(c);
+      const byLesson = (a, b) => (parseFloat(a.lesson) || 999) - (parseFloat(b.lesson) || 999) || a.id - b.id;
+      setRows(all.filter(r => !lessonFilter || String(r.lesson) === lessonFilter).sort(byLesson));
+    });
   };
 
-  useEffect(() => { setRows(null); loadRows(); }, [activeTipo]);
+  useEffect(() => { setRows(null); loadRows(); }, [activeTipo, lessonFilter]);
+  const moveRow = async (row, lesson) => {
+    const { error } = await db.from(cfg.table).update({ lesson }).eq('id', row.id);
+    if (error) { flash('❌ Error: ' + error.message); return; }
+    flash('↪ Pregunta movida a la lección ' + lesson); loadRows();
+  };
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(null), 2500); };
 
@@ -6851,6 +6865,7 @@ function ModuleQuestionsEditor({ modId }) {
     });
     if (cfg.hasTipo) out.tipo = activeTipo;
     if (cfg.table === 'npcr_clasificador_questions') out.active = true;
+    out.lesson = draft.lesson || lessonFilter || lessonOpts[0] || '1';
     return out;
   };
 
@@ -6859,6 +6874,7 @@ function ModuleQuestionsEditor({ modId }) {
     cfg.fields.forEach(f => {
       draft[f.key] = f.type === 'options' ? arrToDisplay(row[f.key]) : (row[f.key] || '');
     });
+    draft.lesson = row.lesson == null ? '' : String(row.lesson);
     setEditDraft(draft);
     setEditId(row.id);
     setAddMode(false);
@@ -6884,7 +6900,6 @@ function ModuleQuestionsEditor({ modId }) {
   const saveAdd = async () => {
     setSaving(true);
     const payload = buildPayload(addDraft);
-    if (cfg.table === 'npcr_clasificador_questions') payload.lesson = 1;
     const { error } = await db.from(cfg.table).insert(payload);
     setSaving(false);
     if (error) { flash('❌ Error: ' + error.message); return; }
@@ -6911,6 +6926,11 @@ function ModuleQuestionsEditor({ modId }) {
 
   const FormBlock = ({ draft, setDraft, onSave, onCancel }) =>
     html('div', { style: { background: 'var(--paper)', borderRadius: 12, padding: 14, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 } },
+      html('div', null,
+        html('div', { style: { fontSize: 11, color: 'var(--ink-soft)', marginBottom: 3, fontWeight: 700 } }, 'Lección del libro'),
+        html('select', { value: draft.lesson || lessonFilter || lessonOpts[0] || '1', onChange: e => setDraft(d => ({ ...d, lesson: e.target.value })),
+          style: { padding: '5px 8px', borderRadius: 8, border: '1px solid var(--paper-deep)', fontSize: 13, background: '#fff' } },
+          lessonOpts.map(l => html('option', { key: l, value: l }, 'Lección ' + l)))),
       ...cfg.fields.map(f =>
         html('div', { key: f.key },
           html('div', { style: { fontSize: 11, color: 'var(--ink-soft)', marginBottom: 3, fontWeight: 700 } }, f.label),
@@ -6942,6 +6962,12 @@ function ModuleQuestionsEditor({ modId }) {
       )
     ),
 
+    // Filtro por lección del libro
+    html('div', { className: 'qed-lessons' },
+      html('button', { className: 'report-tab' + (!lessonFilter ? ' active' : ''), onClick: () => { setLessonFilter(''); setEditId(null); setAddMode(false); } }, 'Todas las lecciones'),
+      lessonOpts.map(l => html('button', { key: l, className: 'report-tab' + (lessonFilter === l ? ' active' : ''), onClick: () => { setLessonFilter(l); setEditId(null); setAddMode(false); } }, 'Lección ' + l)),
+      counts[''] > 0 && html('button', { className: 'report-tab' + (lessonFilter === '' && false ? ' active' : ''), title: 'Preguntas sin lección asignada', onClick: () => flash('Hay ' + counts[''] + ' preguntas sin lección: abrilas en "Todas" y asignales una.') }, '⚠️ Hay preguntas sin lección')),
+
     // Mensaje flash
     msg && html('div', { style: { background: '#f0fdf4', color: '#166534', borderRadius: 8, padding: '7px 12px', fontSize: 13, marginBottom: 8 } }, msg),
 
@@ -6960,6 +6986,7 @@ function ModuleQuestionsEditor({ modId }) {
                     },
                       html('div', { style: { flex: 1, minWidth: 0 } },
                         html('div', { className: 'hanzi-font', style: { fontSize: 15, fontWeight: 700 } },
+                          html('span', { className: 'qed-lesson-tag', style: row.lesson == null ? { background: 'var(--gold-light)', color: 'var(--gold-dark)' } : null }, row.lesson == null ? 'Sin lección' : 'L' + row.lesson),
                           row.sentence || row.line_a || (Array.isArray(row.words) ? row.words.join(' ') : row.words) || '—'
                         ),
                         html('div', { style: { color: 'var(--ink-soft)', fontSize: 12, marginTop: 2 } },
@@ -6972,6 +6999,9 @@ function ModuleQuestionsEditor({ modId }) {
                       ),
                       html('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 } },
                         html('button', { onClick: () => startEdit(row), style: { background: 'var(--paper-deep)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 700 } }, '✏️'),
+                        html('select', { className: 'qed-move', value: '', title: 'Mover a otra lección', onChange: e => e.target.value && moveRow(row, e.target.value) },
+                          html('option', { value: '' }, '↪ Lección'),
+                          lessonOpts.filter(l => String(row.lesson) !== l).map(l => html('option', { key: l, value: l }, 'a L' + l))),
                         confirmDelete === row.id
                           ? html('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
                               html('span', { style: { fontSize: 11, fontWeight: 700, color: 'var(--lacquer)' } }, '¿Quitar?'),
@@ -9234,6 +9264,15 @@ function WorkbookStrokeGame({ lessonId, onBack }) {
 }
 
 // ----------------- Prueba: Clasificadores -----------------
+// Preguntas dentro del tope de lección del aula ("habilitado hasta la lección N")
+const lessonAllowed = (l, max) => { if (max == null) return true; const n = parseFloat(l); return isNaN(n) || n <= max; };
+function withinLessons(raw, max) {
+  const list = raw.filter(q => lessonAllowed(q.lesson, max));
+  const firsts = raw.map(q => parseFloat(q.lesson)).filter(n => !isNaN(n));
+  return { list, firstLesson: firsts.length ? Math.min(...firsts) : null };
+}
+const lockedByLessonMsg = (first, max) => '🔒 Esta actividad empieza en la lección ' + first + '. Tu aula está habilitada hasta la lección ' + max + ': cuando tu lǎoshī la habilite, aparece acá.';
+
 function ClasificadorGame(props) {
   const { tipo = 'clasificador' } = props;
   const titles = { frase: 'Completá la frase', clasificador: 'Clasificadores', modal: 'Verbos modales', tiempo: 'Expresiones de tiempo' };
@@ -9242,7 +9281,7 @@ function ClasificadorGame(props) {
   const [rawErr, setRawErr] = useState(false);
   const load = () => {
     setRaw(null); setRawErr(false);
-    db.from('npcr_clasificador_questions').select('sentence,pinyin,answer,answer_pinyin,options,hint,tipo')
+    db.from('npcr_clasificador_questions').select('sentence,pinyin,answer,answer_pinyin,options,hint,tipo,lesson')
       .eq('active', true).eq('tipo', tipo)
       .then(({ data, error: err }) => {
         if (err) setRawErr(true);
@@ -9253,11 +9292,13 @@ function ClasificadorGame(props) {
   if (rawErr) return html(GameStatusScreen, { onBack: props.onBack, title, msg: '❌ Error de conexión.', onRetry: load });
   if (raw === null) return html(GameStatusScreen, { onBack: props.onBack, title, msg: '⏳ Cargando preguntas...' });
   if (raw.length === 0) return html(GameStatusScreen, { onBack: props.onBack, title, msg: 'Todavía no hay preguntas cargadas. Pedile a tu lǎoshī que las suba.' });
+  const lim = withinLessons(raw, props.maxLesson);
+  if (!lim.list.length) return html(GameStatusScreen, { onBack: props.onBack, title, msg: lockedByLessonMsg(lim.firstLesson, props.maxLesson) });
   // Priorizar preguntas previamente fallidas (match por answer)
   const priorMissed = new Set((props.priorMissed || []).map(m => m.hanzi));
   const ordered = [
-    ...raw.filter(q => priorMissed.has(q.sentence.replace('___', q.answer))),
-    ...shuffle(raw.filter(q => !priorMissed.has(q.sentence.replace('___', q.answer)))),
+    ...lim.list.filter(q => priorMissed.has(q.sentence.replace('___', q.answer))),
+    ...shuffle(lim.list.filter(q => !priorMissed.has(q.sentence.replace('___', q.answer)))),
   ];
   return html(ClasificadorGameBody, { ...props, title, rawQuestions: ordered });
 }
@@ -9862,17 +9903,19 @@ function ZheGame({ onBack, onFinish, zheConfig }) {
 function DialogoGame(props) {
   const [raw, rawErr, rawReload] = useGameQuestions(
     'npcr_dialogo_questions',
-    'context,line_a,line_b,blank_in,answer,answer_pinyin,answer_es,options,explanation',
-    r => ({ context: r.context, A: r.line_a, B: r.line_b, blankIn: r.blank_in, answer: r.answer, answerPinyin: r.answer_pinyin, answerEs: r.answer_es, options: r.options, explanation: r.explanation })
+    'context,line_a,line_b,blank_in,answer,answer_pinyin,answer_es,options,explanation,lesson',
+    r => ({ context: r.context, A: r.line_a, B: r.line_b, blankIn: r.blank_in, answer: r.answer, answerPinyin: r.answer_pinyin, answerEs: r.answer_es, options: r.options, explanation: r.explanation, lesson: r.lesson })
   );
   if (rawErr) return html(GameStatusScreen, { onBack: props.onBack, title: 'Completa el diálogo', msg: '❌ Error de conexión.', onRetry: rawReload });
   if (raw === null) return html(GameStatusScreen, { onBack: props.onBack, title: 'Completa el diálogo', msg: '⏳ Cargando preguntas...' });
   if (raw.length === 0) return html(GameStatusScreen, { onBack: props.onBack, title: 'Completa el diálogo', msg: 'Todavía no hay preguntas cargadas. Pedile a tu lǎoshī que las suba desde el panel de administrador.' });
+  const lim = withinLessons(raw, props.maxLesson);
+  if (!lim.list.length) return html(GameStatusScreen, { onBack: props.onBack, title: 'Completá el diálogo', msg: lockedByLessonMsg(lim.firstLesson, props.maxLesson) });
   // Priorizar preguntas previamente fallidas
   const priorMissed = new Set((props.priorMissed || []).map(m => m.hanzi));
   const ordered = [
-    ...raw.filter(q => priorMissed.has(q.answer)),
-    ...shuffle(raw.filter(q => !priorMissed.has(q.answer))),
+    ...lim.list.filter(q => priorMissed.has(q.answer)),
+    ...shuffle(lim.list.filter(q => !priorMissed.has(q.answer))),
   ];
   return html(DialogoGameBody, { ...props, rawQuestions: ordered });
 }
@@ -9986,15 +10029,17 @@ function DialogoGameBody({ onBack, onFinish, playerName, rawQuestions }) {
 const CIRCLE_NUMS = ['①','②','③','④','⑤','⑥','⑦','⑧'];
 
 function OrdenGame(props) {
-  const [raw, rawErr, rawReload] = useGameQuestions('npcr_orden_questions', 'words,correct,es,pinyin', r => r);
+  const [raw, rawErr, rawReload] = useGameQuestions('npcr_orden_questions', 'words,correct,es,pinyin,lesson', r => r);
   if (rawErr) return html(GameStatusScreen, { onBack: props.onBack, title: 'Ordena la oración', msg: '❌ Error de conexión.', onRetry: rawReload });
   if (raw === null) return html(GameStatusScreen, { onBack: props.onBack, title: 'Ordena la oración', msg: '⏳ Cargando preguntas...' });
   if (raw.length === 0) return html(GameStatusScreen, { onBack: props.onBack, title: 'Ordena la oración', msg: 'Todavía no hay preguntas cargadas. Pedile a tu lǎoshī que las suba desde el panel de administrador.' });
+  const lim = withinLessons(raw, props.maxLesson);
+  if (!lim.list.length) return html(GameStatusScreen, { onBack: props.onBack, title: 'Ordená la oración', msg: lockedByLessonMsg(lim.firstLesson, props.maxLesson) });
   // Priorizar preguntas previamente fallidas (matched por oración correcta)
   const priorMissed = new Set((props.priorMissed || []).map(m => m.hanzi));
   const ordered = [
-    ...raw.filter(q => priorMissed.has(q.correct)),
-    ...shuffle(raw.filter(q => !priorMissed.has(q.correct))),
+    ...lim.list.filter(q => priorMissed.has(q.correct)),
+    ...shuffle(lim.list.filter(q => !priorMissed.has(q.correct))),
   ];
   return html(OrdenGameBody, { ...props, rawQuestions: ordered });
 }

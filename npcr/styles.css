@@ -2085,3 +2085,8 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
 .cfg-flat { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
 .admin-panel label.cfg-sub, .cfg-sub { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--ink-mid); text-transform: none; letter-spacing: 0; }
 .cfg-sub span { flex: 1; }
+/* Editor de preguntas por lección */
+.qed-lessons { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.qed-lessons .report-tab { padding: 5px 10px; font-size: 11px; }
+.qed-move { padding: 2px 4px; border-radius: 8px; border: 1px solid var(--paper-deep); font-size: 11px; font-weight: 800; background: #fff; color: var(--ink-mid); }
+.qed-lesson-tag { display: inline-block; font-size: 10px; font-weight: 900; background: var(--blue-light); color: var(--blue-dark); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }

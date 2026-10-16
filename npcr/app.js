@@ -8667,13 +8667,20 @@ async function uploadZhePhoto(file) {
   if (error) throw new Error(error.message);
   return db.storage.from('npcr-fotos').getPublicUrl(path).data.publicUrl;
 }
-// Busca la palabra en los mazos HSK para traer pinyin, significado y la grabación original
-async function findHskWord(hanzi) {
-  for (const t of ['hsk1_words', 'hsk2_words']) {
-    const { data } = await db.from(t).select('hanzi,pinyin,es,audio').eq('hanzi', hanzi).limit(1);
-    if (data && data[0]) return data[0];
+// Busca la palabra en toda la base (libro NPCR, HSK 1 y HSK 2) para traer pinyin, significado
+// y la grabación original. Si aparece en varias, se queda con la que tiene audio.
+async function findBaseWord(hanzi) {
+  let first = null;
+  const { data: v } = await db.from('npcr_vocabulary').select('hanzi,pinyin,es').eq('hanzi', hanzi).limit(1);
+  if (v && v[0]) {
+    const w = { ...v[0], audio: (NPCR_MEDIA.audio || {})[hanzi] || null, source: 'el libro NPCR' };
+    if (w.audio) return w; first = w;
   }
-  return null;
+  for (const [t, name] of [['hsk1_words', 'HSK 1'], ['hsk2_words', 'HSK 2']]) {
+    const { data } = await db.from(t).select('hanzi,pinyin,es,audio').eq('hanzi', hanzi).limit(1);
+    if (data && data[0]) { const w = { ...data[0], source: name }; if (w.audio) return w; first = first || w; }
+  }
+  return first;
 }
 
 // ── Consola → Contenido: camino de Trazos (solo admin; la base también lo exige) ──
@@ -8804,8 +8811,8 @@ function ZheAdmin({ isSuper }) {
   const startAdd = () => setAdd({ hanzi: '', pinyin: '', es: '', es_s: '', audio: null, file: null, preview: null, found: null });
   const lookup = async () => {
     const h = (add.hanzi || '').trim(); if (!h) return;
-    const w = await findHskWord(h);
-    setAdd(a => ({ ...a, found: w ? 'si' : 'no', audio: w ? w.audio : null,
+    const w = await findBaseWord(h);
+    setAdd(a => ({ ...a, found: w ? 'si' : 'no', audio: w ? w.audio : null, source: w ? w.source : null,
       pinyin: a.pinyin || (w ? w.pinyin : ''), es: a.es || (w ? w.es : '') }));
   };
   const saveAdd = async () => {
@@ -8848,10 +8855,10 @@ function ZheAdmin({ isSuper }) {
         html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
           html('div', { style: { display: 'flex', gap: 6 } },
             inp(add.hanzi, v => setAdd(a => ({ ...a, hanzi: v, found: null, audio: null })), 'Hanzi (ej: 眼睛)', { fontSize: 18, fontFamily: 'Noto Sans SC, sans-serif' }),
-            html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto', padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap' }, onClick: lookup, disabled: !add.hanzi.trim() }, '🔎 Buscar en HSK')),
+            html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto', padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap' }, onClick: lookup, disabled: !add.hanzi.trim() }, '🔎 Buscar en la base')),
           add.found && html('div', { className: 'admin-note', style: { margin: 0 } }, add.found === 'si'
-            ? (add.audio ? '✅ Está en el HSK: se usa su grabación original.' : '✅ Está en el HSK (sin grabación).')
-            : 'No está en el HSK: se puede agregar igual, pero sin audio.'),
+            ? (add.audio ? '✅ Está en la base (' + add.source + '): se usa su grabación original.' : '✅ Está en la base (' + add.source + '), pero sin grabación.')
+            : 'No está en la base: se puede agregar igual, pero sin audio.'),
           inp(add.pinyin, v => setAdd(a => ({ ...a, pinyin: v })), 'Pinyin (ej: yǎnjing)'),
           inp(add.es, v => setAdd(a => ({ ...a, es: v })), 'Significado (ej: ojos)'),
           inp(add.es_s, v => setAdd(a => ({ ...a, es_s: v })), 'Frase de la corrección (ej: Son ojos.)'),
@@ -9528,7 +9535,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
             // ── Módulos de práctica ──
             html('div', null,
               html('label', null, '🎮 Módulos de práctica'),
-              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Activá o desactivá cada módulo para todos los alumnos y editá su contenido. En "Zhè shì shénme?" podés ocultar, cambiar o agregar fotos (se achican solas; si la palabra está en el HSK se usa su grabación original).'),
+              html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Activá o desactivá cada módulo para todos los alumnos y editá su contenido. En "Zhè shì shénme?" podés ocultar, cambiar o agregar fotos (se achican solas; si la palabra ya está en la base se usa su grabación original).'),
               html('div', { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
                 [
                   { id: 'mod-frase',    icon: '🧩', name: 'Completá la frase',    editable: true },

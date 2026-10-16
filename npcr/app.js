@@ -761,6 +761,22 @@ function StudentFile({ row, vocab, lessons, tasks, onBack }) {
   );
 }
 
+// Nombre legible de un tipo de práctica registrado en npcr_activity (kind/mode)
+function activityName(kind, mode) {
+  const extra = { daily: 'Entrenamiento diario', 'refuerzo-clase': 'Refuerzo de clase', semana: 'Palabras de la semana', dificiles: 'Mis palabras difíciles',
+    escritura: 'Práctica de escritura', 'clase-orden': 'Clases · ordenar oraciones', 'clase-quiz': 'Clases · mis preguntas', 'clase-palabras': 'Clases · mis palabras', 'clase-trazos': 'Clases · trazos' };
+  if (kind === 'daily') return extra.daily;
+  const found = [...PLAN_LESSON_MODES, ...PLAN_GAMES].find(x => x[0] === mode);
+  return extra[mode] || (found && found[1]) || mode || kind;
+}
+// Flecha de tendencia contra la semana anterior
+function trendText(now, prev, unit) {
+  if (now == null || prev == null) return 'sin datos de la semana anterior';
+  const d = now - prev;
+  if (d === 0) return '＝ igual que la semana anterior';
+  return (d > 0 ? '▲ +' : '▼ ') + d + (unit || '') + ' vs semana anterior';
+}
+
 function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   const [classes, setClasses] = useState(null);
   const [classId, setClassId] = useState(initialClassId || null);
@@ -779,6 +795,18 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   const [pickLesson, setPickLesson] = useState('1');
   const [savedMsg, setSavedMsg] = useState(null);
   const [sel, setSel] = useState(null);   // alumno resaltado: { uid, name }
+  const [ins, setIns] = useState(null);   // tendencias y dificultad (npcr_class_insights)
+  const [alertCfg, setAlertCfg] = useState({});
+  const [mapMode, setMapMode] = useState('alumnos');
+  const [compose, setCompose] = useState(null);   // { uid|null, name, text }
+  const [sent, setSent] = useState(null);         // mensajes enviados
+  const loadSent = () => db.rpc('npcr_class_messages', { p_class: classId }).then(({ data, error }) => setSent(error ? null : (data || [])));
+  const sendMsg = async () => {
+    const { data, error } = await db.rpc('npcr_class_message', { p_class: classId, p_user: compose.uid || null, p_text: compose.text });
+    if (error) { setFlashMsg({ type: 'err', msg: '❌ ' + error.message + (/function|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_panel_laoshi.sql?' : '') }); return; }
+    setFlashMsg({ type: 'ok', msg: '✉️ Mensaje enviado a ' + (compose.uid ? compose.name : data + ' alumnos') + '. Le aparece al abrir la app (o en menos de un minuto si la tiene abierta).' });
+    setCompose(null); loadSent();
+  };
 
   useEffect(() => {
     db.from('classes').select('id,name').order('created_at', { ascending: false }).then(({ data, error }) => {
@@ -826,6 +854,10 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       });
     loadTasks();
     loadSettings();
+    setIns(null);
+    db.rpc('npcr_class_insights', { p_class: classId }).then(({ data, error }) => setIns(error ? { error: error.message } : data));
+    db.from('npcr_app_config').select('value').eq('key', 'alertas_config').maybeSingle().then(({ data }) => setAlertCfg((data && data.value) || {}));
+    loadSent();
   }, [classId, reloadKey]);
 
   const createTask = async (e) => {
@@ -848,17 +880,23 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
   const active = (rows || []).filter(r => r.user_id);
   const avg = (arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
 
-  // Alertas
+  // Alertas: los umbrales salen de npcr_app_config 'alertas_config' (editable en Configuración)
+  const A = { inactivo_dias: 5, precision_min: 60, sesiones_min: 2, dificiles_min: 8, ejercicio_min: 70, palabra_grupo_pct: 50, ...alertCfg };
   const alerts = [];
   if (rows) {
+    const asleep = active.filter(r => { const d = daysSince(r.last_activity || r.last_seen); return d === null || d >= A.inactivo_dias; });
+    if (asleep.length >= 3) alerts.push({ tone: 'warn', text: '😴 ' + asleep.length + ' alumnos no practican hace ' + A.inactivo_dias + ' días o más: ' + asleep.map(r => r.display_name).join(', ') + '.', uids: asleep });
+    else asleep.forEach(r => { const d = daysSince(r.last_activity || r.last_seen); alerts.push({ tone: 'warn', text: '😴 ' + r.display_name + (d === null ? ' no registra práctica todavía.' : ' no practica hace ' + d + ' días.'), uids: [r] }); });
     rows.filter(r => !r.user_id).forEach(r => alerts.push({ tone: 'info', text: '⏳ ' + r.display_name + ' todavía no activó su código (' + r.code + ').' }));
     active.forEach(r => {
-      const d = daysSince(r.last_activity || r.last_seen);
-      if (d === null || d >= 5) alerts.push({ tone: 'warn', text: '😴 ' + r.display_name + (d === null ? ' no registra práctica todavía.' : ' no practica hace ' + d + ' días.') });
-      if (r.acc_7d != null && r.acc_7d < 60 && r.sessions_7d >= 2) alerts.push({ tone: 'warn', text: '📉 ' + r.display_name + ' tiene precisión baja esta semana (' + r.acc_7d + '%).' });
-      if (r.words_struggling >= 8) alerts.push({ tone: 'warn', text: '🧩 ' + r.display_name + ' acumula ' + r.words_struggling + ' palabras con dificultad.' });
+      if (r.acc_7d != null && r.acc_7d < A.precision_min && r.sessions_7d >= A.sesiones_min) alerts.push({ tone: 'warn', text: '📉 ' + r.display_name + ' tiene precisión baja esta semana (' + r.acc_7d + '%).', uids: [r] });
+      if (r.words_struggling >= A.dificiles_min) alerts.push({ tone: 'warn', text: '🧩 ' + r.display_name + ' acumula ' + r.words_struggling + ' palabras con dificultad.', uids: [r] });
     });
-    if (hard[0] && hard[0].students >= 2) alerts.push({ tone: 'info', text: '🎯 La palabra que más cuesta en la clase es ' + hard[0].hanzi + ' (' + (hard[0].es || '') + '): ' + hard[0].students + ' alumnos.' });
+    (ins && ins.modes || []).filter(m => m.n >= 3 && m.acc < A.ejercicio_min).slice(0, 3).forEach(m =>
+      alerts.push({ tone: 'info', text: '🎯 Al grupo le cuesta "' + activityName(m.kind, m.mode) + '": ' + m.acc + '% de aciertos en ' + m.n + ' intentos.' }));
+    hard.filter(h => active.length && h.students / active.length * 100 >= A.palabra_grupo_pct).slice(0, 3).forEach(h =>
+      alerts.push({ tone: 'info', text: '🔁 ' + h.hanzi + ' (' + (h.es || '') + ') la falla el ' + Math.round(h.students / active.length * 100) + '% del grupo: conviene repasarla en clase.' }));
+    if (!alerts.some(a => a.text.startsWith('🔁')) && hard[0] && hard[0].students >= 2) alerts.push({ tone: 'info', text: '🎯 La palabra que más cuesta en la clase es ' + hard[0].hanzi + ' (' + (hard[0].es || '') + '): ' + hard[0].students + ' alumnos.' });
   }
 
   const sortedRows = rows ? [...rows].sort((a, b) => {
@@ -897,6 +935,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       html('p', { className: 'admin-note', style: { marginTop: 0 } },
         'Agregá a cada alumno con su nombre: la app le genera un código personal. Tocá el código para copiarlo, 📤 para copiar la invitación, 🔄 para darle un código nuevo y "Ver ficha" para ver su avance. Tocá un alumno para resaltarlo: queda marcado en todas las pestañas.'),
       flashMsg && html('div', { className: 'admin-status ' + (flashMsg.type === 'ok' ? 'ok' : 'err'), style: { marginBottom: 10, cursor: 'pointer' }, onClick: () => setFlashMsg(null) }, flashMsg.msg),
+      html('div', { className: 'panel-actions' }, html('button', { className: 'mini-btn strong', onClick: () => setCompose({ uid: null, name: 'toda el aula', text: '' }) }, '✉️ Mensaje a toda el aula')),
       html(ClassStudents, {
         cls: { id: classId, name: cls ? cls.name : '' },
         flash: (type, msg) => setFlashMsg({ type, msg }),
@@ -904,22 +943,53 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
         onOpen: (r) => { const row = (rows || []).find(x => x.seat_id === r.id); if (row) setStudent(row); },
         isSel, onSelect: pick,
       }),
+      sent && sent.length > 0 && html('details', { className: 'sent-box' },
+        html('summary', null, '📨 Mensajes enviados (' + sent.length + ')'),
+        html('div', { className: 'plan-edit-steps' }, sent.slice(0, 60).map((m, i) => { const r = (rows || []).find(x => x.user_id === m.user_id);
+          return html('div', { key: i, className: 'plan-edit-step' },
+            html('span', { style: { flex: 1, minWidth: 0 } }, html('b', null, r ? r.display_name : 'Alumno'), html('small', null, m.text + ' · ' + timeAgo(m.created_at))),
+            html('span', { className: 'sent-state' + (m.done_at ? ' ok' : '') }, m.done_at ? '✓ Leído' : '○ Sin leer')); }))),
     );
   }
   else if (rows.length === 0 && tab !== 'tareas' && tab !== 'config') body = html('p', { className: 'admin-note' }, 'Esta clase todavía no tiene alumnos. Agregalos desde ⚙ Administrar → Mis clases.');
   else if (tab === 'resumen') {
+    const W = ins && !ins.error ? ins.week : null, P = ins && !ins.error ? ins.prev : null;
+    const maxDay = ins && ins.days ? Math.max(1, ...ins.days.map(d => d.sessions)) : 1;
     body = html('div', null,
+      html('div', { className: 'panel-actions' },
+        html('button', { className: 'mini-btn strong', onClick: () => setCompose({ uid: null, name: 'toda el aula', text: '' }) }, '✉️ Mensaje a toda el aula'),
+        ins && ins.error && html('span', { className: 'admin-note', style: { margin: 0 } }, 'Para ver tendencias y dificultad, ejecutá npcr_panel_laoshi.sql.')),
+      W && html('div', { className: 'kpi-grid' },
+        html(KpiCard, { icon: '🧑‍🎓', value: W.students + '/' + active.length, label: 'practicaron estos 7 días', sub: trendText(W.students, P && P.students), tone: W.students >= (P && P.students || 0) ? 'up' : 'down' }),
+        html(KpiCard, { icon: '🔁', value: W.sessions, label: 'sesiones de práctica', sub: trendText(W.sessions, P && P.sessions), tone: W.sessions >= (P && P.sessions || 0) ? 'up' : 'down' }),
+        html(KpiCard, { icon: '🎯', value: W.acc == null ? '—' : W.acc + '%', label: 'aciertos promedio', sub: trendText(W.acc, P && P.acc, ' pts'), tone: (W.acc || 0) >= (P && P.acc || 0) ? 'up' : 'down' })),
+      ins && ins.days && html('div', { className: 'report-card' },
+        html('div', { className: 'report-h' }, '📅 Práctica de los últimos 14 días'),
+        html('div', { className: 'day-bars' }, ins.days.map(d => html('div', { key: d.d, className: 'day-bar', title: d.d + ': ' + d.sessions + ' sesiones · ' + d.students + ' alumnos' + (d.acc != null ? ' · ' + d.acc + '%' : '') },
+          html('span', { className: 'day-n' }, d.sessions || ''),
+          html('i', { style: { height: Math.round(d.sessions / maxDay * 70) + 'px' } }),
+          html('span', { className: 'day-l' }, ['D', 'L', 'M', 'X', 'J', 'V', 'S'][new Date(d.d + 'T12:00').getDay()]))))),
+      ins && ins.modes && ins.modes.length > 0 && html('div', { className: 'report-card' },
+        html('div', { className: 'report-h' }, '🧭 Qué le cuesta más al grupo'),
+        html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Aciertos promedio por tipo de ejercicio en los últimos ' + (A.dias_analisis || 30) + ' días (de menor a mayor).'),
+        html('div', { className: 'mode-bars' }, ins.modes.map(m => { const c = masteryColor(m.acc); return html('div', { key: m.kind + m.mode, className: 'mode-bar' },
+          html('span', { className: 'mode-bar-name' }, activityName(m.kind, m.mode)),
+          html('span', { className: 'mode-bar-track' }, html('i', { style: { width: m.acc + '%', background: c.fg } })),
+          html('span', { className: 'mode-bar-val', style: { color: c.fg } }, m.acc + '%'),
+          html('span', { className: 'mode-bar-n' }, m.n + ' · ' + m.students + (m.students === 1 ? ' alumno' : ' alumnos'))); }))),
       html('div', { className: 'kpi-grid' },
         html(KpiCard, { icon: '👥', value: active.length + '/' + rows.length, label: 'alumnos activos' }),
-        html(KpiCard, { icon: '✅', value: active.filter(r => r.sessions_7d > 0).length, label: 'practicaron esta semana' }),
+        !W && html(KpiCard, { icon: '✅', value: active.filter(r => r.sessions_7d > 0).length, label: 'practicaron esta semana' }),
         html(KpiCard, { icon: '📅', value: (avg(active.map(r => r.daily_7d)) ?? 0) + '/7', label: 'entrenamientos promedio' }),
-        html(KpiCard, { icon: '🎯', value: avg(active.filter(r => r.acc_7d != null).map(r => r.acc_7d)) == null ? '—' : avg(active.filter(r => r.acc_7d != null).map(r => r.acc_7d)) + '%', label: 'precisión 7 días' }),
+        !W && html(KpiCard, { icon: '🎯', value: avg(active.filter(r => r.acc_7d != null).map(r => r.acc_7d)) == null ? '—' : avg(active.filter(r => r.acc_7d != null).map(r => r.acc_7d)) + '%', label: 'precisión 7 días' }),
         html(KpiCard, { icon: '🧠', value: (avg(active.map(r => r.mastery)) ?? 0) + '%', label: 'dominio promedio' }),
       ),
       html('div', { className: 'report-card' },
         html('div', { className: 'report-h' }, '🔔 Alertas'),
         alerts.length === 0 ? html('p', { className: 'admin-note', style: { margin: 0 } }, 'Todo en orden por ahora. 👏')
-        : html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, alerts.map((a, i) => html('div', { key: i, className: 'alert-row ' + a.tone }, a.text))),
+        : html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, alerts.map((a, i) => html('div', { key: i, className: 'alert-row ' + a.tone },
+            html('span', { style: { flex: 1 } }, a.text),
+            a.uids && a.uids.length === 1 && html('button', { className: 'mini-btn', onClick: () => setCompose({ uid: a.uids[0].user_id, name: a.uids[0].display_name, text: '' }) }, '✉️ Escribirle')))),
       ),
       html('div', { className: 'report-card' },
         html('div', { className: 'report-h' }, '📚 Dominio promedio por lección'),
@@ -953,8 +1023,25 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
         )))),
       html('p', { className: 'admin-note', style: { padding: '8px 12px', margin: 0 } }, 'Tocá un encabezado para ordenar y un alumno para resaltarlo; su ficha se abre desde la barra de arriba.'),
     );
+  } else if (tab === 'mapa' && mapMode === 'ejercicios') {
+    const lsn = [...new Set((ins && ins.lessons || []).map(x => x.lesson))].sort(lessonCompare);
+    const mds = [...new Set((ins && ins.lessons || []).map(x => x.mode))];
+    const cellOf = (l, m) => (ins.lessons || []).find(x => x.lesson === l && x.mode === m);
+    body = html('div', null,
+      html('div', { className: 'reg-toolbar', style: { marginBottom: 8 } }, [['alumnos', '👥 Por alumno'], ['ejercicios', '🧭 Por tipo de ejercicio']].map(([k, l]) => html('button', { key: k, className: 'report-tab' + (mapMode === k ? ' active' : ''), onClick: () => setMapMode(k) }, l))),
+      !ins || ins.error || !lsn.length ? html('p', { className: 'admin-note' }, ins && ins.error ? 'Ejecutá npcr_panel_laoshi.sql para ver este mapa.' : 'Todavía no hay práctica registrada por lección.')
+      : html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
+        html('table', { className: 'heat-table' },
+          html('thead', null, html('tr', null, html('th', null, 'Lección'), mds.map(m => html('th', { key: m }, activityName('lesson', m))))),
+          html('tbody', null, lsn.map(l => html('tr', { key: l },
+            html('td', { style: { fontWeight: 800, whiteSpace: 'nowrap', textAlign: 'left' } }, 'L' + l),
+            mds.map(m => { const x = cellOf(l, m); const c = masteryColor(x ? x.acc : null);
+              return html('td', { key: m, style: { background: x ? c.bg : 'var(--paper)', color: c.fg }, title: x ? x.n + ' intentos · ' + x.students + ' alumnos' : 'sin práctica' }, x ? x.acc : ''); }))))),
+        html('p', { className: 'admin-note', style: { padding: '8px 12px', margin: 0 } }, 'Aciertos promedio (0–100) por lección y tipo de ejercicio, de todo el grupo. Pasá el mouse para ver cuántos intentos hubo.')));
   } else if (tab === 'mapa') {
-    body = html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
+    body = html('div', null,
+      html('div', { className: 'reg-toolbar', style: { marginBottom: 8 } }, [['alumnos', '👥 Por alumno'], ['ejercicios', '🧭 Por tipo de ejercicio']].map(([k, l]) => html('button', { key: k, className: 'report-tab' + (mapMode === k ? ' active' : ''), onClick: () => setMapMode(k) }, l))),
+      html(ScrollX, { className: 'report-card', style: { padding: 0 }, arrows: 'top' },
       html('table', { className: 'heat-table' },
         html('thead', null, html('tr', null, html('th', null, 'Alumno'), lessons.map(l => html('th', { key: l }, 'L' + l)))),
         html('tbody', null, active.map(r => html('tr', { key: r.seat_id, onClick: () => pick(r), onDoubleClick: () => setStudent(r), className: isSel(r) ? 'sel-row' : '' },
@@ -964,7 +1051,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       html('p', { className: 'admin-note', style: { padding: '8px 12px', margin: 0 } },
         'Dominio por lección (0–100). ', html('span', { style: { color: '#9A2E1C', fontWeight: 800 } }, 'Rojo < 40'), ' · ',
         html('span', { style: { color: '#8A5A00', fontWeight: 800 } }, 'ámbar < 70'), ' · ', html('span', { style: { color: '#2F6B12', fontWeight: 800 } }, 'verde ≥ 70'), '. Solo alumnos activos.'),
-    );
+    ));
   } else if (tab === 'palabras') {
     body = html('div', { className: 'report-card' },
       html('div', { className: 'report-h' }, '🧩 Lo que más le cuesta a la clase'),
@@ -1096,6 +1183,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       html('small', null, !selRow || !selRow.user_id ? 'Sin activar todavía'
         : 'Dominio ' + (selRow.mastery || 0) + '% · ' + (selRow.sessions_7d || 0) + ' sesiones en 7 días · ' + (selRow.last_activity || selRow.last_seen ? 'última vez ' + timeAgo(selRow.last_activity || selRow.last_seen) : 'sin actividad'))),
     selRow && selRow.user_id && html('button', { className: 'mini-btn', onClick: () => setStudent(selRow) }, '📄 Ver ficha'),
+    selRow && selRow.user_id && html('button', { className: 'mini-btn', onClick: () => setCompose({ uid: selRow.user_id, name: selRow.display_name, text: '' }) }, '✉️ Mensaje'),
     html('button', { className: 'sel-x', title: 'Dejar de resaltar', onClick: () => setSel(null) }, '✕'));
 
   return html('main', { className: (tab === 'bingo' || tab === 'quiz') && !student ? '' : 'wide', style: { paddingTop: 18, paddingBottom: 40 } },
@@ -1111,6 +1199,16 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       classes && classes.length === 0 && html('p', { className: 'admin-note' }, 'Todavía no hay clases. Creá una en ⚙ Administrar → Mis clases.'),
       !student && classId && html('div', { className: 'report-tabs' }, tabs.map(([k, label]) => html('button', { key: k, className: 'report-tab' + (tab === k ? ' active' : ''), onClick: () => setTab(k) }, label))),
       classId && selBar,
+      flashMsg && tab !== 'alumnos' && !student && html('div', { className: 'admin-status ' + (flashMsg.type === 'ok' ? 'ok' : 'err'), style: { marginBottom: 10, cursor: 'pointer' }, onClick: () => setFlashMsg(null) }, flashMsg.msg),
+      compose && html('div', { className: 'name-modal-overlay', onClick: (e) => { if (e.target === e.currentTarget) setCompose(null); } },
+        html('div', { className: 'name-modal', style: { textAlign: 'left' } },
+          html('h2', { className: 'name-modal-title' }, '✉️ Mensaje para ' + compose.name),
+          html('p', { className: 'name-modal-sub' }, compose.uid ? 'Le aparece solo a este alumno, al abrir la app.' : 'Le aparece a cada alumno del aula, al abrir la app.'),
+          html('textarea', { value: compose.text, rows: 4, maxLength: 400, autoFocus: true, placeholder: 'Ej: Mañana repasamos la lección 6. ¡Hagan el entrenamiento diario!', onChange: e => setCompose({ ...compose, text: e.target.value }), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'inherit' } }),
+          html('div', { style: { fontSize: 11, color: 'var(--ink-soft)', textAlign: 'right' } }, compose.text.length + '/400'),
+          html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+            html('button', { className: 'primary-btn', style: { margin: 0 }, disabled: compose.text.trim().length < 2, onClick: sendMsg }, 'Enviar'),
+            html('button', { className: 'secondary-btn', style: { margin: 0 }, onClick: () => setCompose(null) }, 'Cancelar')))),
       classId && body,
     ),
   );
@@ -7941,6 +8039,57 @@ const WRITE_STREAK_DEFAULT = 3;
 // ═══════════════════════════════════════════════════════════
 // AppConfigEditor — edita app_config en Supabase
 // ═══════════════════════════════════════════════════════════
+// ── Configuración → Otros ajustes: todo lo de npcr_app_config que no tiene pantalla propia ──
+// Números, textos, sí/no y grupos de valores se editan con su campo; lo complejo, como JSON.
+const CONFIG_OWN_EDITOR = ['brand_frames', 'brand_anim_interval', 'modules_list', 'write_game_config', 'keyboard_hint_text'];
+const prettyKey = (k) => String(k).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+function GenericConfigEditor({ onAppConfigChange }) {
+  const [rows, setRows] = useState(null);
+  const [draft, setDraft] = useState({});     // key → valor en edición (texto para JSON)
+  const [msg, setMsg] = useState(null);
+  const load = () => db.from('npcr_app_config').select('key,value,label').order('key').then(({ data }) => setRows((data || []).filter(r => !CONFIG_OWN_EDITOR.includes(r.key))));
+  useEffect(() => { load(); }, []);
+  const kindOf = (v) => typeof v === 'number' ? 'num' : typeof v === 'boolean' ? 'bool' : typeof v === 'string' ? 'text'
+    : (v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(x => ['number', 'string', 'boolean'].includes(typeof x))) ? 'flat' : 'json';
+  const save = async (r, value) => {
+    const { error } = await db.from('npcr_app_config').upsert({ key: r.key, value, label: r.label || r.key });
+    if (error) { setMsg({ type: 'err', text: '❌ ' + error.message }); return; }
+    setMsg({ type: 'ok', text: '✅ ' + (r.label || r.key) + ' guardado.' }); setTimeout(() => setMsg(null), 3000);
+    setDraft(d => { const n = { ...d }; delete n[r.key]; return n; });
+    if (onAppConfigChange) onAppConfigChange(r.key, value);
+    load();
+  };
+  if (!rows) return html('p', { className: 'admin-note' }, 'Cargando…');
+  return html('div', null,
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
+    html('div', { className: 'cfg-list' }, rows.map(r => {
+      const k = kindOf(r.value);
+      const cur = r.key in draft ? draft[r.key] : (k === 'json' ? JSON.stringify(r.value, null, 2) : r.value);
+      const set = (v) => setDraft(d => ({ ...d, [r.key]: v }));
+      const changed = r.key in draft;
+      let field;
+      if (k === 'num') field = html('input', { type: 'number', value: cur, onChange: e => set(e.target.value === '' ? '' : Number(e.target.value)), style: { ...cmInput, width: 120, flex: 'none' } });
+      else if (k === 'bool') field = html('label', { className: 'mode-check' + (cur ? ' on' : '') }, html('input', { type: 'checkbox', checked: !!cur, onChange: e => set(e.target.checked) }), cur ? 'Sí' : 'No');
+      else if (k === 'text') field = html('textarea', { value: cur, rows: String(cur).length > 60 ? 3 : 1, onChange: e => set(e.target.value), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'inherit' } });
+      else if (k === 'flat') field = html('div', { className: 'cfg-flat' }, Object.entries(cur).map(([sk, sv]) => html('label', { key: sk, className: 'cfg-sub' },
+        html('span', null, prettyKey(sk)),
+        typeof sv === 'boolean' ? html('input', { type: 'checkbox', checked: sv, onChange: e => set({ ...cur, [sk]: e.target.checked }) })
+        : html('input', { type: typeof sv === 'number' ? 'number' : 'text', value: sv, onChange: e => set({ ...cur, [sk]: typeof sv === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value }), style: { ...cmInput, width: typeof sv === 'number' ? 90 : '100%', flex: typeof sv === 'number' ? 'none' : 1 } }))));
+      else field = html('textarea', { value: cur, rows: Math.min(14, String(cur).split('\n').length), spellCheck: false, onChange: e => set(e.target.value), style: { ...cmInput, width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: 12 } });
+      const doSave = () => {
+        if (k === 'json') { try { save(r, JSON.parse(cur)); } catch (e) { setMsg({ type: 'err', text: '❌ ' + (r.label || r.key) + ': el formato no es válido (' + e.message + ').' }); } return; }
+        if (k === 'num' && (cur === '' || isNaN(cur))) { setMsg({ type: 'err', text: '❌ Escribí un número.' }); return; }
+        save(r, cur);
+      };
+      return html('div', { key: r.key, className: 'cfg-row' + (changed ? ' changed' : '') },
+        html('div', { className: 'cfg-head' }, html('b', null, r.label || prettyKey(r.key)), html('code', null, r.key)),
+        field,
+        changed && html('div', { style: { display: 'flex', gap: 6, marginTop: 6 } },
+          html('button', { className: 'mini-btn strong', onClick: doSave }, 'Guardar'),
+          html('button', { className: 'mini-btn', onClick: () => setDraft(d => { const n = { ...d }; delete n[r.key]; return n; }) }, 'Descartar')));
+    })));
+}
+
 function AppConfigEditor({ appConfig, onAppConfigChange }) {
   const [saving, setSaving] = useState(null);       // key que se está guardando
   const [saveStatus, setSaveStatus] = useState({}); // { [key]: 'ok' | 'err' }
@@ -9887,6 +10036,10 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
               html('label', null, '⚙️ Configuración del app'),
               html('p', { className: 'admin-note', style: { margin: '6px 0 12px' } }, 'Editá los textos y módulos de la app sin tocar código.'),
               html(AppConfigEditor, { appConfig: appConfig || {}, onAppConfigChange }),
+              html('details', { className: 'cfg-more' },
+                html('summary', null, '🧩 Otros ajustes (alertas, juegos, invitados, exámenes…)'),
+                html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'Todos los demás valores de la app. Cambiá lo que necesites y tocá Guardar en ese ajuste: se aplica para todos.'),
+                html(GenericConfigEditor, { onAppConfigChange })),
             ),
           )
 

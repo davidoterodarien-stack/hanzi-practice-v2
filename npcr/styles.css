@@ -2055,3 +2055,36 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
 .dial-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 @media (max-width: 560px) { .dial-roles { grid-template-columns: 1fr; } }
 .dial-role { display: flex; flex-direction: column; gap: 6px; border: 2px solid; border-radius: 12px; padding: 8px; }
+/* Panel del lǎoshī */
+.panel-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.day-bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; align-items: end; height: 110px; }
+.day-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; height: 100%; }
+.day-bar i { display: block; width: 100%; max-width: 26px; min-height: 2px; background: var(--lacquer); border-radius: 6px 6px 0 0; }
+.day-n { font-size: 10px; font-weight: 800; color: var(--ink-soft); }
+.day-l { font-size: 10px; font-weight: 800; color: var(--ink-soft); }
+.mode-bars { display: flex; flex-direction: column; gap: 6px; }
+.mode-bar { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 44px auto; align-items: center; gap: 8px; font-size: 13px; }
+.mode-bar-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mode-bar-track { height: 10px; background: var(--paper-deep); border-radius: 999px; overflow: hidden; }
+.mode-bar-track i { display: block; height: 100%; border-radius: 999px; }
+.mode-bar-val { font-weight: 900; text-align: right; }
+.mode-bar-n { font-size: 11px; color: var(--ink-soft); font-weight: 700; white-space: nowrap; }
+@media (max-width: 560px) { .mode-bar { grid-template-columns: 1fr 44px; } .mode-bar-track { grid-column: 1 / -1; order: 3; } .mode-bar-n { grid-column: 1 / -1; order: 4; } }
+.alert-row { display: flex; align-items: center; gap: 8px; }
+.kpi-card .kpi-sub, .kpi-sub { font-size: 11px; font-weight: 800; }
+.sent-box { margin-top: 14px; }
+.sent-box > summary { cursor: pointer; font-weight: 800; color: var(--ink-mid); padding: 6px 0; }
+.sent-state { font-size: 11px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; }
+.sent-state.ok { color: var(--jade-dark); }
+.kpi-card.up .kpi-sub { color: var(--jade-dark); }
+.kpi-card.down .kpi-sub { color: var(--lacquer); }
+/* Configuración → Otros ajustes */
+.cfg-more > summary { cursor: pointer; font-weight: 800; color: var(--lacquer-dark); padding: 10px 0; }
+.cfg-list { display: flex; flex-direction: column; gap: 10px; }
+.cfg-row { background: #fff; border: 2px solid var(--paper-deep); border-radius: 12px; padding: 10px 12px; }
+.cfg-row.changed { border-color: var(--gold); }
+.cfg-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.cfg-head code { font-size: 10px; color: var(--ink-soft); background: var(--paper); padding: 1px 6px; border-radius: 6px; }
+.cfg-flat { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.admin-panel label.cfg-sub, .cfg-sub { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--ink-mid); text-transform: none; letter-spacing: 0; }
+.cfg-sub span { flex: 1; }

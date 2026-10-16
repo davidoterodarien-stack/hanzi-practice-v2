@@ -2090,3 +2090,12 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
 .qed-lessons .report-tab { padding: 5px 10px; font-size: 11px; }
 .qed-move { padding: 2px 4px; border-radius: 8px; border: 1px solid var(--paper-deep); font-size: 11px; font-weight: 800; background: #fff; color: var(--ink-mid); }
 .qed-lesson-tag { display: inline-block; font-size: 10px; font-weight: 900; background: var(--blue-light); color: var(--blue-dark); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+/* Ventanas propias (avisos y confirmaciones) */
+.app-dialog-ov { z-index: 9500; }
+.app-dialog { text-align: center; animation: bpPop .3s cubic-bezier(.2, 1.4, .4, 1); }
+.app-dialog-icon { font-size: 44px; line-height: 1; margin-bottom: 6px; }
+.app-dialog-text { font-size: 15px; color: var(--ink-mid); font-weight: 600; line-height: 1.45; white-space: pre-wrap; margin: 6px 0 0; }
+.app-dialog-btns { display: flex; gap: 8px; margin-top: 16px; }
+.app-dialog-btns button { margin: 0; flex: 1; }
+.app-dialog.danger { border-top: 5px solid var(--lacquer); }
+.primary-btn.danger { background: var(--lacquer-dark); }

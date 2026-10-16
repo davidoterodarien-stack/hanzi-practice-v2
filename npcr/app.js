@@ -684,7 +684,7 @@ function StudentFile({ row, vocab, lessons, tasks, onBack }) {
           html('div', { style: { fontSize: 12, color: 'var(--ink-soft)', fontWeight: 700 } },
             row.user_id ? 'Código ' + row.code + ' · última actividad ' + timeAgo(row.last_activity || row.last_seen) : '⏳ Todavía no activó su código (' + row.code + ')'),
           html('button', { className: 'hint-link', style: { margin: '4px 0 0', display: 'inline-block', padding: 0 },
-            onClick: () => copyText(inviteMessage(row.display_name.split(' ')[0], row.code), () => window.alert('📤 Invitación copiada: pegala en WhatsApp o mail.')) }, '📤 Copiar invitación'),
+            onClick: () => copyText(inviteMessage(row.display_name.split(' ')[0], row.code), () => appAlert({ icon: '📤', title: 'Invitación copiada', text: 'Pegala en WhatsApp o en un mail.' })) }, '📤 Copiar invitación'),
         ),
         html(MasteryPill, { value: row.user_id ? row.mastery : null }),
       ),
@@ -870,7 +870,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
     loadTasks();
   };
   const deleteTask = async (t) => {
-    if (!window.confirm('¿Eliminar la tarea "' + t.title + '"?')) return;
+    if (!await appConfirm('¿Eliminar la tarea "' + t.title + '"?')) return;
     await db.from('assignments').delete().eq('id', t.id);
     loadTasks();
   };
@@ -1419,7 +1419,7 @@ function ClassPlans({ classId, lessons, students, vocab }) {
     load(); if (ok) flash('ok', ok); return true;
   };
   const remove = async (p) => {
-    if (!window.confirm('¿Eliminar la clase "' + p.title + '"?\n\nSe borra también el avance de los alumnos en esta clase.')) return;
+    if (!await appConfirm('¿Eliminar la clase "' + p.title + '"?\n\nSe borra también el avance de los alumnos en esta clase.')) return;
     const { error } = await db.from('npcr_class_plans').delete().eq('id', p.id);
     if (error) { flash('err', '❌ ' + error.message); return; }
     load(); flash('ok', '🗑 Clase eliminada.');
@@ -1518,7 +1518,7 @@ function PlanLibrary({ onBack, onUse }) {
   });
   useEffect(() => { load(); db.auth.getUser().then(({ data }) => setMe(data && data.user ? data.user.id : null)); }, []);
   const remove = async (it) => {
-    if (!window.confirm('¿Sacar "' + it.title + '" de la biblioteca?\n\nLas aulas que ya la usaron conservan su copia.')) return;
+    if (!await appConfirm('¿Sacar "' + it.title + '" de la biblioteca?\n\nLas aulas que ya la usaron conservan su copia.')) return;
     const { error } = await db.from('npcr_plan_library').delete().eq('id', it.id);
     if (error) { setErr(error.message); return; } load();
   };
@@ -1982,7 +1982,7 @@ function QuizHost({ classId }) {
     setGameId(data);
   };
   const remove = async (s) => {
-    if (!window.confirm('¿Eliminar el cuestionario "' + s.title + '"?')) return;
+    if (!await appConfirm('¿Eliminar el cuestionario "' + s.title + '"?')) return;
     const { error } = await db.from('npcr_quiz_sets').delete().eq('id', s.id);
     if (error) return flash('err', '❌ ' + error.message); load();
   };
@@ -2082,7 +2082,7 @@ function QuizHostGame({ gameId, onClose }) {
   const live = st && st.status === 'question';
   useTicker(live, 200);
   const ms = left();
-  const call = async (fn) => { setBusy(true); const { error } = await db.rpc(fn, { p_game: gameId }); setBusy(false); if (error) alert(error.message); refresh(); };
+  const call = async (fn) => { setBusy(true); const { error } = await db.rpc(fn, { p_game: gameId }); setBusy(false); if (error) appAlert({ icon: '❌', title: 'No se pudo', text: error.message }); refresh(); };
 
   // Sonidos y pasos automáticos
   useEffect(() => {
@@ -2119,7 +2119,7 @@ function QuizHostGame({ gameId, onClose }) {
     html('b', { style: { flex: 1, minWidth: 0 } }, '⚡ ' + st.title),
     st.q_index >= 0 && st.status !== 'end' && html('span', { className: 'quiz-pill' }, 'Pregunta ' + (st.q_index + 1) + ' de ' + st.q_count),
     html(SoundToggle, null),
-    st.status !== 'end' && html('button', { className: 'mini-btn danger', onClick: () => window.confirm('¿Terminar el quiz ahora?') && call('npcr_quiz_end') }, '⏹ Terminar'),
+    st.status !== 'end' && html('button', { className: 'mini-btn danger', onClick: async () => (await appConfirm('¿Terminar el quiz ahora?')) && call('npcr_quiz_end') }, '⏹ Terminar'),
     st.status === 'end' && html('button', { className: 'mini-btn', onClick: onClose }, '← Cuestionarios'));
 
   if (st.status === 'lobby') return html('div', { className: 'quiz-host' }, top,
@@ -2736,7 +2736,7 @@ function App() {
       maxLesson,
       onSelectLesson: (id) => {
         if (guestLimited && (isLocked(id) || !vocab[id])) { setGuestLock(true); return; }
-        if (isLocked(id)) { window.alert('🔒 Tu lǎoshī habilitó hasta la lección ' + maxLesson + '. ¡Esta llega pronto!'); return; }
+        if (isLocked(id)) { appAlert({ icon: '🔒', title: '¡Esta llega pronto!', text: 'Tu lǎoshī habilitó hasta la lección ' + maxLesson + '. Cuando la habilite, se abre sola.' }); return; }
         setScreen({ name: 'lesson', lessonId: id });
         if (studentId) db.from('activity_log')
           .update({ max_lesson: id, last_active: new Date().toISOString() })
@@ -3169,6 +3169,7 @@ function App() {
   );
 
   return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content), needsName && html(NameRequired, { onSave: saveName }),
+    html(AppDialogs),
     guestLock && guestLimited && html(GuestLockModal, { text: guestText, onClose: () => setGuestLock(false), myClasses, onActivateCode: activateStudentCode }),
     !needsName && studentId && html(UserNotices, { studentId, currentName: profile && profile.name, onName: (name) => setProfile(p => ({ ...(p || {}), name })) }));
 }
@@ -3750,7 +3751,7 @@ function StudentCodeCard({ myClasses, onActivateCode, notice, onDismissNotice })
     setBusy(true); setStatus(null);
     let res = await onActivateCode(code);
     if (res.needsSwitch) {
-      const ok = window.confirm('El código de ' + res.info.display_name + ' ya está activado en otra cuenta.\n\n' +
+      const ok = await appConfirm('El código de ' + res.info.display_name + ' ya está activado en otra cuenta.\n\n' +
         '¿Entrar con esa cuenta? Lo que practicaste en este dispositivo sin código no se transfiere.');
       res = ok ? await onActivateCode(code, { allowSwitch: true }) : { ok: false, msg: 'Cancelado.' };
     }
@@ -3831,6 +3832,43 @@ function UserNotices({ studentId, currentName, onName }) {
 }
 
 // Invitados (sin aula ni código): contenido bloqueado. El texto viene de la configuración.
+// ── Ventanas propias de la app (reemplazan los carteles del navegador) ──
+// appAlert(texto | { icon, title, text }) y appConfirm(...) → Promise; las muestra <AppDialogs/>.
+let _dialogPush = null;
+function appDialog(kind, opts) {
+  const o = typeof opts === 'string' ? { text: opts } : (opts || {});
+  if (!_dialogPush) return Promise.resolve(kind === 'confirm' ? window.confirm(o.text) : (window.alert(o.text), true));
+  return new Promise(resolve => _dialogPush({ ...o, kind, resolve }));
+}
+const appAlert = (o) => appDialog('alert', o);
+const appConfirm = (o) => appDialog('confirm', o);
+function AppDialogs() {
+  const [list, setList] = useState([]);
+  useEffect(() => { _dialogPush = (d) => setList(l => [...l, { ...d, id: Math.random() }]); return () => { _dialogPush = null; }; }, []);
+  const d = list[0];
+  useEffect(() => {
+    if (!d) return;
+    const key = (e) => { if (e.key === 'Escape') close(false); if (e.key === 'Enter') close(true); };
+    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
+  });
+  if (!d) return null;
+  const close = (v) => { d.resolve(d.kind === 'confirm' ? v : true); setList(l => l.slice(1)); };
+  // Título y texto: si el mensaje trae un párrafo aparte, la primera línea es el título
+  const parts = String(d.text || '').split('\n\n');
+  const title = d.title || (parts.length > 1 ? parts[0] : null);
+  const body = d.title ? d.text : (parts.length > 1 ? parts.slice(1).join('\n\n') : parts[0]);
+  const danger = d.danger != null ? d.danger : (d.kind === 'confirm' && /eliminar|borrar|definitiv|sacar|quitar|terminar|revertir/i.test(d.text || ''));
+  const icon = d.icon || (d.kind === 'alert' ? '💬' : danger ? '⚠️' : '❓');
+  return html('div', { className: 'name-modal-overlay app-dialog-ov', onClick: (e) => { if (e.target === e.currentTarget) close(false); } },
+    html('div', { key: d.id, className: 'name-modal app-dialog' + (danger ? ' danger' : '') },
+      html('div', { className: 'app-dialog-icon' }, icon),
+      title && html('h2', { className: 'name-modal-title' }, title.replace(/^⚠️\s*/, '')),
+      body && html('p', { className: 'app-dialog-text' }, body),
+      html('div', { className: 'app-dialog-btns' },
+        d.kind === 'confirm' && html('button', { className: 'secondary-btn', onClick: () => close(false) }, d.cancel || 'Cancelar'),
+        html('button', { className: 'primary-btn' + (danger ? ' danger' : ''), autoFocus: true, onClick: () => close(true) }, d.ok || (d.kind === 'confirm' ? (danger ? 'Sí, continuar' : 'Aceptar') : 'Entendido')))));
+}
+
 function GuestLockModal({ text, onClose, myClasses, onActivateCode }) {
   return html('div', { className: 'name-modal-overlay', onClick: (e) => { if (e.target === e.currentTarget) onClose(); } },
     html('div', { className: 'name-modal guest-lock' },
@@ -6020,7 +6058,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
         html('div', { className: 'bingo-sub' }, (game.mode === 'numeros' ? 'Números en chino · ' : 'Hanzi · ') + (game.status === 'lobby' ? 'Sala de espera' : 'Ficha ' + called.length + ' de ' + game.pool.length + ' · cartón ' + game.size + '×' + game.size))),
       html('div', { style: { display: 'flex', gap: 6 } },
         html('button', { className: 'mini-btn', onClick: fullscreen }, '⛶ Pantalla grande'),
-        html('button', { className: 'mini-btn', onClick: () => { if (window.confirm('¿Terminar la partida?')) run('bingo_end', { p_game: game.id }); } }, 'Terminar'))),
+        html('button', { className: 'mini-btn', onClick: async () => { if (await appConfirm('¿Terminar la partida?')) run('bingo_end', { p_game: game.id }); } }, 'Terminar'))),
 
     game.status === 'lobby' && html('div', { className: 'bingo-lobby' },
       html('div', { className: 'bingo-big-n' }, players.filter(p => p.online !== false).length),
@@ -7312,7 +7350,7 @@ function ClassStudents({ cls, onCount, flash, onOpen, onChanged, isSel, onSelect
   };
 
   const remove = async (r) => {
-    if (!window.confirm('¿Sacar a ' + r.display_name + ' de "' + cls.name + '"?\n\nNo pierde su progreso; solo deja de estar en esta clase' +
+    if (!await appConfirm('¿Sacar a ' + r.display_name + ' de "' + cls.name + '"?\n\nNo pierde su progreso; solo deja de estar en esta clase' +
       (r.kind === 'seat' ? ' y su código deja de funcionar.' : '.'))) return;
     const { error } = r.kind === 'seat'
       ? await db.rpc('npcr_remove_student', { p_seat: r.id })
@@ -7323,7 +7361,7 @@ function ClassStudents({ cls, onCount, flash, onOpen, onChanged, isSel, onSelect
   };
 
   const regenerate = async (r) => {
-    if (!window.confirm('¿Generar un código nuevo para ' + r.display_name + '?\n\nEl código anterior (' + r.code + ') deja de funcionar. Su progreso no cambia.')) return;
+    if (!await appConfirm('¿Generar un código nuevo para ' + r.display_name + '?\n\nEl código anterior (' + r.code + ') deja de funcionar. Su progreso no cambia.')) return;
     const { error } = await db.from('npcr_class_students').update({ code: makeStudentCode(r.display_name) }).eq('id', r.id);
     if (error) { flash('err', '❌ ' + error.message); return; }
     load();
@@ -7464,7 +7502,7 @@ function ClassManager({ session, isAdmin, isSuper, onReports }) {
 
   // Archivar: el aula deja de aparecer en la lista (los alumnos conservan todo). Se puede restaurar.
   const archive = async (c, value) => {
-    if (value && !window.confirm('¿Archivar el aula "' + c.name + '"?\n\nDeja de aparecer en tu lista. Sus alumnos y su progreso se conservan, y la podés restaurar cuando quieras.')) return;
+    if (value && !await appConfirm('¿Archivar el aula "' + c.name + '"?\n\nDeja de aparecer en tu lista. Sus alumnos y su progreso se conservan, y la podés restaurar cuando quieras.')) return;
     const { error } = await db.from('classes').update({ archived: value }).eq('id', c.id);
     if (error) { flash('err', '❌ ' + error.message); return; }
     flash('ok', value ? '📦 Aula "' + c.name + '" archivada.' : '↩️ Aula "' + c.name + '" restaurada.');
@@ -7474,7 +7512,7 @@ function ClassManager({ session, isAdmin, isSuper, onReports }) {
   // Eliminar definitivo: solo superadmin (y solo desde Archivadas)
   const removeForever = async (c) => {
     const n = (counts[c.id] || {}).total || 0;
-    if (!window.confirm('⚠️ ¿ELIMINAR DEFINITIVAMENTE el aula "' + c.name + '"?\n\n' +
+    if (!await appConfirm('⚠️ ¿ELIMINAR DEFINITIVAMENTE el aula "' + c.name + '"?\n\n' +
       (n ? 'Sus ' + n + ' alumno(s) quedan fuera del aula y sus códigos dejan de funcionar. ' : '') +
       'Esto no se puede deshacer.')) return;
     const { error } = await db.rpc('npcr_delete_class', { p_class: c.id });
@@ -7601,7 +7639,7 @@ function StaffManager({ session, isSuper }) {
     const msg = role === 'student'
       ? '¿Quitarle los permisos de staff a ' + p.name + '?\n\nSus aulas siguen existiendo, pero ya no va a poder entrar al panel.'
       : '¿Hacer ' + ROLE_LABELS[role] + ' a ' + p.name + '?';
-    if (!window.confirm(msg)) return;
+    if (!await appConfirm(msg)) return;
     const { error } = await db.rpc('npcr_set_role', { p_email: p.email, p_role: role, p_name: null });
     if (error) { setStatus({ type: 'err', msg: '❌ ' + error.message }); return; }
     setStatus({ type: 'ok', msg: '✅ Listo.' });
@@ -7708,17 +7746,17 @@ function ContentTrash() {
     done(error ? '❌ ' + error.message : '↩️ Restaurado. Recargá la app para verlo en las lecciones.');
   };
   const purgeWords = async (ids) => {
-    if (!window.confirm('⚠️ ¿Borrar DEFINITIVAMENTE ' + ids.length + ' palabra(s)?\n\nQuedan en el historial: si te arrepentís, podés recuperarlas desde ahí.')) return;
+    if (!await appConfirm('⚠️ ¿Borrar DEFINITIVAMENTE ' + ids.length + ' palabra(s)?\n\nQuedan en el historial: si te arrepentís, podés recuperarlas desde ahí.')) return;
     const { error } = await db.from('npcr_vocabulary').delete().in('id', ids);
     done(error ? '❌ ' + error.message : '🗑 Borradas definitivamente.');
   };
   const restoreQ = async (q) => { const { error } = await db.from(q.table).update({ active: true }).eq('id', q.row.id); done(error ? '❌ ' + error.message : '↩️ Pregunta restaurada.'); };
   const purgeQ = async (q) => {
-    if (!window.confirm('⚠️ ¿Borrar DEFINITIVAMENTE esta pregunta?')) return;
+    if (!await appConfirm('⚠️ ¿Borrar DEFINITIVAMENTE esta pregunta?')) return;
     const { error } = await db.from(q.table).delete().eq('id', q.row.id); done(error ? '❌ ' + error.message : '🗑 Borrada definitivamente.');
   };
   const revert = async (h) => {
-    if (!window.confirm('¿Revertir este cambio?\n\n' + historySummary(h) + '\n\nEl registro vuelve a como estaba antes.')) return;
+    if (!await appConfirm('¿Revertir este cambio?\n\n' + historySummary(h) + '\n\nEl registro vuelve a como estaba antes.')) return;
     const { error } = await db.rpc('npcr_revert_change', { p_id: h.id });
     done(error ? '❌ ' + error.message : '↩️ Cambio revertido. Recargá la app para verlo.');
   };
@@ -7977,7 +8015,7 @@ function FrasesDiaAdmin() {
     setEdit(null); load(); flash('ok', '✅ Guardada.');
   };
   const toggle = async (r) => { const { error } = await db.from('frases_del_dia').update({ active: !r.active }).eq('id', r.id); if (error) flash('err', '❌ ' + error.message); load(); };
-  const del = async (r) => { if (!window.confirm('¿Eliminar "' + r.zh + '"?')) return; const { error } = await db.from('frases_del_dia').delete().eq('id', r.id); if (error) flash('err', '❌ ' + error.message); load(); };
+  const del = async (r) => { if (!await appConfirm('¿Eliminar "' + r.zh + '"?')) return; const { error } = await db.from('frases_del_dia').delete().eq('id', r.id); if (error) flash('err', '❌ ' + error.message); load(); };
   const inp = (k, ph, extra) => html('input', { value: edit[k] || '', placeholder: ph, onChange: e => setEdit({ ...edit, [k]: e.target.value }), style: { ...cmInput, width: '100%', ...(extra || {}) } });
   if (!rows) return html('p', { className: 'admin-note' }, 'Cargando…');
   const on = rows.filter(r => r.active).length;
@@ -8032,7 +8070,7 @@ function ZheAdmin({ isSuper }) {
     } catch (e) { setBusy(null); flash('err', '❌ ' + e.message + (/bucket|not found/i.test(e.message) ? ' — ¿Ejecutaste npcr_zhe_admin.sql?' : '')); }
   };
   const remove = async (it) => {
-    if (!window.confirm('¿Eliminar la foto de ' + it.hanzi + ' (' + it.es + ') del juego?\n\nSi solo querés que no aparezca, usá "Ocultar".')) return;
+    if (!await appConfirm('¿Eliminar la foto de ' + it.hanzi + ' (' + it.es + ') del juego?\n\nSi solo querés que no aparezca, usá "Ocultar".')) return;
     const { error } = await db.from('npcr_zhe_items').delete().eq('id', it.id);
     if (error) { flash('err', '❌ ' + error.message); return; }
     setItems(list => list.filter(x => x.id !== it.id));
@@ -8286,7 +8324,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   const doMerge = async () => {
     const to = activityLog.find(x => x.user_id === mergeTo);
     if (!mergeFrom || !to) return;
-    if (!window.confirm('¿Pasar todo el progreso de "' + (mergeFrom.name || 'Sin nombre') + '" (invitado) a ' + to.name + ' (' + (to.code || 'con código') + ')?' + String.fromCharCode(10, 10) + 'Lo que exista en las dos cuentas se combina quedándose con lo mejor. El invitado deja de aparecer en el registro. No se puede deshacer.')) return;
+    if (!await appConfirm('¿Pasar todo el progreso de "' + (mergeFrom.name || 'Sin nombre') + '" (invitado) a ' + to.name + ' (' + (to.code || 'con código') + ')?' + String.fromCharCode(10, 10) + 'Lo que exista en las dos cuentas se combina quedándose con lo mejor. El invitado deja de aparecer en el registro. No se puede deshacer.')) return;
     const { data, error } = await db.rpc('npcr_merge_accounts', { p_from: mergeFrom.user_id, p_to: to.user_id });
     if (error) { setMergeMsg({ type: 'err', msg: '❌ ' + error.message + (/function|does not exist/.test(error.message) ? ' — ¿Ejecutaste npcr_unir_cuentas.sql?' : '') }); return; }
     const d = data || {};

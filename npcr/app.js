@@ -906,7 +906,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       }),
     );
   }
-  else if (rows.length === 0 && tab !== 'tareas' && tab !== 'config') body = html('p', { className: 'admin-note' }, 'Esta clase todavía no tiene alumnos. Agregalos desde ⚙ Administrar → Mis clases.');
+  else if (rows.length === 0 && tab !== 'tareas' && tab !== 'config') body = html('p', { className: 'admin-note' }, 'Esta clase todavía no tiene alumnos. Agregalos desde ⚙ 看老师 Kàn Lǎoshī → Aulas.');
   else if (tab === 'resumen') {
     body = html('div', null,
       html('div', { className: 'kpi-grid' },
@@ -1108,7 +1108,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       ),
     ),
     html('div', { style: { padding: '0 16px' } },
-      classes && classes.length === 0 && html('p', { className: 'admin-note' }, 'Todavía no hay clases. Creá una en ⚙ Administrar → Mis clases.'),
+      classes && classes.length === 0 && html('p', { className: 'admin-note' }, 'Todavía no hay clases. Creá una en ⚙ 看老师 Kàn Lǎoshī → Aulas.'),
       !student && classId && html('div', { className: 'report-tabs' }, tabs.map(([k, label]) => html('button', { key: k, className: 'report-tab' + (tab === k ? ' active' : ''), onClick: () => setTab(k) }, label))),
       classId && selBar,
       classId && body,
@@ -2990,7 +2990,7 @@ function App() {
     ),
     html('div', { style: { display: 'flex', gap: 8 } },
       html(SoundToggle, { className: 'icon-btn' }),
-      screen.name === 'home' && html('button', { className: 'icon-btn', onClick: () => setScreen({ name: 'admin' }), title: 'Administrar vocabulario' }, '⚙'),
+      screen.name === 'home' && html('button', { className: 'icon-btn', onClick: () => setScreen({ name: 'admin' }), title: '看老师 Kàn Lǎoshī · Plataforma de administración' }, '⚙'),
     )
   );
 
@@ -3071,7 +3071,7 @@ function App() {
           html('circle', { cx: 12, cy: 12, r: 3 }),
           html('path', { d: 'M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z' }),
         ),
-        'Administrar',
+        html('span', { className: 'kls-nav' }, html('span', { className: 'hanzi-font' }, '看老师'), ' Kàn Lǎoshī'),
       ),
     ),
     html('div', { className: 'sidebar-progress-panel' },
@@ -8429,7 +8429,7 @@ function makePassword() {
 function staffWelcome(name, email, password, role) {
   const url = location.origin + location.pathname;
   return '¡Hola ' + (name || '').split(' ')[0] + '! 👋\nYa tenés tu cuenta de ' + (role === 'admin' ? 'administrador' : 'profe') + ' en NPCR Practice.\n\n' +
-    '1. Entrá a ' + url + '\n2. Tocá ⚙ Administrar\n3. Mail: ' + email + '\n   Contraseña: ' + password + '\n\nDesde ahí creás tus aulas y cargás a tus alumnos. 加油！';
+    '1. Entrá a ' + url + '\n2. Tocá ⚙ 看老师 Kàn Lǎoshī\n3. Mail: ' + email + '\n   Contraseña: ' + password + '\n\nDesde ahí creás tus aulas y cargás a tus alumnos. 加油！';
 }
 
 function StaffManager({ session, isSuper }) {
@@ -8674,6 +8674,90 @@ async function findHskWord(hanzi) {
     if (data && data[0]) return data[0];
   }
   return null;
+}
+
+// ── Consola → Contenido: camino de Trazos (solo admin; la base también lo exige) ──
+function TrazosAdmin({ vocab }) {
+  const lessons = Object.keys(vocab);
+  const [cfg, setCfg] = useState(null);
+  const [info, setInfo] = useState({});
+  const [lesson, setLesson] = useState(null);
+  const [add, setAdd] = useState('');
+  const [msg, setMsg] = useState(null);
+  const [edit, setEdit] = useState(null);     // { c, pinyin, es }
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+  const load = () => Promise.all([db.from('npcr_trazos_admin').select('*'), db.from('npcr_hanzi_info').select('hanzi,pinyin,es')])
+    .then(([c, h]) => {
+      if (c.error) { setMsg({ type: 'err', text: '❌ ' + c.error.message + (/relation|does not exist/.test(c.error.message) ? ' — ¿Ejecutaste npcr_trazos_admin.sql?' : '') }); setCfg([]); }
+      else setCfg(c.data || []);
+      const m = {}; (h.data || []).forEach(r => { m[r.hanzi] = r; }); setInfo(m);
+    });
+  useEffect(() => { load(); }, []);
+  if (!cfg) return html('p', { className: 'admin-note' }, 'Cargando trazos…');
+  const path = trazosPath(vocab, lessons, cfg, true);
+  const cur = path.find(p => p.lesson === lesson) || path[0];
+  if (!cur) return html('p', { className: 'admin-note' }, 'No hay lecciones con hanzi para dibujar.');
+  const confOf = (c) => cfg.find(r => r.hanzi === c) || { hanzi: c };
+  const save = async (rows, ok) => {
+    const { error } = await db.from('npcr_trazos_admin').upsert(rows.map(r => ({ ...r, updated_at: new Date().toISOString() })));
+    if (error) { flash('err', '❌ ' + error.message); return false; }
+    await load(); if (ok) flash('ok', ok); return true;
+  };
+  const visible = cur.chars;
+  const order = (i, d) => {
+    const j = i + d; if (j < 0 || j >= visible.length) return;
+    const list = [...visible]; [list[i], list[j]] = [list[j], list[i]];
+    save(list.map((x, n) => ({ ...confOf(x.c), position: n })));
+  };
+  const addChar = async () => {
+    const c = [...add.trim()][0];
+    if (!c) return;
+    if (!NPCR_MEDIA.svg[c]) return flash('err', 'No hay modelo de trazos para ' + c + ' (solo se pueden usar los hanzi del libro).');
+    const where = path.find(p => p.chars.some(x => x.c === c));
+    if (where && where.lesson === cur.lesson) return flash('err', c + ' ya está en esta lección.');
+    if (await save([{ ...confOf(c), lesson: cur.lesson, hidden: false, position: visible.length }], '✍️ ' + c + ' agregado a la lección ' + cur.lesson + (where ? ' (antes estaba en la ' + where.lesson + ')' : '') + '.')) setAdd('');
+  };
+  const saveInfo = async () => {
+    const { c, pinyin, es } = edit;
+    if (!pinyin.trim() || !es.trim()) return flash('err', 'Completá el pinyin y el significado.');
+    const { error } = await db.from('npcr_hanzi_info').upsert({ hanzi: c, pinyin: pinyin.trim(), es: es.trim() });
+    if (error) return flash('err', '❌ ' + error.message);
+    setEdit(null); load(); flash('ok', '✅ ' + c + ' actualizado.');
+  };
+  return html('div', null,
+    html('p', { className: 'admin-note', style: { margin: '0 0 8px' } }, 'El camino se arma solo con los hanzi nuevos de cada lección. Acá podés ocultar hanzi (por ejemplo, de nombres), pasarlos a otra lección, agregar otros del libro, ordenarlos y corregir el pinyin y el significado que ven los alumnos.'),
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
+    html('div', { className: 'reg-toolbar', style: { marginBottom: 10 } }, path.map(p => html('button', { key: p.lesson, className: 'report-tab' + (p.lesson === cur.lesson ? ' active' : ''), onClick: () => { setLesson(p.lesson); setEdit(null); } },
+      'L' + p.lesson + ' · ' + p.chars.filter(x => !x.hidden).length))),
+    html('div', { className: 'tza-grid' }, visible.map((x, i) => {
+      const inf = info[x.c] || {};
+      return html('div', { key: x.c, className: 'tza-card' + (x.hidden ? ' off' : '') },
+        html('div', { className: 'tza-top' },
+          html('span', { className: 'tza-h hanzi-font' }, x.c),
+          html('span', { className: 'tza-n' }, i + 1),
+          x.hidden && html('span', { className: 'tza-tag' }, 'Oculto'),
+          x.moved && html('span', { className: 'tza-tag blue' }, 'Venía de L' + x.from),
+          x.added && html('span', { className: 'tza-tag blue' }, 'Agregado')),
+        edit && edit.c === x.c
+          ? html('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+              html('input', { value: edit.pinyin, placeholder: 'Pinyin', onChange: e => setEdit({ ...edit, pinyin: e.target.value }), style: { ...cmInput, width: '100%', padding: '6px 8px' } }),
+              html('input', { value: edit.es, placeholder: 'Significado', onChange: e => setEdit({ ...edit, es: e.target.value }), style: { ...cmInput, width: '100%', padding: '6px 8px' } }),
+              html('div', { style: { display: 'flex', gap: 4 } },
+                html('button', { className: 'mini-btn strong', onClick: saveInfo }, 'Guardar'), html('button', { className: 'mini-btn', onClick: () => setEdit(null) }, 'Cancelar')))
+          : html('div', { className: 'tza-info' }, inf.pinyin ? html(TonedPinyin, { text: inf.pinyin }) : html('i', null, 'sin pinyin'), html('small', null, inf.es || (x.w ? 'en ' + x.w.hanzi : ''))),
+        html('div', { className: 'tza-actions' },
+          html('button', { className: 'mini-btn', title: 'Subir', disabled: i === 0, onClick: () => order(i, -1) }, '↑'),
+          html('button', { className: 'mini-btn', title: 'Bajar', disabled: i === visible.length - 1, onClick: () => order(i, 1) }, '↓'),
+          html('button', { className: 'mini-btn', onClick: () => save([{ ...confOf(x.c), hidden: !x.hidden }], x.hidden ? '👁 ' + x.c + ' vuelve a Trazos.' : '🚫 ' + x.c + ' ya no aparece en Trazos.') }, x.hidden ? '👁 Mostrar' : '🚫 Ocultar'),
+          html('button', { className: 'mini-btn', title: 'Editar pinyin y significado', onClick: () => setEdit({ c: x.c, pinyin: inf.pinyin || '', es: inf.es || '' }) }, '✏️'),
+          html('select', { className: 'mini-btn', value: '', title: 'Pasar a otra lección', onChange: e => e.target.value && save([{ ...confOf(x.c), lesson: e.target.value, position: null }], '↪ ' + x.c + ' pasó a la lección ' + e.target.value + '.') },
+            html('option', { value: '' }, '↪ Mover'),
+            path.filter(p => p.lesson !== cur.lesson).map(p => html('option', { key: p.lesson, value: p.lesson }, 'a L' + p.lesson)))));
+    })),
+    html('div', { className: 'tza-add' },
+      html('input', { value: add, maxLength: 2, placeholder: 'Hanzi', onChange: e => setAdd(e.target.value), style: { ...cmInput, width: 80, flex: 'none', fontSize: 20, textAlign: 'center', fontFamily: 'Noto Sans SC, sans-serif' } }),
+      html('button', { className: 'mini-btn strong', onClick: addChar }, '+ Agregar a la lección ' + cur.lesson),
+      html('span', { className: 'admin-note', style: { margin: 0 } }, 'Solo hanzi del libro (tienen modelo de trazos).')));
 }
 
 function ZheAdmin({ isSuper }) {
@@ -9274,7 +9358,9 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   return html('main', { className: ['aulas', 'equipo', 'alumnos', 'ingresos'].includes(tab) ? 'wide' : '', style: { paddingTop: '18px' } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
-      html('h1', null, 'Administrar'),
+      html('div', null,
+        html('h1', { className: 'kls-title' }, html('span', { className: 'hanzi-font' }, '看老师'), ' Kàn Lǎoshī'),
+        html('div', { className: 'kls-sub' }, 'Plataforma de administración')),
     ),
     html('div', { className: 'admin-panel' },
 
@@ -9452,6 +9538,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                   { id: 'mod-audio',    icon: '🔊', name: 'Reconocer por audio',  editable: false },
                   { id: 'mod-refuerzo', icon: '💪', name: 'Reforcemos',           editable: false },
                   { id: 'aula-zhe',     icon: '📷', name: 'Zhè shì shénme? (这是什么？)', editable: true, aula: true },
+                  { id: 'aula-trazos',  icon: '✍️', name: 'Trazos', editable: true, aula: true, sub: 'Camino de hanzi de Mi aula · cada clase lo activa en su ⚙️ Configurar' },
                 ].map(m => {
                   const theme = LESSON_THEMES[m.id] || {};
                   const isHidden = !!theme.hidden;
@@ -9462,7 +9549,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                     },
                       html('span', { style: { fontSize: 22, minWidth: 32 } }, m.icon),
                       html('div', { style: { flex: 1, fontWeight: 700, fontSize: 14 } }, m.name,
-                        m.aula && html('div', { style: { fontSize: 11, fontWeight: 600, color: 'var(--ink-soft)' } }, 'Fotos del juego de Mi aula · cada clase lo activa en su ⚙️ Configurar')),
+                        m.aula && html('div', { style: { fontSize: 11, fontWeight: 600, color: 'var(--ink-soft)' } }, m.sub || 'Fotos del juego de Mi aula · cada clase lo activa en su ⚙️ Configurar')),
                       m.editable && html('button', {
                         onClick: () => setExpandedMod(isOpen ? null : m.id),
                         title: isOpen ? 'Cerrar editor' : (m.aula ? 'Editar fotos' : 'Editar preguntas'),
@@ -9477,7 +9564,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                     isOpen && html('div', {
                       style: { background: 'var(--paper)', borderRadius: '0 0 12px 12px', padding: '12px 14px', boxShadow: 'var(--shadow-paper)', borderTop: '1px solid var(--paper-deep)' }
                     },
-                      m.aula ? html(ZheAdmin, { isSuper }) : html(ModuleQuestionsEditor, { modId: m.id })
+                      m.id === 'aula-trazos' ? html(TrazosAdmin, { vocab }) : m.aula ? html(ZheAdmin, { isSuper }) : html(ModuleQuestionsEditor, { modId: m.id })
                     ),
                   );
                 })
@@ -10310,6 +10397,32 @@ function useHoldTip() {
   return [tip, props];
 }
 
+// Camino de Trazos: cada hanzi la primera vez que aparece en una lección (con modelo de trazos),
+// corregido por el admin (npcr_trazos_admin): ocultar, mover de lección, agregar y ordenar.
+// withHidden: para la consola (muestra también los ocultos, marcados).
+function trazosPath(vocab, lessons, cfg, withHidden) {
+  const conf = {}; (cfg || []).forEach(r => { conf[r.hanzi] = r; });
+  const wordWith = (c) => { for (const l of Object.keys(vocab)) { const w = (vocab[l] || []).find(x => String(x.hanzi || '').includes(c)); if (w) return w; } return null; };
+  const ls = lessons.filter(l => /^\d+$/.test(l)).sort(lessonCompare);
+  const by = {}; ls.forEach(l => { by[l] = []; });
+  const seen = new Set(); let k = 0;
+  ls.forEach(l => (vocab[l] || []).forEach(w => [...String(w.hanzi || '')].forEach(c => {
+    if (seen.has(c) || !NPCR_MEDIA.svg[c]) return;
+    seen.add(c);
+    const r = conf[c] || {};
+    const to = r.lesson && by[r.lesson] ? r.lesson : l;
+    by[to].push({ c, w, k: k++, hidden: !!r.hidden, moved: to !== l, from: l, pos: r.position }); })));
+  // Agregados por el admin que no salían solos
+  Object.values(conf).forEach(r => {
+    if (seen.has(r.hanzi) || !r.lesson || !by[r.lesson] || !NPCR_MEDIA.svg[r.hanzi]) return;
+    by[r.lesson].push({ c: r.hanzi, w: wordWith(r.hanzi), k: k++, hidden: !!r.hidden, added: true, pos: r.position });
+  });
+  return ls.map(l => ({ lesson: l, chars: by[l]
+    .filter(x => withHidden || !x.hidden)
+    .sort((a, b) => (a.pos == null ? 1e6 + a.k : a.pos) - (b.pos == null ? 1e6 + b.k : b.pos)) }))
+    .filter(x => withHidden || x.chars.length);
+}
+
 function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
   const [info, setInfo] = useState({});
   const [tip, holdProps] = useHoldTip();
@@ -10326,18 +10439,11 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
     });
   }, []);
   useEffect(() => { try { localStorage.setItem('npcr-trazos-' + studentId, JSON.stringify([...done])); } catch (e) {} }, [done]);
+  const [cfg, setCfg] = useState([]);
+  useEffect(() => { db.from('npcr_trazos_admin').select('*').then(({ data, error }) => { if (!error) setCfg(data || []); }); }, []);
 
-  // Hanzi de cada lección (la primera vez que aparecen, con modelo de trazos)
-  const path = useMemo(() => {
-    const seen = new Set();
-    return lessons.filter(l => /^\d+$/.test(l)).sort(lessonCompare).map(l => {
-      const chars = [];
-      (vocab[l] || []).forEach(w => [...String(w.hanzi || '')].forEach(c => {
-        if (!seen.has(c) && NPCR_MEDIA.svg[c]) { seen.add(c); chars.push({ c, w }); }
-      }));
-      return { lesson: l, chars };
-    }).filter(x => x.chars.length);
-  }, [vocab, lessons]);
+  // Hanzi de cada lección (con los cambios que haya hecho el admin)
+  const path = useMemo(() => trazosPath(vocab, lessons, cfg, false), [vocab, lessons, cfg]);
   const wordOf = (c, w) => (w && w.hanzi === c) ? w : (Object.values(vocab).flat().find(x => x.hanzi === c) || null);
   const inWordOf = (c, w) => (w && w.hanzi !== c && String(w.hanzi).includes(c)) ? w : null;
   const lessonDone = (p) => p.chars.every(x => done.has(x.c));

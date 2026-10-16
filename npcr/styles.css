@@ -2035,3 +2035,21 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
 .prueba-card.guest-locked .mode-sub { color: var(--lacquer-dark); font-weight: 800; }
 .guest-lock .guest-lock-icon { font-size: 54px; text-align: center; animation: quizBounce 1.2s ease-in-out infinite; }
 .guest-lock .name-modal-sub { font-size: 15px; font-weight: 700; color: var(--ink-mid); }
+/* Consola: camino de Trazos */
+.tza-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.tza-card { background: #fff; border: 2px solid var(--paper-deep); border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.tza-card.off { opacity: .55; border-style: dashed; }
+.tza-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tza-h { font-size: 38px; font-weight: 700; line-height: 1; }
+.tza-n { margin-left: auto; font-size: 11px; font-weight: 900; color: var(--ink-soft); }
+.tza-tag { font-size: 10px; font-weight: 800; background: var(--paper-deep); border-radius: 999px; padding: 2px 7px; }
+.tza-tag.blue { background: var(--blue-light); color: var(--blue-dark); }
+.tza-info { display: flex; flex-direction: column; font-size: 13px; font-weight: 700; min-height: 34px; }
+.tza-info small { font-weight: 600; color: var(--ink-mid); }
+.tza-actions { display: flex; flex-wrap: wrap; gap: 3px; }
+.tza-actions select.mini-btn { padding: 3px 4px; }
+.tza-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+/* 看老师 Kàn Lǎoshī */
+.kls-nav .hanzi-font { font-weight: 800; margin-right: 2px; }
+.kls-title .hanzi-font { color: var(--lacquer); margin-right: 4px; }
+.kls-sub { font-size: 12px; font-weight: 700; color: var(--ink-soft); letter-spacing: .04em; text-transform: uppercase; margin-top: 2px; }

@@ -906,7 +906,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       }),
     );
   }
-  else if (rows.length === 0 && tab !== 'tareas' && tab !== 'config') body = html('p', { className: 'admin-note' }, 'Esta clase todavía no tiene alumnos. Agregalos desde ⚙ 看老师 Kàn Lǎoshī → Aulas.');
+  else if (rows.length === 0 && tab !== 'tareas' && tab !== 'config') body = html('p', { className: 'admin-note' }, 'Esta clase todavía no tiene alumnos. Agregalos desde ⚙ Administrar → Mis clases.');
   else if (tab === 'resumen') {
     body = html('div', null,
       html('div', { className: 'kpi-grid' },
@@ -1108,7 +1108,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       ),
     ),
     html('div', { style: { padding: '0 16px' } },
-      classes && classes.length === 0 && html('p', { className: 'admin-note' }, 'Todavía no hay clases. Creá una en ⚙ 看老师 Kàn Lǎoshī → Aulas.'),
+      classes && classes.length === 0 && html('p', { className: 'admin-note' }, 'Todavía no hay clases. Creá una en ⚙ Administrar → Mis clases.'),
       !student && classId && html('div', { className: 'report-tabs' }, tabs.map(([k, label]) => html('button', { key: k, className: 'report-tab' + (tab === k ? ' active' : ''), onClick: () => setTab(k) }, label))),
       classId && selBar,
       classId && body,
@@ -2990,7 +2990,7 @@ function App() {
     ),
     html('div', { style: { display: 'flex', gap: 8 } },
       html(SoundToggle, { className: 'icon-btn' }),
-      screen.name === 'home' && html('button', { className: 'icon-btn', onClick: () => setScreen({ name: 'admin' }), title: '看老师 Kàn Lǎoshī · Plataforma de administración' }, '⚙'),
+      screen.name === 'home' && html('button', { className: 'icon-btn', onClick: () => setScreen({ name: 'admin' }), title: 'Administrar vocabulario' }, '⚙'),
     )
   );
 
@@ -3071,7 +3071,7 @@ function App() {
           html('circle', { cx: 12, cy: 12, r: 3 }),
           html('path', { d: 'M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.63 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z' }),
         ),
-        html('span', { className: 'kls-nav' }, html('span', { className: 'hanzi-font' }, '看老师'), ' Kàn Lǎoshī'),
+        'Administrar',
       ),
     ),
     html('div', { className: 'sidebar-progress-panel' },
@@ -8429,7 +8429,7 @@ function makePassword() {
 function staffWelcome(name, email, password, role) {
   const url = location.origin + location.pathname;
   return '¡Hola ' + (name || '').split(' ')[0] + '! 👋\nYa tenés tu cuenta de ' + (role === 'admin' ? 'administrador' : 'profe') + ' en NPCR Practice.\n\n' +
-    '1. Entrá a ' + url + '\n2. Tocá ⚙ 看老师 Kàn Lǎoshī\n3. Mail: ' + email + '\n   Contraseña: ' + password + '\n\nDesde ahí creás tus aulas y cargás a tus alumnos. 加油！';
+    '1. Entrá a ' + url + '\n2. Tocá ⚙ Administrar\n3. Mail: ' + email + '\n   Contraseña: ' + password + '\n\nDesde ahí creás tus aulas y cargás a tus alumnos. 加油！';
 }
 
 function StaffManager({ session, isSuper }) {
@@ -9358,9 +9358,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
   return html('main', { className: ['aulas', 'equipo', 'alumnos', 'ingresos'].includes(tab) ? 'wide' : '', style: { paddingTop: '18px' } },
     html('div', { className: 'header-row' },
       html('button', { className: 'back-btn', onClick: onBack }, '←'),
-      html('div', null,
-        html('h1', { className: 'kls-title' }, html('span', { className: 'hanzi-font' }, '看老师'), ' Kàn Lǎoshī'),
-        html('div', { className: 'kls-sub' }, 'Plataforma de administración')),
+      html('h1', null, 'Administrar'),
     ),
     html('div', { className: 'admin-panel' },
 

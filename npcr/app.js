@@ -8728,7 +8728,7 @@ function TrazosAdmin({ vocab }) {
     html('p', { className: 'admin-note', style: { margin: '0 0 8px' } }, 'El camino se arma solo con los hanzi nuevos de cada lección. Acá podés ocultar hanzi (por ejemplo, de nombres), pasarlos a otra lección, agregar otros del libro, ordenarlos y corregir el pinyin y el significado que ven los alumnos.'),
     msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
     html('div', { className: 'reg-toolbar', style: { marginBottom: 10 } }, path.map(p => html('button', { key: p.lesson, className: 'report-tab' + (p.lesson === cur.lesson ? ' active' : ''), onClick: () => { setLesson(p.lesson); setEdit(null); } },
-      'L' + p.lesson + ' · ' + p.chars.filter(x => !x.hidden).length))),
+      'Lección ' + p.lesson))),
     html('div', { className: 'tza-grid' }, visible.map((x, i) => {
       const inf = info[x.c] || {};
       return html('div', { key: x.c, className: 'tza-card' + (x.hidden ? ' off' : '') },

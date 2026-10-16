@@ -1116,7 +1116,7 @@ function ClassAnalytics({ onBack, vocab, lessons, initialClassId }) {
       savedMsg && html('div', { className: 'admin-status ' + (savedMsg.startsWith('✅') ? 'ok' : 'err'), style: { marginBottom: 10 } }, savedMsg),
       html('div', { className: 'report-card' },
         html('div', { className: 'report-h' }, '🔒 Avance del grupo'),
-        html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Los alumnos ven con candado las lecciones posteriores, y el entrenamiento diario, los tonos y el dictado usan solo las habilitadas.'),
+        html('p', { className: 'admin-note', style: { marginTop: 0 } }, 'Los alumnos ven con candado las lecciones posteriores, y todas las actividades del aula usan solo las habilitadas: entrenamiento diario, tonos, dictado, Completá la frase, Ordená la oración, clasificadores, verbos modales, expresiones de tiempo, audio, escritura y Trazos.'),
         html('select', { value: settings.max_lesson, onChange: e => saveSettings({ max_lesson: e.target.value }), style: { ...cmInput, width: '100%', fontWeight: 700 } },
           html('option', { value: '' }, 'Todas las lecciones habilitadas'),
           lessons.map(l => html('option', { key: l, value: l }, 'Habilitado hasta la lección ' + l))),
@@ -9690,11 +9690,12 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
   useEffect(() => { db.from('npcr_trazos_admin').select('*').then(({ data, error }) => { if (!error) setCfg(data || []); }); }, []);
 
   // Hanzi de cada lección (con los cambios que haya hecho el admin)
-  const path = useMemo(() => trazosPath(vocab, lessons, cfg, false), [vocab, lessons, cfg]);
+  // Solo las lecciones que habilita el aula ("habilitado hasta la lección N")
+  const path = useMemo(() => trazosPath(vocab, lessons, cfg, false).filter(p => !maxLesson || parseFloat(p.lesson) <= maxLesson), [vocab, lessons, cfg, maxLesson]);
   const wordOf = (c, w) => (w && w.hanzi === c) ? w : (Object.values(vocab).flat().find(x => x.hanzi === c) || null);
   const inWordOf = (c, w) => (w && w.hanzi !== c && String(w.hanzi).includes(c)) ? w : null;
   const lessonDone = (p) => p.chars.every(x => done.has(x.c));
-  const unlocked = (k) => (k === 0 || lessonDone(path[k - 1])) && !(maxLesson && parseFloat(path[k].lesson) > maxLesson);
+  const unlocked = (k) => k === 0 || lessonDone(path[k - 1]);
   const allDone = path.length > 0 && path.every(lessonDone);
 
   const markDone = (c) => {
@@ -9735,16 +9736,17 @@ function TrazosGame({ vocab, lessons, studentId, maxLesson, onBack }) {
     html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '✍️ Trazos')),
     html('div', { className: 'tz-wrap' },
       allDone
-        ? html('div', { className: 'tz-win' }, html('div', { className: 'tz-win-big' }, '🏆'), html('b', null, '¡Ganaste!'),
-            html('span', null, 'Dibujaste los ' + path.reduce((s, p) => s + p.chars.length, 0) + ' hanzi de las ' + path.length + ' lecciones.'))
-        : html('p', { className: 'zhe-intro' }, 'Dibujá cada hanzi con el dedo, en el orden correcto. Completá una lección para desbloquear la siguiente, hasta la ' + (path.length ? path[path.length - 1].lesson : 14) + '.'),
+        ? html('div', { className: 'tz-win' }, html('div', { className: 'tz-win-big' }, '🏆'), html('b', null, maxLesson ? '¡Completaste las lecciones habilitadas!' : '¡Ganaste!'),
+            html('span', null, 'Dibujaste los ' + path.reduce((s, p) => s + p.chars.length, 0) + ' hanzi de ' + (path.length === 1 ? 'la lección 1' : 'las ' + path.length + ' lecciones') + '.'
+              + (maxLesson ? ' Cuando tu lǎoshī habilite más lecciones, aparecen acá.' : '')))
+        : html('p', { className: 'zhe-intro' }, 'Dibujá cada hanzi con el dedo, en el orden correcto. Completá una lección para desbloquear la siguiente, hasta la lección ' + (path.length ? path[path.length - 1].lesson : '') + '.'),
       html('div', { className: 'tz-map' }, path.map((p, k) => {
         const n = p.chars.filter(x => done.has(x.c)).length;
         const open = unlocked(k), full = n === p.chars.length;
         return html('button', { key: p.lesson, className: 'tz-node' + (full ? ' full' : open ? ' open' : ' locked'), disabled: !open, onClick: () => setView({ name: 'lesson', k }) },
           html('span', { className: 'tz-node-n' }, full ? '✓' : open ? p.lesson : '🔒'),
           html('span', { className: 'tz-node-t' }, 'Lección ' + p.lesson),
-          html('span', { className: 'tz-node-s' }, n + '/' + p.chars.length + ' hanzi'),
+          html('span', { className: 'tz-node-s' }, open || full ? n + '/' + p.chars.length + ' hanzi' : 'Completá la lección ' + path[k - 1].lesson),
           html('span', { className: 'tz-node-bar' }, html('i', { style: { width: Math.round(n / p.chars.length * 100) + '%' } })));
       }))));
 }

@@ -6943,6 +6943,8 @@ function DialogoPractica({ onBack }) {
           result[d.key] = {
             titulo: nfc(d.titulo),
             roles: (d.roles || []).map(nfc),
+            avatars: Array.isArray(d.avatars) && d.avatars.length === 2 ? d.avatars : null,
+            icon: d.icon || null, subtitulo: d.subtitulo ? nfc(d.subtitulo) : null, grupo: d.grupo || 'extra', sort: d.sort_order || 0,
             turns: (turnsRes.data || [])
               .filter(t => t.dialogue_key === d.key)
               .map(t => ({ quien: t.quien, texto: nfc(t.texto), pinyin: nfc(t.pinyin), es: nfc(t.es) })),
@@ -6976,42 +6978,22 @@ function DialogoPractica({ onBack }) {
       html('h1', null, '🎙️ Práctica oral'),
     ),
     html('p', { style: { color: 'var(--ink-soft)', fontSize: 14, marginBottom: 20 } }, 'Elegí el escenario que querés practicar:'),
-    // ── Diálogos nuevos para el oral ──
-    html('div', { style: { fontSize: 10, fontWeight: 800, color: 'var(--lacquer)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 } }, '⭐ Para el examen oral'),
-    html('button', { className: 'mode-card', style: { width: '100%', marginBottom: 10, borderColor: 'var(--lacquer)', borderWidth: 2 }, onClick: () => setEscenario('reunion') },
-      html('div', { className: 'mode-emoji', style: { background: '#E8EAF6', fontSize: 24 } }, '📞'),
-      html('div', null,
-        html('div', { className: 'mode-title' }, '朋友们去买东西 — Acordar salida + compras'),
-        html('div', { className: 'mode-sub' }, 'Llamada entre amigos: día, hora, lugar y qué comprar'),
-      )
-    ),
-    html('button', { className: 'mode-card', style: { width: '100%', marginBottom: 16, borderColor: 'var(--lacquer)', borderWidth: 2 }, onClick: () => setEscenario('compras') },
-      html('div', { className: 'mode-emoji', style: { background: '#FFF3E0', fontSize: 24 } }, '🛒'),
-      html('div', null,
-        html('div', { className: 'mode-title' }, '在商场买东西 — En el shopping (CD + frutas)'),
-        html('div', { className: 'mode-sub' }, 'Preguntar precio, regatear, pagar y recibir vuelto'),
-      )
-    ),
-    // ── Diálogos originales ──
-    html('div', { style: { fontSize: 10, fontWeight: 800, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 } }, 'Práctica adicional'),
-    html('button', { className: 'mode-card', style: { width: '100%', marginBottom: 10 }, onClick: () => setEscenario('vendedor') },
-      html('div', { className: 'mode-emoji', style: { background: '#FFF3E0', fontSize: 24 } }, '🛍️'),
-      html('div', null,
-        html('div', { className: 'mode-title' }, 'Opción B — Vendedor / Cliente (frutas)'),
-        html('div', { className: 'mode-sub' }, 'Frutas, precio, cantidad y vuelto'),
-      )
-    ),
-    html('button', { className: 'mode-card', style: { width: '100%' }, onClick: () => setEscenario('amigos') },
-      html('div', { className: 'mode-emoji', style: { background: '#E8F5E9', fontSize: 24 } }, '📅'),
-      html('div', null,
-        html('div', { className: 'mode-title' }, 'Opción A — Acordar una actividad'),
-        html('div', { className: 'mode-sub' }, 'Dos amigos, horarios y plan semanal'),
-      )
-    ),
+    // Escenas desde la base (exam_dialogues): primero las del examen oral, después las demás
+    ['examen', 'extra'].map(g => {
+      const list = Object.entries(dialogosDB).filter(([, d]) => (d.grupo || 'extra') === g).sort((x, y) => (x[1].sort || 0) - (y[1].sort || 0));
+      if (!list.length) return null;
+      return html(React.Fragment, { key: g },
+        html('div', { style: { fontSize: 10, fontWeight: 800, color: g === 'examen' ? 'var(--lacquer)' : 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 1, margin: '6px 0' } }, g === 'examen' ? '⭐ Para el examen oral' : 'Práctica adicional'),
+        list.map(([k, d]) => html('button', { key: k, className: 'mode-card', style: { width: '100%', marginBottom: 10, ...(g === 'examen' ? { borderColor: 'var(--lacquer)', borderWidth: 2 } : {}) }, onClick: () => setEscenario(k) },
+          html('div', { className: 'mode-emoji', style: { background: ((d.avatars && d.avatars[0] && d.avatars[0].color) || '#E8EAF6'), fontSize: 24 } }, d.icon || '💬'),
+          html('div', null,
+            html('div', { className: 'mode-title' }, d.titulo),
+            d.subtitulo && html('div', { className: 'mode-sub' }, d.subtitulo)))));
+    }),
   );
 
   const dial = (dialogosDB || DIALOGOS_PRACTICA)[escenario] || DIALOGOS_PRACTICA[escenario];
-  const avatares = DIAL_AVATARES[escenario];
+  const avatares = (dial && dial.avatars) || DIAL_AVATARES[escenario] || DIAL_AVATAR_BLANK;
 
   if (miRol === null) return html('div', { style: { padding: '20px 16px', maxWidth: 480, margin: '0 auto' } },
     html('div', { className: 'header-row' },
@@ -8767,6 +8749,217 @@ function TrazosAdmin({ vocab }) {
       html('span', { className: 'admin-note', style: { margin: 0 } }, 'Solo hanzi del libro (tienen modelo de trazos).')));
 }
 
+// ── Consola → Contenido: frases del libro (frases clave y frases de contexto) ──
+function SentencesAdmin({ vocab }) {
+  const lessons = Object.keys(vocab).filter(l => /^\d+(\.\d+)?$/.test(l)).sort(lessonCompare);
+  const [lesson, setLesson] = useState(lessons[0] || '1');
+  const [kind, setKind] = useState('clave');      // 'clave' (npcr_sentences) | 'ctx' (npcr_context_sentences)
+  const [rows, setRows] = useState(null);
+  const [edit, setEdit] = useState(null);          // fila en edición (o { _new: true })
+  const [msg, setMsg] = useState(null);
+  const table = kind === 'clave' ? 'npcr_sentences' : 'npcr_context_sentences';
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+  const load = () => {
+    setRows(null);
+    db.from(table).select(kind === 'clave' ? 'id,lesson,hanzi,pinyin,es,hidden' : 'id,lesson,word,hanzi,pinyin,es,hidden').eq('lesson', lesson).order('id')
+      .then(({ data, error }) => { if (error) { flash('err', '❌ ' + error.message); setRows([]); } else setRows(data || []); });
+  };
+  useEffect(() => { setEdit(null); load(); }, [lesson, kind]);
+  const save = async () => {
+    const e = edit;
+    if (!e.hanzi.trim() || !e.pinyin.trim() || !e.es.trim() || (kind === 'ctx' && !e.word)) return flash('err', 'Completá todos los campos.');
+    const row = { hanzi: e.hanzi.trim(), pinyin: e.pinyin.trim(), es: e.es.trim(), ...(kind === 'ctx' ? { word: e.word } : {}) };
+    const { error } = e._new ? await db.from(table).insert({ ...row, lesson }) : await db.from(table).update(row).eq('id', e.id);
+    if (error) return flash('err', '❌ ' + error.message);
+    setEdit(null); load(); flash('ok', e._new ? '✅ Frase agregada.' : '✅ Frase guardada.');
+  };
+  const toggle = async (r) => {
+    const { error } = await db.from(table).update({ hidden: !r.hidden }).eq('id', r.id);
+    if (error) return flash('err', '❌ ' + error.message);
+    load(); flash('ok', r.hidden ? '👁 La frase vuelve a aparecer.' : '🚫 La frase ya no aparece en la app.');
+  };
+  const words = (vocab[lesson] || []).map(w => w.hanzi);
+  const inp = (k, ph, extra) => html('input', { value: edit[k] || '', placeholder: ph, onChange: e => setEdit({ ...edit, [k]: e.target.value }), style: { ...cmInput, width: '100%', ...(extra || {}) } });
+  const form = edit && html('div', { className: 'plan-add', style: { marginBottom: 10 } },
+    html('div', { className: 'report-h', style: { margin: '0 0 8px' } }, edit._new ? '➕ Frase nueva · lección ' + lesson : '✏️ Editar frase'),
+    !edit._new && hasRealAudio(edit._orig) && html('div', { className: 'admin-status', style: { marginBottom: 8, background: 'var(--gold-light)' } }, '🔊 Esta frase tiene audio del libro. Si cambiás el texto en chino, deja de sonar (el pinyin y la traducción se pueden corregir sin problema).'),
+    html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+      kind === 'ctx' && html('select', { value: edit.word || '', onChange: e => setEdit({ ...edit, word: e.target.value }), style: { ...cmInput, width: '100%' } },
+        html('option', { value: '' }, 'Palabra que se completa…'), words.map(w => html('option', { key: w, value: w }, w))),
+      inp('hanzi', 'Frase en chino (ej: 我喝茶。)', { fontFamily: 'Noto Sans SC, sans-serif', fontSize: 16 }),
+      inp('pinyin', 'Pinyin (ej: Wǒ hē chá.)'),
+      inp('es', 'Traducción (ej: Tomo té.)')),
+    html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+      html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: save }, 'Guardar'),
+      html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setEdit(null) }, 'Cancelar')));
+  return html('div', null,
+    html('p', { className: 'admin-note', style: { margin: '0 0 8px' } }, 'Frases clave: las del libro (tarjetas de frases, Ordená y Completá). Frases de contexto: las que aparecen en las tarjetas para completar con la palabra. Ocultá las que no sirvan, corregilas o agregá nuevas.'),
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
+    html('div', { className: 'reg-toolbar', style: { marginBottom: 8 } },
+      [['clave', '💬 Frases clave'], ['ctx', '🧩 Frases de contexto']].map(([k, l]) => html('button', { key: k, className: 'report-tab' + (kind === k ? ' active' : ''), onClick: () => setKind(k) }, l)),
+      html('select', { value: lesson, onChange: e => setLesson(e.target.value), style: { ...cmInput, flex: '0 0 auto' } }, lessons.map(l => html('option', { key: l, value: l }, 'Lección ' + l))),
+      !edit && html('button', { className: 'primary-btn', style: { margin: '0 0 0 auto', width: 'auto', padding: '8px 14px' }, onClick: () => setEdit({ _new: true, hanzi: '', pinyin: '', es: '', word: '' }) }, '+ Frase nueva')),
+    form,
+    !rows ? html('p', { className: 'admin-note' }, 'Cargando…')
+    : rows.length === 0 ? html('p', { className: 'admin-note' }, 'No hay frases en esta lección.')
+    : html('div', { className: 'plan-edit-steps' }, rows.map(r => html('div', { key: r.id, className: 'plan-edit-step' + (r.hidden ? ' txt-off' : '') },
+        html('span', { style: { flex: 1, minWidth: 0 } },
+          kind === 'ctx' && html('span', { className: 'txt-word hanzi-font' }, r.word),
+          html('span', { className: 'hanzi-font', style: { fontSize: 16 } }, r.hanzi),
+          html('small', null, r.pinyin + ' · ' + r.es + (hasRealAudio(r.hanzi) ? ' · 🔊 audio del libro' : '') + (r.hidden ? ' · 🚫 oculta' : ''))),
+        html('button', { className: 'mini-btn', onClick: () => setEdit({ ...r, _orig: r.hanzi }) }, '✏️'),
+        html('button', { className: 'mini-btn', onClick: () => toggle(r) }, r.hidden ? '👁 Mostrar' : '🚫 Ocultar')))));
+}
+
+// ── Consola → Contenido: diálogos de práctica oral (exam_dialogues + dialogue_turns) ──
+const DIAL_AVATAR_BLANK = [{ emoji: '🧑', nombre: 'A', color: '#E8EAF6', acento: '#3949ab' }, { emoji: '👩', nombre: 'B', color: '#FCE4EC', acento: '#c2185b' }];
+function DialogosAdmin() {
+  const [dials, setDials] = useState(null);
+  const [turns, setTurns] = useState([]);
+  const [open, setOpen] = useState(null);         // key del diálogo abierto
+  const [head, setHead] = useState(null);         // edición de título/roles/personajes
+  const [tEdit, setTEdit] = useState(null);       // turno en edición
+  const [msg, setMsg] = useState(null);
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+  const load = () => Promise.all([db.from('exam_dialogues').select('*').order('sort_order'), db.from('dialogue_turns').select('*').order('dialogue_key').order('turn_order')])
+    .then(([d, t]) => {
+      if (d.error) { flash('err', '❌ ' + d.error.message); setDials([]); return; }
+      setDials(d.data || []); setTurns(t.data || []);
+    });
+  useEffect(() => { load(); }, []);
+  if (!dials) return html('p', { className: 'admin-note' }, 'Cargando diálogos…');
+  const dial = dials.find(d => d.key === open);
+  const list = turns.filter(t => t.dialogue_key === open).sort((a, b) => a.turn_order - b.turn_order);
+  const avOf = (d) => (Array.isArray(d.avatars) && d.avatars.length === 2) ? d.avatars : DIAL_AVATAR_BLANK;
+  const newDialog = async () => {
+    const key = 'd' + Date.now().toString(36);
+    const { error } = await db.from('exam_dialogues').insert({ key, titulo: 'Diálogo nuevo', roles: ['A', 'B'], avatars: DIAL_AVATAR_BLANK, icon: '💬', grupo: 'extra', sort_order: dials.length });
+    if (error) return flash('err', '❌ ' + error.message + (/avatars/.test(error.message) ? ' — ¿Ejecutaste npcr_contenido_admin.sql?' : ''));
+    await load(); setOpen(key); setHead({ titulo: 'Diálogo nuevo', subtitulo: '', icon: '💬', grupo: 'extra', roles: ['A', 'B'], avatars: DIAL_AVATAR_BLANK });
+  };
+  const saveHead = async () => {
+    if (!head.titulo.trim() || head.roles.some(r => !r.trim())) return flash('err', 'Completá el título y los dos roles.');
+    const { error } = await db.from('exam_dialogues').update({ titulo: head.titulo.trim(), subtitulo: head.subtitulo.trim() || null, icon: head.icon.trim() || null, grupo: head.grupo,
+      roles: head.roles.map(r => r.trim()), avatars: head.avatars, updated_at: new Date().toISOString() }).eq('id', dial.id);
+    if (error) return flash('err', '❌ ' + error.message);
+    setHead(null); load(); flash('ok', '✅ Diálogo guardado.');
+  };
+  const delDialog = async () => {
+    if (!window.confirm('¿Eliminar el diálogo "' + dial.titulo + '" con sus ' + list.length + ' turnos?')) return;
+    await db.from('dialogue_turns').delete().eq('dialogue_key', dial.key);
+    const { error } = await db.from('exam_dialogues').delete().eq('id', dial.id);
+    if (error) return flash('err', '❌ ' + error.message);
+    setOpen(null); load(); flash('ok', '🗑 Diálogo eliminado (queda en el historial).');
+  };
+  const saveTurn = async () => {
+    const t = tEdit;
+    if (!t.texto.trim() || !t.pinyin.trim() || !t.es.trim()) return flash('err', 'Completá el texto, el pinyin y la traducción.');
+    const row = { quien: Number(t.quien), texto: t.texto.trim(), pinyin: t.pinyin.trim(), es: t.es.trim(), updated_at: new Date().toISOString() };
+    const { error } = t._new
+      ? await db.from('dialogue_turns').insert({ ...row, dialogue_key: open, turn_order: list.length ? Math.max(...list.map(x => x.turn_order)) + 1 : 1 })
+      : await db.from('dialogue_turns').update(row).eq('id', t.id);
+    if (error) return flash('err', '❌ ' + error.message);
+    setTEdit(null); load();
+  };
+  const moveTurn = async (i, d) => {
+    const j = i + d; if (j < 0 || j >= list.length) return;
+    const a = list[i], b = list[j];
+    await db.from('dialogue_turns').update({ turn_order: b.turn_order }).eq('id', a.id);
+    await db.from('dialogue_turns').update({ turn_order: a.turn_order }).eq('id', b.id);
+    load();
+  };
+  const delTurn = async (t) => { const { error } = await db.from('dialogue_turns').delete().eq('id', t.id); if (error) flash('err', '❌ ' + error.message); load(); };
+  const tin = (k, ph, extra) => html('input', { value: tEdit[k] || '', placeholder: ph, onChange: e => setTEdit({ ...tEdit, [k]: e.target.value }), style: { ...cmInput, width: '100%', ...(extra || {}) } });
+
+  if (!dial) return html('div', null,
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
+    html('p', { className: 'admin-note', style: { margin: '0 0 8px' } }, 'Escenas para practicar una conversación: el alumno elige un rol y responde por turnos. Editá los textos, los personajes o creá escenas nuevas.'),
+    html('div', { className: 'plan-list' }, dials.map(d => html('button', { key: d.id, className: 'plan-card student', onClick: () => { setOpen(d.key); setHead(null); setTEdit(null); } },
+      html('div', { className: 'plan-card-title' }, (d.icon || '💬') + '  ' + d.titulo),
+      html('div', { className: 'plan-card-sub' }, (d.grupo === 'examen' ? '⭐ Examen oral · ' : '') + (d.roles || []).join(' · ') + ' · ' + turns.filter(t => t.dialogue_key === d.key).length + ' turnos')))),
+    html('button', { className: 'secondary-btn', style: { marginTop: 10 }, onClick: newDialog }, '+ Diálogo nuevo'));
+
+  return html('div', null,
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
+    html('div', { className: 'plan-head', style: { marginBottom: 8 } }, html('button', { className: 'mini-btn', onClick: () => setOpen(null) }, '← Diálogos'), html('b', { style: { flex: 1 } }, dial.titulo),
+      !head && html('button', { className: 'mini-btn', onClick: () => setHead({ titulo: dial.titulo, subtitulo: dial.subtitulo || '', icon: dial.icon || '💬', grupo: dial.grupo || 'extra', roles: [...(dial.roles || ['A', 'B'])], avatars: JSON.parse(JSON.stringify(avOf(dial))) }) }, '✏️ Título y personajes'),
+      html('button', { className: 'mini-btn danger', onClick: delDialog }, '🗑')),
+    head && html('div', { className: 'plan-add', style: { marginBottom: 10 } },
+      html('div', { style: { display: 'flex', gap: 6, marginBottom: 6 } },
+        html('input', { value: head.icon, maxLength: 4, title: 'Ícono', onChange: e => setHead({ ...head, icon: e.target.value }), style: { ...cmInput, width: 56, flex: 'none', textAlign: 'center', fontSize: 20 } }),
+        html('input', { value: head.titulo, placeholder: 'Título de la escena', onChange: e => setHead({ ...head, titulo: e.target.value }), style: { ...cmInput, fontWeight: 700 } })),
+      html('input', { value: head.subtitulo, placeholder: 'Descripción corta (ej: Preguntar precio, regatear y pagar)', onChange: e => setHead({ ...head, subtitulo: e.target.value }), style: { ...cmInput, width: '100%', marginBottom: 6 } }),
+      html('div', { className: 'reg-toolbar', style: { marginBottom: 8 } }, [['examen', '⭐ Para el examen oral'], ['extra', 'Práctica adicional']].map(([k, l]) => html('button', { key: k, className: 'report-tab' + (head.grupo === k ? ' active' : ''), onClick: () => setHead({ ...head, grupo: k }) }, l))),
+      html('div', { className: 'dial-roles' }, [0, 1].map(i => html('div', { key: i, className: 'dial-role', style: { background: head.avatars[i].color, borderColor: head.avatars[i].acento } },
+        html('b', null, 'Rol ' + (i === 0 ? 'A' : 'B')),
+        html('input', { value: head.roles[i], placeholder: 'Nombre del rol (ej: 老板 (vendedor))', onChange: e => setHead({ ...head, roles: head.roles.map((r, j) => j === i ? e.target.value : r) }), style: { ...cmInput, width: '100%' } }),
+        html('div', { style: { display: 'flex', gap: 6 } },
+          html('input', { value: head.avatars[i].emoji, maxLength: 4, title: 'Emoji', onChange: e => setHead({ ...head, avatars: head.avatars.map((a, j) => j === i ? { ...a, emoji: e.target.value } : a) }), style: { ...cmInput, width: 56, flex: 'none', textAlign: 'center', fontSize: 20 } }),
+          html('input', { value: head.avatars[i].nombre, placeholder: 'Nombre visible', onChange: e => setHead({ ...head, avatars: head.avatars.map((a, j) => j === i ? { ...a, nombre: e.target.value } : a) }), style: { ...cmInput } }),
+          html('input', { type: 'color', value: head.avatars[i].acento, title: 'Color', onChange: e => setHead({ ...head, avatars: head.avatars.map((a, j) => j === i ? { ...a, acento: e.target.value, color: e.target.value + '22' } : a) }), style: { width: 44, height: 40, border: 'none', background: 'none', flex: 'none' } }))))),
+      html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: saveHead }, 'Guardar'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setHead(null) }, 'Cancelar'))),
+    html('div', { className: 'plan-edit-steps' }, list.map((t, i) => {
+      const av = avOf(dial)[t.quien] || avOf(dial)[0];
+      if (tEdit && tEdit.id === t.id) return null;
+      return html('div', { key: t.id, className: 'plan-edit-step', style: { borderLeft: '4px solid ' + av.acento } },
+        html('span', { style: { fontSize: 20 } }, av.emoji),
+        html('span', { style: { flex: 1, minWidth: 0 } }, html('span', { className: 'hanzi-font', style: { fontSize: 15 } }, t.texto), html('small', null, t.pinyin + ' · ' + t.es)),
+        html('button', { className: 'mini-btn', onClick: () => setTEdit({ ...t }) }, '✏️'),
+        html('button', { className: 'mini-btn', disabled: i === 0, onClick: () => moveTurn(i, -1) }, '↑'),
+        html('button', { className: 'mini-btn', disabled: i === list.length - 1, onClick: () => moveTurn(i, 1) }, '↓'),
+        html('button', { className: 'mini-btn danger', onClick: () => delTurn(t) }, '✕'));
+    })),
+    tEdit && html('div', { className: 'plan-add', style: { marginTop: 10 } },
+      html('div', { className: 'report-h', style: { margin: '0 0 8px' } }, tEdit._new ? '➕ Turno nuevo' : '✏️ Editar turno'),
+      html('div', { className: 'reg-toolbar', style: { marginBottom: 6 } }, [0, 1].map(i => html('button', { key: i, className: 'report-tab' + (Number(tEdit.quien) === i ? ' active' : ''), onClick: () => setTEdit({ ...tEdit, quien: i }) }, avOf(dial)[i].emoji + ' ' + (dial.roles || [])[i]))),
+      html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+        tin('texto', 'Texto en chino', { fontFamily: 'Noto Sans SC, sans-serif', fontSize: 16 }), tin('pinyin', 'Pinyin'), tin('es', 'Traducción')),
+      html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: saveTurn }, 'Guardar turno'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setTEdit(null) }, 'Cancelar'))),
+    !tEdit && html('button', { className: 'secondary-btn', style: { marginTop: 10 }, onClick: () => setTEdit({ _new: true, quien: list.length % 2, texto: '', pinyin: '', es: '' }) }, '+ Turno'));
+}
+
+// ── Consola → Contenido: frase del día (cartel "Lectura del día" del inicio) ──
+function FrasesDiaAdmin() {
+  const [rows, setRows] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const flash = (type, text) => { setMsg({ type, text }); setTimeout(() => setMsg(m => (m && m.text === text ? null : m)), 3500); };
+  const load = () => db.from('frases_del_dia').select('*').order('id').then(({ data, error }) => { if (error) { flash('err', '❌ ' + error.message); setRows([]); } else setRows(data || []); });
+  useEffect(() => { load(); }, []);
+  const save = async () => {
+    const e = edit;
+    if (!e.zh.trim() || !e.py.trim() || !e.es.trim()) return flash('err', 'Completá la frase, el pinyin y la traducción.');
+    const row = { zh: e.zh.trim(), py: e.py.trim(), es: e.es.trim() };
+    const { error } = e._new ? await db.from('frases_del_dia').insert({ ...row, active: true }) : await db.from('frases_del_dia').update(row).eq('id', e.id);
+    if (error) return flash('err', '❌ ' + error.message);
+    setEdit(null); load(); flash('ok', '✅ Guardada.');
+  };
+  const toggle = async (r) => { const { error } = await db.from('frases_del_dia').update({ active: !r.active }).eq('id', r.id); if (error) flash('err', '❌ ' + error.message); load(); };
+  const del = async (r) => { if (!window.confirm('¿Eliminar "' + r.zh + '"?')) return; const { error } = await db.from('frases_del_dia').delete().eq('id', r.id); if (error) flash('err', '❌ ' + error.message); load(); };
+  const inp = (k, ph, extra) => html('input', { value: edit[k] || '', placeholder: ph, onChange: e => setEdit({ ...edit, [k]: e.target.value }), style: { ...cmInput, width: '100%', ...(extra || {}) } });
+  if (!rows) return html('p', { className: 'admin-note' }, 'Cargando…');
+  const on = rows.filter(r => r.active).length;
+  return html('div', null,
+    html('p', { className: 'admin-note', style: { margin: '0 0 8px' } }, 'Cada día el inicio muestra una de las frases activas (' + on + ' de ' + rows.length + '), en rotación. Apagá las que no quieras usar o agregá nuevas.'),
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 8 } }, msg.text),
+    edit && html('div', { className: 'plan-add', style: { marginBottom: 10 } },
+      html('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+        inp('zh', 'Frase en chino (ej: 今天天气很好！)', { fontFamily: 'Noto Sans SC, sans-serif', fontSize: 16 }), inp('py', 'Pinyin'), inp('es', 'Traducción')),
+      html('div', { style: { display: 'flex', gap: 8, marginTop: 10 } },
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto' }, onClick: save }, 'Guardar'),
+        html('button', { className: 'secondary-btn', style: { margin: 0, width: 'auto' }, onClick: () => setEdit(null) }, 'Cancelar'))),
+    !edit && html('button', { className: 'secondary-btn', style: { marginBottom: 8 }, onClick: () => setEdit({ _new: true, zh: '', py: '', es: '' }) }, '+ Frase nueva'),
+    html('div', { className: 'plan-edit-steps' }, rows.map(r => html('div', { key: r.id, className: 'plan-edit-step' + (r.active ? '' : ' txt-off') },
+      html('span', { style: { flex: 1, minWidth: 0 } }, html('span', { className: 'hanzi-font', style: { fontSize: 16 } }, r.zh), html('small', null, r.py + ' · ' + r.es + (r.active ? '' : ' · apagada'))),
+      html('button', { className: 'mini-btn', onClick: () => setEdit({ ...r }) }, '✏️'),
+      html('button', { className: 'mini-btn', onClick: () => toggle(r) }, r.active ? '🚫 Apagar' : '👁 Activar'),
+      html('button', { className: 'mini-btn danger', onClick: () => del(r) }, '🗑')))));
+}
+
 function ZheAdmin({ isSuper }) {
   const [items, setItems] = useState(null);
   const [err, setErr] = useState(null);
@@ -9544,6 +9737,9 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                   { id: 'mod-refuerzo', icon: '💪', name: 'Reforcemos',           editable: false },
                   { id: 'aula-zhe',     icon: '📷', name: 'Zhè shì shénme? (这是什么？)', editable: true, aula: true },
                   { id: 'aula-trazos',  icon: '✍️', name: 'Trazos', editable: true, aula: true, sub: 'Camino de hanzi de Mi aula · cada clase lo activa en su ⚙️ Configurar' },
+                  { id: 'txt-frases',   icon: '💬', name: 'Frases del libro', editable: true, aula: true, sub: 'Frases clave y frases de contexto de cada lección', comp: 'frases' },
+                  { id: 'txt-dialogos', icon: '🗣️', name: 'Diálogos de práctica oral', editable: true, aula: true, sub: 'Escenas, personajes y turnos', comp: 'dialogos' },
+                  { id: 'txt-dia',      icon: '☀️', name: 'Frase del día', editable: true, aula: true, sub: 'El cartel "Lectura del día" del inicio', comp: 'dia' },
                 ].map(m => {
                   const theme = LESSON_THEMES[m.id] || {};
                   const isHidden = !!theme.hidden;
@@ -9569,7 +9765,8 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
                     isOpen && html('div', {
                       style: { background: 'var(--paper)', borderRadius: '0 0 12px 12px', padding: '12px 14px', boxShadow: 'var(--shadow-paper)', borderTop: '1px solid var(--paper-deep)' }
                     },
-                      m.id === 'aula-trazos' ? html(TrazosAdmin, { vocab }) : m.aula ? html(ZheAdmin, { isSuper }) : html(ModuleQuestionsEditor, { modId: m.id })
+                      m.comp === 'frases' ? html(SentencesAdmin, { vocab }) : m.comp === 'dialogos' ? html(DialogosAdmin) : m.comp === 'dia' ? html(FrasesDiaAdmin)
+                      : m.id === 'aula-trazos' ? html(TrazosAdmin, { vocab }) : m.aula ? html(ZheAdmin, { isSuper }) : html(ModuleQuestionsEditor, { modId: m.id })
                     ),
                   );
                 })

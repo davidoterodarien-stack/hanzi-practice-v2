@@ -2052,9 +2052,6 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
 /* Consola: editores de textos */
 .plan-edit-step.txt-off { opacity: .55; }
 .txt-word { display: inline-block; background: var(--gold-light); color: var(--gold-dark); border-radius: 8px; padding: 0 6px; margin-right: 6px; font-weight: 800; }
-.dial-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-@media (max-width: 560px) { .dial-roles { grid-template-columns: 1fr; } }
-.dial-role { display: flex; flex-direction: column; gap: 6px; border: 2px solid; border-radius: 12px; padding: 8px; }
 /* Panel del lǎoshī */
 .panel-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .day-bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; align-items: end; height: 110px; }

@@ -4182,7 +4182,14 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
             html('div', { className: 'mode-sub' }, 'Tabla interactiva con audio · toca para escuchar'),
           )
         ),
-        modes.filter(Boolean).map(m => html('button', { key: m.id, className: 'mode-card' + (m.id === 'flash' ? ' flash' : ''), onClick: () => onSelectMode(m.id) },
+        modes.filter(Boolean).map(m => m.id === 'flash'
+          ? html('button', { key: m.id, className: 'flash-entry', onClick: () => onSelectMode(m.id) },
+              html('span', { className: 'flash-entry-icon' }, '⚡'),
+              html('span', { style: { flex: 1, textAlign: 'left' } },
+                html('div', { className: 'flash-entry-title' }, m.title),
+                html('div', { className: 'flash-entry-sub' }, m.best ? 'Tu última vuelta: ' + m.best + '% sabidas' : m.sub)),
+              html('span', { className: 'flash-entry-go' }, 'Jugar →'))
+          : html('button', { key: m.id, className: 'mode-card', onClick: () => onSelectMode(m.id) },
           html('div', { className: 'mode-emoji ' + m.cls }, m.emoji),
           html('div', { style: { flex: 1 } },
             html('div', { className: 'mode-title' }, m.title),
@@ -4304,7 +4311,8 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   useEffect(() => { if (!shown) return; const t = setTimeout(next, 1400); return () => clearTimeout(t); }, [shown]);
   useEffect(() => stopAudio, []);
 
-  const head = html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '⚡ Vocabulario Flash'));
+  const head = html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'),
+    html('h1', { className: 'fl-title' }, html('span', { className: 'fl-title-bolt' }, '⚡'), html('span', { className: 'fl-title-txt' }, 'Vocabulario Flash')));
   if (!round) {
     const red = allWords.filter(x => known[x.hanzi] === false);
     return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 40 } }, head,

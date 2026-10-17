@@ -2099,3 +2099,52 @@ main.quiz-p.bad .quiz-result-icon { color: #C0172F; }
 .app-dialog-btns button { margin: 0; flex: 1; }
 .app-dialog.danger { border-top: 5px solid var(--lacquer); }
 .primary-btn.danger { background: var(--lacquer-dark); }
+/* ── Bingo: diseños del cartón (el alumno elige) ── */
+.bingo-themes { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 10px; }
+.bingo-themes span { font-size: 16px; }
+.bingo-theme-dot { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; background: var(--c); box-shadow: 0 0 0 2px var(--paper-deep); cursor: pointer; padding: 0; transition: transform .15s; }
+.bingo-theme-dot.on { box-shadow: 0 0 0 3px var(--ink); transform: scale(1.15); }
+
+/* Jade: verde con celdas color arroz */
+.bingo-card.theme-jade { background: linear-gradient(145deg, #3E9B6B, #1F6B47); box-shadow: 0 4px 0 #154C33; }
+.theme-jade .bingo-cell { background: #F4FBF5; }
+.theme-jade .bingo-cell .hanzi-font { color: #16432C; }
+.theme-jade .bingo-cell.marked { background: #DDF3E4; }
+.theme-jade .bingo-cell.marked .hanzi-font { color: #1F6B47; }
+.theme-jade .bingo-stamp { border-color: rgba(31,107,71,.75); box-shadow: inset 0 0 0 2px rgba(31,107,71,.18); }
+
+/* Porcelana: azul y blanco (青花) */
+.bingo-card.theme-porcelana { background: #1F4E9C; box-shadow: 0 4px 0 #13336A; padding: 10px; }
+.theme-porcelana .bingo-cell { background: #FBFDFF; border: 2px solid #C9D8F2; }
+.theme-porcelana .bingo-cell .hanzi-font { color: #173B78; }
+.theme-porcelana .bingo-cell.marked { background: #E3ECFB; }
+.theme-porcelana .bingo-cell.marked .hanzi-font { color: #1F4E9C; }
+.theme-porcelana .bingo-stamp { border: 3px double rgba(31,78,156,.8); box-shadow: none; }
+
+/* Farol dorado: marco dorado y celdas rojas */
+.bingo-card.theme-farol { background: linear-gradient(145deg, #F2C14E, #C98A12); box-shadow: 0 4px 0 #8E5F08; }
+.theme-farol .bingo-cell { background: #B8321C; }
+.theme-farol .bingo-cell .hanzi-font { color: #FFE9A8; }
+.theme-farol .bingo-cell.marked { background: #7E1E10; }
+.theme-farol .bingo-cell.marked .hanzi-font { color: #FFD45C; }
+.theme-farol .bingo-stamp { border-color: rgba(255,212,92,.9); box-shadow: inset 0 0 0 2px rgba(255,212,92,.25); }
+
+/* Tinta china: negro, papel y sello rojo cuadrado */
+.bingo-card.theme-tinta { background: #1D1D1F; box-shadow: 0 4px 0 #000; }
+.theme-tinta .bingo-cell { background: #F6F1E6; border-radius: 4px; }
+.theme-tinta .bingo-cell .hanzi-font { color: #111; font-family: 'Noto Serif SC', serif; }
+.theme-tinta .bingo-cell.marked { background: #EFE5D0; }
+.theme-tinta .bingo-cell.marked .hanzi-font { color: #111; }
+.theme-tinta .bingo-stamp { inset: 12%; border-radius: 6px; border: 3px solid rgba(200,30,30,.85); box-shadow: inset 0 0 0 2px rgba(200,30,30,.2); transform: rotate(-6deg); }
+
+/* Flor de ciruelo: rosa suave */
+.bingo-card.theme-cerezo { background: linear-gradient(145deg, #F2A7BE, #D9688C); box-shadow: 0 4px 0 #A9476A; }
+.theme-cerezo .bingo-cell { background: #FFF8FA; }
+.theme-cerezo .bingo-cell .hanzi-font { color: #7A2944; }
+.theme-cerezo .bingo-cell.marked { background: #FCE3EB; }
+.theme-cerezo .bingo-cell.marked .hanzi-font { color: #B23C63; }
+.theme-cerezo .bingo-stamp { border-color: rgba(178,60,99,.75); box-shadow: inset 0 0 0 2px rgba(178,60,99,.18); }
+.theme-cerezo .bingo-cell.marked::after { content: '✿'; position: absolute; top: 4px; right: 6px; font-size: 12px; color: #D9688C; }
+
+/* Aviso del Terno */
+.bingo-prize-card.terno { background: linear-gradient(160deg, #FFF8E1, #FFD866); }

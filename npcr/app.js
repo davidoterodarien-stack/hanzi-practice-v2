@@ -4254,7 +4254,7 @@ function useVocabFlash(lessonId) {
 }
 
 // Grilla de la lección: tocar una palabra la da vuelta (pinyin + español) y suena el audio del libro
-function VocabGrid({ words, known, compact }) {
+function VocabGrid({ words, known, compact, locked }) {
   const [open, setOpen] = useState(null);
   const n = words.length, ok = words.filter(w => known[w.hanzi] === true).length, bad = words.filter(w => known[w.hanzi] === false).length;
   return html('div', { className: 'vg' + (compact ? ' compact' : '') },
@@ -4263,9 +4263,11 @@ function VocabGrid({ words, known, compact }) {
       html('span', { className: 'vg-stats' }, html('b', { className: 'g' }, ok + ' ✓'), html('b', { className: 'r' }, bad + ' ✗'), html('b', null, (n - ok - bad) + ' sin ver'))),
     html('div', { className: 'vg-grid' }, words.map(w => {
       const st = known[w.hanzi], isOpen = open === w.hanzi;
-      return html('button', { key: w.hanzi, type: 'button', className: 'vg-tile' + (st === true ? ' ok' : st === false ? ' bad' : '') + (isOpen ? ' open' : ''),
-        onClick: () => { setOpen(isOpen ? null : w.hanzi); if (!isOpen && hasRealAudio(w.hanzi)) speak(w.hanzi); } },
-        isOpen
+      // Durante el juego (locked) no se pueden dar vuelta: el pinyin sería una pista
+      return html('button', { key: w.hanzi, type: 'button', className: 'vg-tile' + (st === true ? ' ok' : st === false ? ' bad' : '') + (isOpen && !locked ? ' open' : '') + (locked ? ' locked' : ''),
+        tabIndex: locked ? -1 : 0, 'aria-disabled': locked || undefined,
+        onClick: () => { if (locked) return; setOpen(isOpen ? null : w.hanzi); if (!isOpen && hasRealAudio(w.hanzi)) speak(w.hanzi); } },
+        isOpen && !locked
           ? html('span', { className: 'vg-back' }, html(TonedPinyin, { text: w.pinyin, className: 'vg-py' }), html('span', { className: 'vg-es' }, w.es))
           : html('span', { className: 'vg-h hanzi-font len' + Math.min([...w.hanzi].length, 4) }, w.hanzi));
     })));
@@ -4351,7 +4353,7 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
       html('div', { className: 'fl-btns' },
         html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, '✗ No lo sé'),
         html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, '⚡ Lo sé')),
-      html(VocabGrid, { words: round.list.length === allWords.length ? allWords : round.list, known, compact: true })));
+      html(VocabGrid, { words: round.list.length === allWords.length ? allWords : round.list, known, compact: true, locked: true })));
 }
 
 // ----------------- Play screen router -----------------

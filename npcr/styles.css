@@ -2182,3 +2182,6 @@ main.fl-main { max-width: 640px !important; }
 .fl-score { display: flex; justify-content: center; gap: 22px; font-size: 40px; font-weight: 900; }
 .fl-score .g { color: var(--fl-ok); } .fl-score .r { color: var(--fl-bad); }
 .fl-result-t { font-weight: 800; margin-top: 4px; color: var(--ink-mid); }
+.vg-tile.locked { cursor: default; }
+.vg-tile.locked:hover { transform: none; border-color: var(--paper-deep); }
+.vg-tile.locked.ok:hover { border-color: var(--fl-ok); } .vg-tile.locked.bad:hover { border-color: var(--fl-bad); }

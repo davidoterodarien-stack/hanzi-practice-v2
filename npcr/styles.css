@@ -2152,7 +2152,7 @@ main.fl-main { max-width: 640px !important; }
 .fl-intro p { margin: 6px 0 12px; line-height: 1.5; color: var(--ink-mid); }
 .fl-intro b { color: var(--fl-gold-d); }
 .fl-bolt { font-size: 44px; filter: drop-shadow(0 0 10px rgba(226,174,47,.6)); animation: flBolt 1.8s ease-in-out infinite; }
-.fl-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--ink-mid); cursor: pointer; padding: 6px 12px; border-radius: 999px; border: 2px solid var(--paper-deep); text-transform: none; letter-spacing: 0; }
+.fl-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--ink-mid); cursor: default; padding: 6px 12px; border-radius: 999px; border: 2px solid var(--paper-deep); text-transform: none; letter-spacing: 0; }
 .fl-switch.on { color: var(--fl-gold-d); border-color: var(--fl-gold); background: #FFF8E3; }
 .fl-switch input { accent-color: var(--fl-gold); }
 .fl-start { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }

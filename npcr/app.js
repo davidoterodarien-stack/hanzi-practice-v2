@@ -4271,15 +4271,15 @@ function VocabGrid({ words, known, compact }) {
     })));
 }
 
-const FLASH_TIMER_KEY = 'npcr-flash-rayito';
 function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard }) {
   const [known, mark] = useVocabFlash(lessonId);
-  const [timer, setTimerRaw] = useState(() => { try { return localStorage.getItem(FLASH_TIMER_KEY) === '1'; } catch (e) { return false; } });
-  const setTimer = (v) => { setTimerRaw(v); try { localStorage.setItem(FLASH_TIMER_KEY, v ? '1' : '0'); } catch (e) {} };
+  const timer = true;   // siempre contra reloj
+  // Segundos por palabra: npcr_app_config 'flash_segundos' (editable en Configuración → Otros ajustes)
+  const [SECS, setSecs] = useState(5);
+  useEffect(() => { db.from('npcr_app_config').select('value').eq('key', 'flash_segundos').maybeSingle().then(({ data }) => { const n = Number(data && data.value); if (n > 0) setSecs(n); }); }, []);
   const [round, setRound] = useState(null);        // { list, i, res: { hanzi: bool } }
   const [shown, setShown] = useState(null);        // respuesta que se está mostrando
   const [left, setLeft] = useState(5000);
-  const SECS = 5;
   const start = (list) => { setRound({ list: shuffle(list), i: 0, res: {} }); setShown(null); setLeft(SECS * 1000); };
   const w = round && round.list[round.i];
   const answer = (val) => {
@@ -4318,8 +4318,8 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
       html('div', { className: 'fl-wrap' },
         html('div', { className: 'fl-intro' },
           html('div', { className: 'fl-bolt' }, '⚡'),
-          html('p', null, 'Las palabras pasan en orden aleatorio. Para cada una, ¿sabés qué significa? Tocá ', html('b', null, '⚡ Lo sabía'), ' o ', html('b', null, '✗ No lo sabía'), ' y se va pintando tu mapa de la lección.'),
-          html('label', { className: 'fl-switch' + (timer ? ' on' : '') }, html('input', { type: 'checkbox', checked: timer, onChange: e => setTimer(e.target.checked) }), '⏱ Rayito: ' + SECS + ' segundos por palabra'),
+          html('p', null, 'Las palabras pasan en orden aleatorio. ¿Sabés su significado en ', html('b', null, SECS + ' segundos'), '? Tocá ', html('b', null, '⚡ Lo sé'), ' o ', html('b', null, '✗ No lo sé'), ' y se va pintando tu mapa de la lección. Si se acaba el tiempo, cuenta como que no lo sabés.'),
+          html('div', { className: 'fl-switch on' }, '⏱ ' + SECS + ' segundos por palabra'),
           html('div', { className: 'fl-start' },
             html('button', { className: 'fl-btn gold', onClick: () => start(allWords) }, '⚡ Empezar · ' + allWords.length + ' palabras'),
             red.length > 0 && html('button', { className: 'fl-btn dark', onClick: () => start(red) }, '✗ Solo las rojas · ' + red.length))),
@@ -4347,10 +4347,10 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
         html('div', { className: 'fl-h hanzi-font len' + Math.min([...w.hanzi].length, 4) }, w.hanzi),
         shown
           ? html('div', { className: 'fl-ans' }, html(TonedPinyin, { text: w.pinyin, className: 'fl-py' }), html('div', { className: 'fl-es' }, w.es))
-          : html('div', { className: 'fl-q' }, '¿Qué significa?')),
+          : html('div', { className: 'fl-q' }, '¿Sabés su significado en ' + SECS + ' segundos?')),
       html('div', { className: 'fl-btns' },
-        html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, '✗ No lo sabía'),
-        html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, '⚡ Lo sabía')),
+        html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, '✗ No lo sé'),
+        html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, '⚡ Lo sé')),
       html(VocabGrid, { words: round.list.length === allWords.length ? allWords : round.list, known, compact: true })));
 }
 

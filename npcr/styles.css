@@ -2185,3 +2185,16 @@ main.fl-main { max-width: 640px !important; }
 .vg-tile.locked { cursor: default; }
 .vg-tile.locked:hover { transform: none; border-color: var(--paper-deep); }
 .vg-tile.locked.ok:hover { border-color: var(--fl-ok); } .vg-tile.locked.bad:hover { border-color: var(--fl-bad); }
+/* Flechas entre lecciones */
+.lesson-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.lesson-nav-btn { display: flex; align-items: center; gap: 10px; background: #fff; border: 2px solid var(--paper-deep); border-radius: 16px; padding: 10px 14px; cursor: pointer; font-family: inherit; color: var(--ink); box-shadow: 0 3px 0 var(--paper-deep); transition: border-color .15s, transform .1s; min-width: 0; }
+.lesson-nav-btn:hover { border-color: var(--lacquer); }
+.lesson-nav-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--paper-deep); }
+.lesson-nav-btn.next { justify-content: flex-end; text-align: right; }
+.lesson-nav-btn.prev { text-align: left; }
+.lesson-nav-btn.locked { opacity: .6; }
+.lesson-nav-arrow { font-size: 22px; font-weight: 900; color: var(--lacquer); flex-shrink: 0; }
+.lesson-nav-txt { display: flex; flex-direction: column; min-width: 0; }
+.lesson-nav-txt small { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
+.lesson-nav-txt b { font-size: 15px; font-weight: 900; }
+.lesson-nav-txt i { font-style: normal; font-size: 12px; color: var(--ink-mid); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

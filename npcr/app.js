@@ -2738,21 +2738,28 @@ function App() {
     setProfile(p => ({ ...(p || {}), name }));
   };
 
+  // Abrir una lección (desde el inicio o con las flechas anterior/siguiente), respetando los candados
+  const openLesson = (id) => {
+    if (guestLimited && (isLocked(id) || !vocab[id])) { setGuestLock(true); return; }
+    if (isLocked(id)) { appAlert({ icon: '🔒', title: '¡Esta llega pronto!', text: 'Tu lǎoshī habilitó hasta la lección ' + maxLesson + '. Cuando la habilite, se abre sola.' }); return; }
+    setScreen({ name: 'lesson', lessonId: id });
+    window.scrollTo(0, 0);
+    if (studentId) db.from('activity_log')
+      .update({ max_lesson: id, last_active: new Date().toISOString() })
+      .eq('student_id', studentId)
+      .order('connected_at', { ascending: false }).limit(1).then(() => {});
+  };
+  // Orden de las lecciones del libro para las flechas (sin módulos ni lecciones ocultas)
+  const lessonRoute = [...new Set([...regularLessons, ...(guestLimited ? Object.keys(LESSON_THEMES).filter(k => /^\d+(\.\d+)?$/.test(k)) : [])])]
+    .filter(id => !String(id).startsWith('mod-') && !(LESSON_THEMES[id] && LESSON_THEMES[id].hidden)).sort(lessonCompare);
+
   let content;
   if (screen.name === 'home') {
     content = html(Home, {
       vocab, lessons, progress, totalWords, totalStars,
       modulesList: appConfig.modules_list,
       maxLesson,
-      onSelectLesson: (id) => {
-        if (guestLimited && (isLocked(id) || !vocab[id])) { setGuestLock(true); return; }
-        if (isLocked(id)) { appAlert({ icon: '🔒', title: '¡Esta llega pronto!', text: 'Tu lǎoshī habilitó hasta la lección ' + maxLesson + '. Cuando la habilite, se abre sola.' }); return; }
-        setScreen({ name: 'lesson', lessonId: id });
-        if (studentId) db.from('activity_log')
-          .update({ max_lesson: id, last_active: new Date().toISOString() })
-          .eq('student_id', studentId)
-          .order('connected_at', { ascending: false }).limit(1).then(() => {});
-      },
+      onSelectLesson: openLesson,
       onAdmin: () => setScreen({ name: 'admin' }),
       onPrueba: (game) => setScreen({ name: 'prueba', game }),
       pruebaProgress: progress.prueba || {},
@@ -2799,6 +2806,7 @@ function App() {
       onSelectMode: (mode) => setScreen({ name: 'play', lessonId: screen.lessonId, mode }),
       onWorkbookListen: () => setScreen({ name: 'workbook-listen', lessonId: screen.lessonId }),
       onWorkbookStroke: () => setScreen({ name: 'workbook-stroke', lessonId: screen.lessonId }),
+      route: lessonRoute, onGoLesson: openLesson, isLocked: (id) => isLocked(id) || (guestLimited && !vocab[id]),
     });
   } else if (screen.name === 'workbook-listen') {
     content = html(WorkbookListeningGame, {
@@ -4151,7 +4159,7 @@ function srsSub(words, lessonId, sentenceMode, cardState, fallback) {
   return '📅 ' + today + ' para hoy' + (st.fresh ? ' (' + st.fresh + ' nuevas)' : '') + (st.learned ? ' · ' + st.learned + ' aprendidas' : '');
 }
 
-function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, onSelectMode, onWorkbookListen, onWorkbookStroke }) {
+function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, onSelectMode, onWorkbookListen, onWorkbookStroke, route, onGoLesson, isLocked }) {
   const theme = LESSON_THEMES[lessonId] || { name: 'Lección ' + lessonId };
   const lp = progress.lessons[lessonId] || {};
   const hasWorkbook = false;
@@ -4202,6 +4210,21 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
           )
         ))
       ),
+      (() => {   // Flechas: lección anterior / siguiente
+        const k = (route || []).indexOf(lessonId);
+        if (k < 0 || !onGoLesson) return null;
+        const prev = route[k - 1], next = route[k + 1];
+        const nameOf = (id) => (LESSON_THEMES[id] && LESSON_THEMES[id].name) || '';
+        return html('div', { className: 'lesson-nav' },
+          prev ? html('button', { className: 'lesson-nav-btn prev', onClick: () => onGoLesson(prev) },
+            html('span', { className: 'lesson-nav-arrow' }, '←'),
+            html('span', { className: 'lesson-nav-txt' }, html('small', null, 'Lección anterior'), html('b', null, 'Lección ' + prev), html('i', null, nameOf(prev))))
+          : html('span'),
+          next ? html('button', { className: 'lesson-nav-btn next' + (isLocked && isLocked(next) ? ' locked' : ''), onClick: () => onGoLesson(next) },
+            html('span', { className: 'lesson-nav-txt' }, html('small', null, 'Lección siguiente'), html('b', null, (isLocked && isLocked(next) ? '🔒 ' : '') + 'Lección ' + next), html('i', null, nameOf(next))),
+            html('span', { className: 'lesson-nav-arrow' }, '→'))
+          : html('span'));
+      })(),
       hasWorkbook && html(React.Fragment, null,
         html('h2', { className: 'section-title', style: { marginTop: 20 } }, '📘 Libro de Ejercicios'),
         html('div', { className: 'mode-list' },

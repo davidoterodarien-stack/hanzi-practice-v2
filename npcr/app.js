@@ -123,6 +123,16 @@ function playLevelChime() {
   try { [[784, 0], [988, 0.12], [1175, 0.24], [1568, 0.38]].forEach(([f, t]) => softTone(f, t, 0.7, 0.04)); } catch (e) {}
 }
 
+// Pista del Bingo: brillo suave de "estrellitas mágicas" (notas agudas que suben y titilan)
+function playSparkle() {
+  if (!_soundOn) return;
+  try {
+    [[1568, 0], [2093, 0.07], [2637, 0.14], [3136, 0.21], [2637, 0.32], [3520, 0.40], [4186, 0.52], [3136, 0.66], [4699, 0.80]]
+      .forEach(([f, t], i) => softTone(f, t, 0.5, i % 2 ? 0.012 : 0.018));
+    softTone(1046.5, 0, 1.4, 0.01);
+  } catch (e) {}
+}
+
 function playWrong() {
   if (!_soundOn) return;
   try { softTone(220, 0, 0.25, 0.05); } catch (e) {}
@@ -6154,6 +6164,7 @@ function BingoPlayer({ gameId, onBack }) {
     if (n > hintSeen.current && game.hint_h) {
       hintSeen.current = n;
       setHint({ h: game.hint_h, key: n });
+      playSparkle();
       const t = setTimeout(() => setHint(x => (x && x.key === n ? null : x)), (hintSec || 5) * 1000);
       return () => clearTimeout(t);
     }

@@ -2198,3 +2198,18 @@ main.fl-main { max-width: 640px !important; }
 .lesson-nav-txt small { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); }
 .lesson-nav-txt b { font-size: 15px; font-weight: 900; }
 .lesson-nav-txt i { font-style: normal; font-size: 12px; color: var(--ink-mid); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ⚡ Flash: "Con dudas" (ámbar) */
+:root { --fl-mid: #E08A1E; }
+.fl-btn.mid { background: #fff; color: #9A5A08; border: 2px solid var(--fl-mid); box-shadow: 0 4px 0 #C27412; }
+.fl-btn.big { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.fl-card.mid { border-color: var(--fl-mid); background: #FFF6EA; }
+.vg-tile.mid { border-color: var(--fl-mid); background: #FFF3E2; }
+.vg-tile.mid::after { position: absolute; top: 3px; right: 5px; font-size: 10px; font-weight: 900; content: '?'; color: var(--fl-mid); }
+.vg-stats .m, .fl-score .m { color: var(--fl-mid); }
+@media (max-width: 480px) {
+  .fl-btns { gap: 6px; }
+  .fl-btn.big { flex-direction: column; gap: 2px; padding: 12px 4px; font-size: 14px; }
+  .fl-btn.big .fl-ic { font-size: 20px; }
+  .fl-score { gap: 14px; font-size: 32px; }
+}

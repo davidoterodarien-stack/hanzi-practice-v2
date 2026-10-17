@@ -4249,7 +4249,8 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
 }
 
 // ═════════════════ ⚡ Vocabulario Flash + grilla de vocabulario de la lección ═════════════════
-// Qué palabras sabe el alumno (npcr_vocab_flash): verde = lo sabía, rojo = no lo sabía.
+// Qué palabras sabe el alumno (npcr_vocab_flash): verde = lo sabe, ámbar = con dudas, rojo = no lo sabe.
+// Estado por palabra: true | 'doubt' | false (en la base: known + doubt).
 // Si la tabla todavía no existe, se guarda en el dispositivo para no perder nada.
 function useVocabFlash(lessonId) {
   const [known, setKnown] = useState({});
@@ -4262,16 +4263,19 @@ function useVocabFlash(lessonId) {
       let local = {}; try { local = JSON.parse(localStorage.getItem(lsKey(u)) || '{}'); } catch (e) {}
       setKnown(local);
       if (!u) return;
-      db.from('npcr_vocab_flash').select('hanzi,known').eq('student_id', u).eq('lesson', lessonId).then(({ data: rows, error }) => {
+      db.from('npcr_vocab_flash').select('*').eq('student_id', u).eq('lesson', lessonId).then(({ data: rows, error }) => {
         if (error || !alive) return;
-        const m = {}; (rows || []).forEach(r => { m[r.hanzi] = r.known; }); setKnown(k => ({ ...k, ...m }));
+        const m = {}; (rows || []).forEach(r => { m[r.hanzi] = r.doubt ? 'doubt' : r.known; }); setKnown(k => ({ ...k, ...m }));
       });
     });
     return () => { alive = false; };
   }, [lessonId]);
   const mark = (hanzi, val) => {
     setKnown(k => { const n = { ...k, [hanzi]: val }; try { localStorage.setItem(lsKey(uid), JSON.stringify(n)); } catch (e) {} return n; });
-    if (uid) db.from('npcr_vocab_flash').upsert({ student_id: uid, lesson: lessonId, hanzi, known: val, updated_at: new Date().toISOString() }).then(() => {});
+    if (!uid) return;
+    const row = { student_id: uid, lesson: lessonId, hanzi, known: val === true, updated_at: new Date().toISOString() };
+    // Si la columna "doubt" todavía no existe en la base, se guarda igual sin ella
+    db.from('npcr_vocab_flash').upsert({ ...row, doubt: val === 'doubt' }).then(({ error }) => { if (error) db.from('npcr_vocab_flash').upsert(row).then(() => {}); });
   };
   return [known, mark];
 }
@@ -4279,15 +4283,15 @@ function useVocabFlash(lessonId) {
 // Grilla de la lección: tocar una palabra la da vuelta (pinyin + español) y suena el audio del libro
 function VocabGrid({ words, known, compact, locked }) {
   const [open, setOpen] = useState(null);
-  const n = words.length, ok = words.filter(w => known[w.hanzi] === true).length, bad = words.filter(w => known[w.hanzi] === false).length;
+  const n = words.length, ok = words.filter(w => known[w.hanzi] === true).length, mid = words.filter(w => known[w.hanzi] === 'doubt').length, bad = words.filter(w => known[w.hanzi] === false).length;
   return html('div', { className: 'vg' + (compact ? ' compact' : '') },
     !compact && html('div', { className: 'vg-head' },
       html('span', { className: 'vg-title' }, '📋 Vocabulario de la lección'),
-      html('span', { className: 'vg-stats' }, html('b', { className: 'g' }, ok + ' ✓'), html('b', { className: 'r' }, bad + ' ✗'), html('b', null, (n - ok - bad) + ' sin ver'))),
+      html('span', { className: 'vg-stats' }, html('b', { className: 'g' }, ok + ' ✓'), html('b', { className: 'm' }, mid + ' ?'), html('b', { className: 'r' }, bad + ' ✗'), html('b', null, (n - ok - mid - bad) + ' sin ver'))),
     html('div', { className: 'vg-grid' }, words.map(w => {
       const st = known[w.hanzi], isOpen = open === w.hanzi;
       // Durante el juego (locked) no se pueden dar vuelta: el pinyin sería una pista
-      return html('button', { key: w.hanzi, type: 'button', className: 'vg-tile' + (st === true ? ' ok' : st === false ? ' bad' : '') + (isOpen && !locked ? ' open' : '') + (locked ? ' locked' : ''),
+      return html('button', { key: w.hanzi, type: 'button', className: 'vg-tile' + (st === true ? ' ok' : st === 'doubt' ? ' mid' : st === false ? ' bad' : '') + (isOpen && !locked ? ' open' : '') + (locked ? ' locked' : ''),
         tabIndex: locked ? -1 : 0, 'aria-disabled': locked || undefined,
         onClick: () => { if (locked) return; setOpen(isOpen ? null : w.hanzi); if (!isOpen && hasRealAudio(w.hanzi)) speak(w.hanzi); } },
         isOpen && !locked
@@ -4310,8 +4314,9 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   const answer = (val) => {
     if (!w || shown) return;
     mark(w.hanzi, val);
-    if (!val && onRecordCard) onRecordCard(cardKey(lessonId, false, w.hanzi), 'no');   // vuelve en el Entrenamiento diario
-    if (val) playMatchChime(); else playWrong();
+    // Lo que no sabe o duda vuelve en el Entrenamiento diario (las dudas, más espaciadas)
+    if (val !== true && onRecordCard) onRecordCard(cardKey(lessonId, false, w.hanzi), val === 'doubt' ? 'maybe' : 'no');
+    if (val === true) playMatchChime(); else if (val === false) playWrong();
     if (hasRealAudio(w.hanzi)) speak(w.hanzi);
     setShown({ val });
     setRound(r => ({ ...r, res: { ...r.res, [w.hanzi]: val } }));
@@ -4319,8 +4324,8 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   const next = () => {
     if (!round) return;
     if (round.i + 1 >= round.list.length) {
-      const res = round.res, okN = Object.values(res).filter(Boolean).length;
-      onFinish && onFinish(Math.round(okN / round.list.length * 100), round.list.filter(x => !res[x.hanzi]).map(x => ({ hanzi: x.hanzi, pinyin: x.pinyin, es: x.es })));
+      const res = round.res, okN = Object.values(res).filter(v => v === true).length;
+      onFinish && onFinish(Math.round(okN / round.list.length * 100), round.list.filter(x => res[x.hanzi] !== true).map(x => ({ hanzi: x.hanzi, pinyin: x.pinyin, es: x.es })));
       setRound(r => ({ ...r, done: true })); setShown(null); return;
     }
     setRound(r => ({ ...r, i: r.i + 1 })); setShown(null); setLeft(SECS * 1000);
@@ -4338,27 +4343,28 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   const head = html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'),
     html('h1', { className: 'fl-title' }, html('span', { className: 'fl-title-bolt' }, '⚡'), html('span', { className: 'fl-title-txt' }, 'Vocabulario Flash')));
   if (!round) {
-    const red = allWords.filter(x => known[x.hanzi] === false);
+    const red = allWords.filter(x => known[x.hanzi] === false || known[x.hanzi] === 'doubt');
     return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 40 } }, head,
       html('div', { className: 'fl-wrap' },
         html('div', { className: 'fl-intro' },
           html('div', { className: 'fl-bolt' }, '⚡'),
-          html('p', null, 'Las palabras pasan en orden aleatorio. ¿Sabés su significado en ', html('b', null, SECS + ' segundos'), '? Tocá ', html('b', null, '⚡ Lo sé'), ' o ', html('b', null, '✗ No lo sé'), ' y se va pintando tu mapa de la lección. Si se acaba el tiempo, cuenta como que no lo sabés.'),
+          html('p', null, 'Las palabras pasan en orden aleatorio. ¿Sabés su significado en ', html('b', null, SECS + ' segundos'), '? Tocá ', html('b', null, '⚡ Lo sé'), ', ', html('b', null, '🤔 Con dudas'), ' o ', html('b', null, '✗ No lo sé'), ' y se va pintando tu mapa de la lección. Si se acaba el tiempo, cuenta como que no lo sabés.'),
           html('div', { className: 'fl-switch on' }, '⏱ ' + SECS + ' segundos por palabra'),
           html('div', { className: 'fl-start' },
             html('button', { className: 'fl-btn gold', onClick: () => start(allWords) }, '⚡ Empezar · ' + allWords.length + ' palabras'),
-            red.length > 0 && html('button', { className: 'fl-btn dark', onClick: () => start(red) }, '✗ Solo las rojas · ' + red.length))),
+            red.length > 0 && html('button', { className: 'fl-btn dark', onClick: () => start(red) }, '✗ Solo las rojas y con dudas · ' + red.length))),
         html(VocabGrid, { words: allWords, known })));
   }
   if (round.done) {
-    const okN = Object.values(round.res).filter(Boolean).length, badList = round.list.filter(x => !round.res[x.hanzi]);
+    const okN = Object.values(round.res).filter(v => v === true).length, midN = Object.values(round.res).filter(v => v === 'doubt').length;
+    const badList = round.list.filter(x => round.res[x.hanzi] !== true);
     return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 40 } }, head,
       html('div', { className: 'fl-wrap' },
         html('div', { className: 'fl-result' },
-          html('div', { className: 'fl-score' }, html('span', { className: 'g' }, okN + ' ⚡'), html('span', { className: 'r' }, badList.length + ' ✗')),
-          html('div', { className: 'fl-result-t' }, badList.length === 0 ? '¡Todas! Sos un rayo ⚡' : okN >= badList.length ? '¡Muy bien! Repasá las rojas y vas a tenerlas todas.' : 'Buen comienzo: las rojas vuelven en tu Entrenamiento diario.'),
+          html('div', { className: 'fl-score' }, html('span', { className: 'g' }, okN + ' ⚡'), html('span', { className: 'm' }, midN + ' 🤔'), html('span', { className: 'r' }, (badList.length - midN) + ' ✗')),
+          html('div', { className: 'fl-result-t' }, badList.length === 0 ? '¡Todas! Sos un rayo ⚡' : okN >= badList.length ? '¡Muy bien! Repasá las rojas y vas a tenerlas todas.' : 'Buen comienzo: las rojas y las dudas vuelven en tu Entrenamiento diario.'),
           html('div', { className: 'fl-start' },
-            badList.length > 0 && html('button', { className: 'fl-btn gold', onClick: () => start(badList) }, '✗ Repasar las rojas · ' + badList.length),
+            badList.length > 0 && html('button', { className: 'fl-btn gold', onClick: () => start(badList) }, '✗ Repasar rojas y dudas · ' + badList.length),
             html('button', { className: 'fl-btn dark', onClick: () => start(allWords) }, '↻ Otra vuelta'),
             html('button', { className: 'fl-btn dark', onClick: onBack }, 'Volver'))),
         html(VocabGrid, { words: allWords, known })));
@@ -4367,15 +4373,16 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 20 } }, head,
     html('div', { className: 'fl-wrap' },
       html('div', { className: 'fl-progress' }, html('i', { style: { width: pct + '%' } }), html('span', null, (round.i + 1) + ' / ' + round.list.length)),
-      html('div', { key: w.hanzi, className: 'fl-card' + (shown ? (shown.val ? ' ok' : ' bad') : '') },
+      html('div', { key: w.hanzi, className: 'fl-card' + (shown ? (shown.val === true ? ' ok' : shown.val === 'doubt' ? ' mid' : ' bad') : '') },
         timer && !shown && html('div', { className: 'fl-timer' }, html('i', { style: { width: (left / (SECS * 1000) * 100) + '%' } })),
         html('div', { className: 'fl-h hanzi-font len' + Math.min([...w.hanzi].length, 4) }, w.hanzi),
         shown
           ? html('div', { className: 'fl-ans' }, html(TonedPinyin, { text: w.pinyin, className: 'fl-py' }), html('div', { className: 'fl-es' }, w.es))
           : html('div', { className: 'fl-q' }, '¿Sabés su significado en ' + SECS + ' segundos?')),
       html('div', { className: 'fl-btns' },
-        html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, '✗ No lo sé'),
-        html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, '⚡ Lo sé')),
+        html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, html('span', { className: 'fl-ic' }, '✗'), html('span', null, 'No lo sé')),
+        html('button', { className: 'fl-btn mid big', disabled: !!shown, onClick: () => answer('doubt') }, html('span', { className: 'fl-ic' }, '🤔'), html('span', null, 'Con dudas')),
+        html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, html('span', { className: 'fl-ic' }, '⚡'), html('span', null, 'Lo sé'))),
       html(VocabGrid, { words: round.list.length === allWords.length ? allWords : round.list, known, compact: true, locked: true })));
 }
 

@@ -4307,20 +4307,28 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   const [SECS, setSecs] = useState(5);
   useEffect(() => { db.from('npcr_app_config').select('value').eq('key', 'flash_segundos').maybeSingle().then(({ data }) => { const n = Number(data && data.value); if (n > 0) setSecs(n); }); }, []);
   const [round, setRound] = useState(null);        // { list, i, res: { hanzi: bool } }
-  const [shown, setShown] = useState(null);        // respuesta que se está mostrando
+  const [flipped, setFlipped] = useState(null);    // tarjeta dada vuelta: { timeout }
+  const [shown, setShown] = useState(null);        // calificación ya elegida: { val }
   const [left, setLeft] = useState(5000);
-  const start = (list) => { setRound({ list: shuffle(list), i: 0, res: {} }); setShown(null); setLeft(SECS * 1000); };
+  const start = (list) => { setRound({ list: shuffle(list), i: 0, res: {} }); setFlipped(null); setShown(null); setLeft(SECS * 1000); };
   const w = round && round.list[round.i];
-  const answer = (val) => {
-    if (!w || shown) return;
+  // 1) El alumno piensa el significado y da vuelta la tarjeta (pinyin + español + audio del libro)
+  const flip = (timeout) => {
+    if (!w || flipped) return;
+    setFlipped({ timeout: !!timeout });
+    if (hasRealAudio(w.hanzi)) speak(w.hanzi);
+    if (timeout) grade(false);
+  };
+  // 2) Recién viendo la respuesta se califica: lo sabía / con dudas / no lo sabía
+  const grade = (val) => {
     mark(w.hanzi, val);
     // Lo que no sabe o duda vuelve en el Entrenamiento diario (las dudas, más espaciadas)
     if (val !== true && onRecordCard) onRecordCard(cardKey(lessonId, false, w.hanzi), val === 'doubt' ? 'maybe' : 'no');
     if (val === true) playMatchChime(); else if (val === false) playWrong();
-    if (hasRealAudio(w.hanzi)) speak(w.hanzi);
     setShown({ val });
     setRound(r => ({ ...r, res: { ...r.res, [w.hanzi]: val } }));
   };
+  const answer = (val) => { if (!w || !flipped || shown) return; grade(val); };
   const next = () => {
     if (!round) return;
     if (round.i + 1 >= round.list.length) {
@@ -4328,16 +4336,25 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
       onFinish && onFinish(Math.round(okN / round.list.length * 100), round.list.filter(x => res[x.hanzi] !== true).map(x => ({ hanzi: x.hanzi, pinyin: x.pinyin, es: x.es })));
       setRound(r => ({ ...r, done: true })); setShown(null); return;
     }
-    setRound(r => ({ ...r, i: r.i + 1 })); setShown(null); setLeft(SECS * 1000);
+    setRound(r => ({ ...r, i: r.i + 1 })); setFlipped(null); setShown(null); setLeft(SECS * 1000);
   };
-  // Rayito: 5 segundos por palabra; si se acaba, cuenta como "no lo sabía"
+  // Reloj de N segundos para dar vuelta la tarjeta; si se acaba, gira sola y cuenta como "no lo sabía"
   useEffect(() => {
-    if (!timer || !round || round.done || shown) return;
-    if (left <= 0) { answer(false); return; }
+    if (!timer || !round || round.done || flipped) return;
+    if (left <= 0) { flip(true); return; }
     const t = setTimeout(() => setLeft(l => l - 100), 100); return () => clearTimeout(t);
-  }, [timer, left, round && round.i, shown, round && round.done]);
-  // Después de responder, la respuesta queda a la vista un momento y pasa sola
-  useEffect(() => { if (!shown) return; const t = setTimeout(next, 1400); return () => clearTimeout(t); }, [shown]);
+  }, [timer, left, round && round.i, flipped, round && round.done]);
+  // Calificada, pasa sola a la siguiente (si fue por tiempo, deja leer la respuesta un poco más)
+  useEffect(() => { if (!shown) return; const t = setTimeout(next, flipped && flipped.timeout ? 2200 : 650); return () => clearTimeout(t); }, [shown]);
+  // En la compu: espacio da vuelta; 1 / 2 / 3 = no lo sabía / con dudas / lo sabía
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!round || round.done) return;
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(false); }
+      else if (e.key === '1') answer(false); else if (e.key === '2') answer('doubt'); else if (e.key === '3') answer(true);
+    };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  });
   useEffect(() => stopAudio, []);
 
   const head = html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'),
@@ -4348,7 +4365,7 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
       html('div', { className: 'fl-wrap' },
         html('div', { className: 'fl-intro' },
           html('div', { className: 'fl-bolt' }, '⚡'),
-          html('p', null, 'Las palabras pasan en orden aleatorio. ¿Sabés su significado en ', html('b', null, SECS + ' segundos'), '? Tocá ', html('b', null, '⚡ Lo sé'), ', ', html('b', null, '🤔 Con dudas'), ' o ', html('b', null, '✗ No lo sé'), ' y se va pintando tu mapa de la lección. Si se acaba el tiempo, cuenta como que no lo sabés.'),
+          html('p', null, 'Las palabras pasan en orden aleatorio. Pensá su significado y ', html('b', null, 'dá vuelta la tarjeta'), ' antes de ', html('b', null, SECS + ' segundos'), '. Al ver la respuesta, marcá con sinceridad ', html('b', null, '⚡ Lo sabía'), ', ', html('b', null, '🤔 Con dudas'), ' o ', html('b', null, '✗ No lo sabía'), ' y se va pintando tu mapa de la lección. Si se acaba el tiempo, cuenta como que no lo sabías.'),
           html('div', { className: 'fl-switch on' }, '⏱ ' + SECS + ' segundos por palabra'),
           html('div', { className: 'fl-start' },
             html('button', { className: 'fl-btn gold', onClick: () => start(allWords) }, '⚡ Empezar · ' + allWords.length + ' palabras'),
@@ -4373,16 +4390,21 @@ function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard 
   return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 20 } }, head,
     html('div', { className: 'fl-wrap' },
       html('div', { className: 'fl-progress' }, html('i', { style: { width: pct + '%' } }), html('span', null, (round.i + 1) + ' / ' + round.list.length)),
-      html('div', { key: w.hanzi, className: 'fl-card' + (shown ? (shown.val === true ? ' ok' : shown.val === 'doubt' ? ' mid' : ' bad') : '') },
-        timer && !shown && html('div', { className: 'fl-timer' }, html('i', { style: { width: (left / (SECS * 1000) * 100) + '%' } })),
+      html('div', { key: w.hanzi + (flipped ? '-b' : '-f'), role: flipped ? undefined : 'button', tabIndex: flipped ? -1 : 0, onClick: () => flip(false),
+          className: 'fl-card' + (flipped ? ' back' : ' front') + (shown ? (shown.val === true ? ' ok' : shown.val === 'doubt' ? ' mid' : ' bad') : '') },
+        timer && !flipped && html('div', { className: 'fl-timer' }, html('i', { style: { width: (left / (SECS * 1000) * 100) + '%' } })),
         html('div', { className: 'fl-h hanzi-font len' + Math.min([...w.hanzi].length, 4) }, w.hanzi),
-        shown
-          ? html('div', { className: 'fl-ans' }, html(TonedPinyin, { text: w.pinyin, className: 'fl-py' }), html('div', { className: 'fl-es' }, w.es))
-          : html('div', { className: 'fl-q' }, '¿Sabés su significado en ' + SECS + ' segundos?')),
-      html('div', { className: 'fl-btns' },
-        html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, html('span', { className: 'fl-ic' }, '✗'), html('span', null, 'No lo sé')),
-        html('button', { className: 'fl-btn mid big', disabled: !!shown, onClick: () => answer('doubt') }, html('span', { className: 'fl-ic' }, '🤔'), html('span', null, 'Con dudas')),
-        html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, html('span', { className: 'fl-ic' }, '⚡'), html('span', null, 'Lo sé'))),
+        flipped
+          ? html('div', { className: 'fl-ans' }, html(TonedPinyin, { text: w.pinyin, className: 'fl-py' }), html('div', { className: 'fl-es' }, w.es),
+              flipped.timeout && html('div', { className: 'fl-late' }, '⏱ Se acabó el tiempo'))
+          : html('div', { className: 'fl-q' }, '¿Sabés su significado? Tocá para dar vuelta')),
+      flipped
+        ? html('div', { className: 'fl-btns' },
+            html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, html('span', { className: 'fl-ic' }, '✗'), html('span', null, 'No lo sabía')),
+            html('button', { className: 'fl-btn mid big', disabled: !!shown, onClick: () => answer('doubt') }, html('span', { className: 'fl-ic' }, '🤔'), html('span', null, 'Con dudas')),
+            html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, html('span', { className: 'fl-ic' }, '⚡'), html('span', null, 'Lo sabía')))
+        : html('div', { className: 'fl-btns' },
+            html('button', { className: 'fl-btn gold big', onClick: () => flip(false) }, html('span', { className: 'fl-ic' }, '↻'), html('span', null, 'Dar vuelta'))),
       html(VocabGrid, { words: round.list.length === allWords.length ? allWords : round.list, known, compact: true, locked: true })));
 }
 

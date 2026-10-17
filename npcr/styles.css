@@ -2213,3 +2213,10 @@ main.fl-main { max-width: 640px !important; }
   .fl-btn.big .fl-ic { font-size: 20px; }
   .fl-score { gap: 14px; font-size: 32px; }
 }
+
+/* ⚡ Flash: tarjeta que se da vuelta */
+.fl-card.front { cursor: pointer; }
+.fl-card.front:hover { box-shadow: 0 6px 0 var(--paper-deep), 0 0 0 3px rgba(226,174,47,.25); }
+.fl-card.back { animation: flFlip .35s ease; }
+@keyframes flFlip { from { transform: perspective(900px) rotateY(90deg); } to { transform: perspective(900px) rotateY(0); } }
+.fl-late { margin-top: 8px; font-size: 13px; font-weight: 800; color: var(--fl-bad); }

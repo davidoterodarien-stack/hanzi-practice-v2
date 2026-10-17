@@ -6098,20 +6098,7 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
 }
 
 // ── Pantalla del alumno: cartón, marcar y cantar bingo ──
-// Diseños del cartón: cada alumno elige el suyo (se recuerda en su dispositivo)
-const BINGO_THEMES = [
-  { id: 'laca', name: 'Laca roja', dot: '#C14028' },
-  { id: 'jade', name: 'Jade', dot: '#2E8B57' },
-  { id: 'porcelana', name: 'Porcelana', dot: '#1F4E9C' },
-  { id: 'farol', name: 'Farol dorado', dot: '#D99A1E' },
-  { id: 'tinta', name: 'Tinta china', dot: '#1D1D1F' },
-  { id: 'cerezo', name: 'Flor de ciruelo', dot: '#E0789A' },
-];
-const BINGO_THEME_KEY = 'npcr-bingo-theme';
-
 function BingoPlayer({ gameId, onBack }) {
-  const [theme, setThemeRaw] = useState(() => { try { return localStorage.getItem(BINGO_THEME_KEY) || 'laca'; } catch (e) { return 'laca'; } });
-  const setTheme = (t) => { setThemeRaw(t); try { localStorage.setItem(BINGO_THEME_KEY, t); } catch (e) {} };
   const [hint, setHint] = useState(null);           // { h, key } mientras se ve la pista
   const hintSeen = React.useRef(null);               // última pista ya mostrada (null = recién entró)
   const [hintSec, setHintSec] = useState(null);
@@ -6230,11 +6217,7 @@ function BingoPlayer({ gameId, onBack }) {
           game.mode !== 'numeros' && hasRealAudio(current.h) && html('button', { className: 'mini-btn', onClick: () => speak(current.h) }, '🔊'))
           : html('span', { className: 'bingo-sub' }, 'Todavía no salió ninguna ficha')),
       game.status === 'finished' && html('div', { className: 'bingo-banner' }, '🏁 La partida terminó · salieron ' + called.length + ' fichas' + (winners.length ? '' : ' · nadie cantó premios')),
-      html('div', { className: 'bingo-themes', role: 'radiogroup', 'aria-label': 'Diseño del cartón' },
-        html('span', null, '🎨'),
-        BINGO_THEMES.map(t => html('button', { key: t.id, type: 'button', title: t.name, 'aria-label': t.name, 'aria-checked': theme === t.id, role: 'radio',
-          className: 'bingo-theme-dot' + (theme === t.id ? ' on' : ''), style: { '--c': t.dot }, onClick: () => setTheme(t.id) }))),
-      html('div', { className: 'bingo-card theme-' + theme, style: { gridTemplateColumns: 'repeat(' + n + ', 1fr)' } },
+      html('div', { className: 'bingo-card', style: { gridTemplateColumns: 'repeat(' + n + ', 1fr)' } },
         cells.map((h, i) => html('button', { key: i, type: 'button', onClick: () => toggle(i),
           className: 'bingo-cell' + (marks.includes(i) ? ' marked' : '') + (n === 3 ? ' big' : '') },
           html('span', { className: 'hanzi-font len' + Math.min([...h].length, 4) }, h),

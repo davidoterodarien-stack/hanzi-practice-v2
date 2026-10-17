@@ -773,7 +773,7 @@ function StudentFile({ row, vocab, lessons, tasks, onBack }) {
 // Nombre legible de un tipo de práctica registrado en npcr_activity (kind/mode)
 function activityName(kind, mode) {
   const extra = { daily: 'Entrenamiento diario', 'refuerzo-clase': 'Refuerzo de clase', semana: 'Palabras de la semana', dificiles: 'Mis palabras difíciles',
-    escritura: 'Práctica de escritura', 'clase-orden': 'Clases · ordenar oraciones', 'clase-quiz': 'Clases · mis preguntas', 'clase-palabras': 'Clases · mis palabras', 'clase-trazos': 'Clases · trazos' };
+    escritura: 'Práctica de escritura', flash: 'Vocabulario Flash', 'clase-orden': 'Clases · ordenar oraciones', 'clase-quiz': 'Clases · mis preguntas', 'clase-palabras': 'Clases · mis palabras', 'clase-trazos': 'Clases · trazos' };
   if (kind === 'daily') return extra.daily;
   const found = [...PLAN_LESSON_MODES, ...PLAN_GAMES].find(x => x[0] === mode);
   return extra[mode] || (found && found[1]) || mode || kind;
@@ -4155,8 +4155,11 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
   const theme = LESSON_THEMES[lessonId] || { name: 'Lección ' + lessonId };
   const lp = progress.lessons[lessonId] || {};
   const hasWorkbook = false;
+  const [flashKnown] = useVocabFlash(lessonId);
+  const lessonWords = vocab[lessonId] || [];
 
   const modes = [
+    lessonWords.length >= 2 && { id: 'flash', emoji: '⚡', title: 'Vocabulario Flash', sub: 'Pasan todas las palabras: ¿lo sabías o no? Pintá tu mapa', cls: 'flash', best: lp.flash },
     { id: 'match', emoji: '🔗', title: 'Emparejar', sub: 'Une carácter, pinyin y significado', cls: 'match', best: lp.match },
     { id: 'cards', emoji: '🀄', title: 'Tarjetas', sub: srsSub(vocab[lessonId] || [], lessonId, false, cardState, 'Repasá carácter por carácter'), cls: 'cards', best: lp.cards },
     { id: 'quiz', emoji: '✅', title: 'Opción múltiple', sub: 'Elegí el significado correcto', cls: 'quiz', best: lp.quiz },
@@ -4179,7 +4182,7 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
             html('div', { className: 'mode-sub' }, 'Tabla interactiva con audio · toca para escuchar'),
           )
         ),
-        modes.map(m => html('button', { key: m.id, className: 'mode-card', onClick: () => onSelectMode(m.id) },
+        modes.filter(Boolean).map(m => html('button', { key: m.id, className: 'mode-card' + (m.id === 'flash' ? ' flash' : ''), onClick: () => onSelectMode(m.id) },
           html('div', { className: 'mode-emoji ' + m.cls }, m.emoji),
           html('div', { style: { flex: 1 } },
             html('div', { className: 'mode-title' }, m.title),
@@ -4192,6 +4195,7 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
           )
         ))
       ),
+      lessonWords.length > 0 && html('div', { style: { marginTop: 18 } }, html(VocabGrid, { words: lessonWords, known: flashKnown })),
       hasWorkbook && html(React.Fragment, null,
         html('h2', { className: 'section-title', style: { marginTop: 20 } }, '📘 Libro de Ejercicios'),
         html('div', { className: 'mode-list' },
@@ -4215,6 +4219,134 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
   );
 }
 
+// ═════════════════ ⚡ Vocabulario Flash + grilla de vocabulario de la lección ═════════════════
+// Qué palabras sabe el alumno (npcr_vocab_flash): verde = lo sabía, rojo = no lo sabía.
+// Si la tabla todavía no existe, se guarda en el dispositivo para no perder nada.
+function useVocabFlash(lessonId) {
+  const [known, setKnown] = useState({});
+  const [uid, setUid] = useState(null);
+  const lsKey = (u) => 'npcr-flash-' + (u || 'anon') + '-' + lessonId;
+  useEffect(() => {
+    let alive = true;
+    db.auth.getUser().then(({ data }) => {
+      const u = data && data.user ? data.user.id : null; if (!alive) return; setUid(u);
+      let local = {}; try { local = JSON.parse(localStorage.getItem(lsKey(u)) || '{}'); } catch (e) {}
+      setKnown(local);
+      if (!u) return;
+      db.from('npcr_vocab_flash').select('hanzi,known').eq('student_id', u).eq('lesson', lessonId).then(({ data: rows, error }) => {
+        if (error || !alive) return;
+        const m = {}; (rows || []).forEach(r => { m[r.hanzi] = r.known; }); setKnown(k => ({ ...k, ...m }));
+      });
+    });
+    return () => { alive = false; };
+  }, [lessonId]);
+  const mark = (hanzi, val) => {
+    setKnown(k => { const n = { ...k, [hanzi]: val }; try { localStorage.setItem(lsKey(uid), JSON.stringify(n)); } catch (e) {} return n; });
+    if (uid) db.from('npcr_vocab_flash').upsert({ student_id: uid, lesson: lessonId, hanzi, known: val, updated_at: new Date().toISOString() }).then(() => {});
+  };
+  return [known, mark];
+}
+
+// Grilla de la lección: tocar una palabra la da vuelta (pinyin + español) y suena el audio del libro
+function VocabGrid({ words, known, compact }) {
+  const [open, setOpen] = useState(null);
+  const n = words.length, ok = words.filter(w => known[w.hanzi] === true).length, bad = words.filter(w => known[w.hanzi] === false).length;
+  return html('div', { className: 'vg' + (compact ? ' compact' : '') },
+    !compact && html('div', { className: 'vg-head' },
+      html('span', { className: 'vg-title' }, '📋 Vocabulario de la lección'),
+      html('span', { className: 'vg-stats' }, html('b', { className: 'g' }, ok + ' ✓'), html('b', { className: 'r' }, bad + ' ✗'), html('b', null, (n - ok - bad) + ' sin ver'))),
+    html('div', { className: 'vg-grid' }, words.map(w => {
+      const st = known[w.hanzi], isOpen = open === w.hanzi;
+      return html('button', { key: w.hanzi, type: 'button', className: 'vg-tile' + (st === true ? ' ok' : st === false ? ' bad' : '') + (isOpen ? ' open' : ''),
+        onClick: () => { setOpen(isOpen ? null : w.hanzi); if (!isOpen && hasRealAudio(w.hanzi)) speak(w.hanzi); } },
+        isOpen
+          ? html('span', { className: 'vg-back' }, html(TonedPinyin, { text: w.pinyin, className: 'vg-py' }), html('span', { className: 'vg-es' }, w.es))
+          : html('span', { className: 'vg-h hanzi-font len' + Math.min([...w.hanzi].length, 4) }, w.hanzi));
+    })));
+}
+
+const FLASH_TIMER_KEY = 'npcr-flash-rayito';
+function VocabFlash({ words: allWords, lessonId, onBack, onFinish, onRecordCard }) {
+  const [known, mark] = useVocabFlash(lessonId);
+  const [timer, setTimerRaw] = useState(() => { try { return localStorage.getItem(FLASH_TIMER_KEY) === '1'; } catch (e) { return false; } });
+  const setTimer = (v) => { setTimerRaw(v); try { localStorage.setItem(FLASH_TIMER_KEY, v ? '1' : '0'); } catch (e) {} };
+  const [round, setRound] = useState(null);        // { list, i, res: { hanzi: bool } }
+  const [shown, setShown] = useState(null);        // respuesta que se está mostrando
+  const [left, setLeft] = useState(5000);
+  const SECS = 5;
+  const start = (list) => { setRound({ list: shuffle(list), i: 0, res: {} }); setShown(null); setLeft(SECS * 1000); };
+  const w = round && round.list[round.i];
+  const answer = (val) => {
+    if (!w || shown) return;
+    mark(w.hanzi, val);
+    if (!val && onRecordCard) onRecordCard(cardKey(lessonId, false, w.hanzi), 'no');   // vuelve en el Entrenamiento diario
+    if (val) playMatchChime(); else playWrong();
+    if (hasRealAudio(w.hanzi)) speak(w.hanzi);
+    setShown({ val });
+    setRound(r => ({ ...r, res: { ...r.res, [w.hanzi]: val } }));
+  };
+  const next = () => {
+    if (!round) return;
+    if (round.i + 1 >= round.list.length) {
+      const res = round.res, okN = Object.values(res).filter(Boolean).length;
+      onFinish && onFinish(Math.round(okN / round.list.length * 100), round.list.filter(x => !res[x.hanzi]).map(x => ({ hanzi: x.hanzi, pinyin: x.pinyin, es: x.es })));
+      setRound(r => ({ ...r, done: true })); setShown(null); return;
+    }
+    setRound(r => ({ ...r, i: r.i + 1 })); setShown(null); setLeft(SECS * 1000);
+  };
+  // Rayito: 5 segundos por palabra; si se acaba, cuenta como "no lo sabía"
+  useEffect(() => {
+    if (!timer || !round || round.done || shown) return;
+    if (left <= 0) { answer(false); return; }
+    const t = setTimeout(() => setLeft(l => l - 100), 100); return () => clearTimeout(t);
+  }, [timer, left, round && round.i, shown, round && round.done]);
+  // Después de responder, la respuesta queda a la vista un momento y pasa sola
+  useEffect(() => { if (!shown) return; const t = setTimeout(next, 1400); return () => clearTimeout(t); }, [shown]);
+  useEffect(() => stopAudio, []);
+
+  const head = html('div', { className: 'header-row' }, html('button', { className: 'back-btn', onClick: onBack }, '←'), html('h1', null, '⚡ Vocabulario Flash'));
+  if (!round) {
+    const red = allWords.filter(x => known[x.hanzi] === false);
+    return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 40 } }, head,
+      html('div', { className: 'fl-wrap' },
+        html('div', { className: 'fl-intro' },
+          html('div', { className: 'fl-bolt' }, '⚡'),
+          html('p', null, 'Las palabras pasan en orden aleatorio. Para cada una, ¿sabés qué significa? Tocá ', html('b', null, '⚡ Lo sabía'), ' o ', html('b', null, '✗ No lo sabía'), ' y se va pintando tu mapa de la lección.'),
+          html('label', { className: 'fl-switch' + (timer ? ' on' : '') }, html('input', { type: 'checkbox', checked: timer, onChange: e => setTimer(e.target.checked) }), '⏱ Rayito: ' + SECS + ' segundos por palabra'),
+          html('div', { className: 'fl-start' },
+            html('button', { className: 'fl-btn gold', onClick: () => start(allWords) }, '⚡ Empezar · ' + allWords.length + ' palabras'),
+            red.length > 0 && html('button', { className: 'fl-btn dark', onClick: () => start(red) }, '✗ Solo las rojas · ' + red.length))),
+        html(VocabGrid, { words: allWords, known })));
+  }
+  if (round.done) {
+    const okN = Object.values(round.res).filter(Boolean).length, badList = round.list.filter(x => !round.res[x.hanzi]);
+    return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 40 } }, head,
+      html('div', { className: 'fl-wrap' },
+        html('div', { className: 'fl-result' },
+          html('div', { className: 'fl-score' }, html('span', { className: 'g' }, okN + ' ⚡'), html('span', { className: 'r' }, badList.length + ' ✗')),
+          html('div', { className: 'fl-result-t' }, badList.length === 0 ? '¡Todas! Sos un rayo ⚡' : okN >= badList.length ? '¡Muy bien! Repasá las rojas y vas a tenerlas todas.' : 'Buen comienzo: las rojas vuelven en tu Entrenamiento diario.'),
+          html('div', { className: 'fl-start' },
+            badList.length > 0 && html('button', { className: 'fl-btn gold', onClick: () => start(badList) }, '✗ Repasar las rojas · ' + badList.length),
+            html('button', { className: 'fl-btn dark', onClick: () => start(allWords) }, '↻ Otra vuelta'),
+            html('button', { className: 'fl-btn dark', onClick: onBack }, 'Volver'))),
+        html(VocabGrid, { words: allWords, known })));
+  }
+  const pct = round.i / round.list.length * 100;
+  return html('main', { className: 'fl-main', style: { paddingTop: 18, paddingBottom: 20 } }, head,
+    html('div', { className: 'fl-wrap' },
+      html('div', { className: 'fl-progress' }, html('i', { style: { width: pct + '%' } }), html('span', null, (round.i + 1) + ' / ' + round.list.length)),
+      html('div', { key: w.hanzi, className: 'fl-card' + (shown ? (shown.val ? ' ok' : ' bad') : '') },
+        timer && !shown && html('div', { className: 'fl-timer' }, html('i', { style: { width: (left / (SECS * 1000) * 100) + '%' } })),
+        html('div', { className: 'fl-h hanzi-font len' + Math.min([...w.hanzi].length, 4) }, w.hanzi),
+        shown
+          ? html('div', { className: 'fl-ans' }, html(TonedPinyin, { text: w.pinyin, className: 'fl-py' }), html('div', { className: 'fl-es' }, w.es))
+          : html('div', { className: 'fl-q' }, '¿Qué significa?')),
+      html('div', { className: 'fl-btns' },
+        html('button', { className: 'fl-btn dark big', disabled: !!shown, onClick: () => answer(false) }, '✗ No lo sabía'),
+        html('button', { className: 'fl-btn gold big', disabled: !!shown, onClick: () => answer(true) }, '⚡ Lo sabía')),
+      html(VocabGrid, { words: round.list.length === allWords.length ? allWords : round.list, known, compact: true })));
+}
+
 // ----------------- Play screen router -----------------
 function PlayScreen({ vocab, sentences, lessonId, mode, cardState, onRecordCard, onBack, onHome, onFinish, nextAction, savedResult, onSaveResult, onClearResult }) {
   const words = vocab[lessonId];
@@ -4227,6 +4359,7 @@ function PlayScreen({ vocab, sentences, lessonId, mode, cardState, onRecordCard,
   if (mode === 'cards') return html(FlashcardGame, { words, lessonId, cardState, onRecordCard, onBack, onHome, onFinish, nextAction, ...fresh });
   if (mode === 'quiz') return html(QuizGame, { words, lessonId, onBack, onHome, onFinish, nextAction, ...extra });
   if (mode === 'memoria') return html(MemoryGame, { words, lessonId, onBack, onHome, onFinish });
+  if (mode === 'flash') return html(VocabFlash, { words: words || [], lessonId, onBack, onFinish, onRecordCard });
   return null;
 }
 

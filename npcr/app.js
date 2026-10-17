@@ -4155,18 +4155,18 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
   const theme = LESSON_THEMES[lessonId] || { name: 'Lección ' + lessonId };
   const lp = progress.lessons[lessonId] || {};
   const hasWorkbook = false;
-  const [flashKnown] = useVocabFlash(lessonId);
   const lessonWords = vocab[lessonId] || [];
 
   const modes = [
-    lessonWords.length >= 2 && { id: 'flash', emoji: '⚡', title: 'Vocabulario Flash', sub: 'Pasan todas las palabras: ¿lo sabías o no? Pintá tu mapa', cls: 'flash', best: lp.flash },
     { id: 'match', emoji: '🔗', title: 'Emparejar', sub: 'Une carácter, pinyin y significado', cls: 'match', best: lp.match },
     { id: 'cards', emoji: '🀄', title: 'Tarjetas', sub: srsSub(vocab[lessonId] || [], lessonId, false, cardState, 'Repasá carácter por carácter'), cls: 'cards', best: lp.cards },
     { id: 'quiz', emoji: '✅', title: 'Opción múltiple', sub: 'Elegí el significado correcto', cls: 'quiz', best: lp.quiz },
   ];
   if ((vocab[lessonId] || []).length >= 4) modes.push({ id: 'memoria', emoji: '🃏', title: 'Memoria', sub: 'Encontrá las parejas: hanzi y su significado', cls: 'match', best: lp.memoria });
   const sentenceCount = ((sentences || {})[lessonId] || []).length;
+  const flashMode = lessonWords.length >= 2 && { id: 'flash', emoji: '⚡', title: 'Vocabulario Flash', sub: 'Todo el vocabulario de la lección: tocá para escuchar y jugá a ver cuánto sabés', cls: 'flash', best: lp.flash };
   if (sentenceCount) modes.push({ id: 'frases', emoji: '💬', title: 'Frases clave', sub: srsSub(sentences[lessonId], lessonId, true, cardState, sentenceCount + ' frases del libro con audio'), cls: 'cards', best: lp.frases });
+  if (flashMode) modes.push(flashMode);   // va al final de la lista
 
   return html(React.Fragment, null,
     html('main', { style: { paddingTop: '18px' } },
@@ -4202,7 +4202,6 @@ function LessonMenu({ vocab, sentences, lessonId, progress, cardState, onBack, o
           )
         ))
       ),
-      lessonWords.length > 0 && html('div', { style: { marginTop: 18 } }, html(VocabGrid, { words: lessonWords, known: flashKnown })),
       hasWorkbook && html(React.Fragment, null,
         html('h2', { className: 'section-title', style: { marginTop: 20 } }, '📘 Libro de Ejercicios'),
         html('div', { className: 'mode-list' },

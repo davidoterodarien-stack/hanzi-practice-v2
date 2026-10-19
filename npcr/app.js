@@ -2336,7 +2336,9 @@ function BrandAnimText({ frames, intervalSec }) {
 
 // ----------------- App -----------------
 function App() {
-  const [vocab, setVocab] = useState(loadVocab);
+  const [rawVocab, setVocab] = useState(loadVocab);
+  // Para el alumno, sin palabras repetidas entre lecciones; la consola recibe rawVocab tal cual está en la base
+  const vocab = useMemo(() => uniqueVocab(rawVocab), [rawVocab]);
   const [sentences, setSentences] = useState({});
   const [progress, setProgress] = useState(loadProgress);
   const [screen, setScreen] = useState({ name: 'home' });
@@ -2889,7 +2891,7 @@ function App() {
     });
   } else if (screen.name === 'admin') {
     content = html(AdminPanel, {
-      vocab,
+      vocab: rawVocab,
       appConfig,
       onAppConfigChange: (key, value) => setAppConfig(prev => ({ ...prev, [key]: value })),
       onBack: () => setScreen({ name: 'home' }),
@@ -7001,6 +7003,25 @@ function supabaseRowsToVocab(rows) {
     vocab[r.lesson].push({ hanzi: nfc(r.hanzi), pinyin: nfc(r.pinyin), es: nfc(r.es) });
   });
   return vocab;
+}
+
+// Lo que ve el alumno: cada palabra una sola vez, en la primera lección donde aparece.
+// Si el libro la vuelve a presentar con otro significado (要 "querer" L2 / "tener que" L12),
+// el significado se suma a la primera. La base no se toca: la consola sigue viendo todo.
+// Los módulos que no son lecciones (países, números) quedan como están.
+function uniqueVocab(vocab) {
+  const out = {}, first = {};
+  Object.keys(vocab).sort(lessonCompare).forEach(l => {
+    if (isNaN(parseFloat(l))) { out[l] = vocab[l]; return; }
+    out[l] = [];
+    (vocab[l] || []).forEach(w => {
+      const prev = first[w.hanzi];
+      if (!prev) { first[w.hanzi] = { ...w }; out[l].push(first[w.hanzi]); return; }
+      if (!w.es || prev.es.includes(w.es)) return;
+      prev.es = w.es.includes(prev.es) ? w.es : prev.es + '; ' + w.es;
+    });
+  });
+  return out;
 }
 
 function ModuleQuestionsEditor({ modId }) {

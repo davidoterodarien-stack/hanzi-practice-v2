@@ -1864,6 +1864,40 @@ const QUIZ_COLORS = [
   { bg: '#E21B3C', shape: '▲' }, { bg: '#1368CE', shape: '◆' }, { bg: '#D89E00', shape: '●' }, { bg: '#26890C', shape: '■' }];
 const QUIZ_TIMES = [10, 20, 30, 60];
 
+// Texto que se ajusta a su cuadro: arranca en `max` px y achica lo justo para entrar entero
+// (una palabra o una oración larga, en cualquier pantalla). El cuadro tiene que tener tamaño
+// propio por CSS (.fit-text); se recalcula si cambia el tamaño o se gira el celular.
+function FitText({ text, className, max = 56, min = 14 }) {
+  const ref = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Se mide el texto real (no scrollHeight, que suma el interlineado) con 2 px de margen
+    const fits = () => { const t = el.firstChild; return t.offsetHeight <= el.clientHeight - 2 && t.scrollWidth <= el.clientWidth; };
+    const fit = () => {
+      if (!el.clientHeight || !el.clientWidth) return;
+      el.style.fontSize = max + 'px';
+      if (fits()) return;
+      let lo = min, hi = max;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; el.style.fontSize = mid + 'px'; if (fits()) lo = mid; else hi = mid; }
+      el.style.fontSize = lo + 'px';
+    };
+    fit();
+    // Se reajusta si cambia el cuadro: al cargar una foto (el evento "load" no burbujea, por eso se
+    // escucha en captura), al girar o redimensionar la pantalla, al cargar la fuente y por ResizeObserver
+    let w = el.clientWidth, h = el.clientHeight;
+    const refit = () => { if (el.clientWidth === w && el.clientHeight === h) return; w = el.clientWidth; h = el.clientHeight; fit(); };
+    const ro = typeof ResizeObserver !== 'undefined' && new ResizeObserver(refit);
+    if (ro) ro.observe(el);
+    const later = () => setTimeout(refit, 0);
+    document.addEventListener('load', later, true);
+    window.addEventListener('resize', later);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    return () => { if (ro) ro.disconnect(); document.removeEventListener('load', later, true); window.removeEventListener('resize', later); };
+  }, [text, max, min]);
+  return html('span', { ref, className: 'fit-text ' + (className || '') }, html('span', { className: 'fit-text-in' }, text));
+}
+
 // Sonidos del quiz (sintetizados, sin voces): se apagan con el mismo 🔔 de la app
 function qTone(freq, start, dur, vol, type) {
   if (!_soundOn) return;
@@ -2145,7 +2179,7 @@ function QuizHostGame({ gameId, onClose }) {
     const max = isRv ? Math.max(1, ...rv.counts) : 1;
     return html('div', { className: 'quiz-host' }, top,
       html('div', { key: 'q' + st.q_index, className: 'quiz-q-card' },
-        html('div', { className: 'quiz-q-text hanzi-font' }, cur ? cur.q : ''),
+        html('div', { className: 'quiz-q-text' }, html(FitText, { text: cur ? cur.q : '', className: 'hanzi-font', max: 56 })),
         html('div', { className: 'quiz-q-mid' },
           !isRv && html(QuizTimer, { left: ms, total: cur.time, big: true }),
           cur && cur.img ? html('img', { className: 'quiz-q-img', src: cur.img, alt: '' }) : html('div', { className: 'quiz-q-noimg' }),
@@ -2157,7 +2191,7 @@ function QuizHostGame({ gameId, onClose }) {
         html('span', { className: 'quiz-bar-s' }, QUIZ_COLORS[i].shape, i === rv.correct ? ' ✓' : '')))),
       html('div', { className: 'quiz-opts host' }, (cur ? cur.options : []).map((o, i) => html('div', { key: i,
         className: 'quiz-opt' + (isRv ? (i === rv.correct ? ' ok' : ' dim') : ''), style: { '--c': QUIZ_COLORS[i].bg } },
-        html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html('span', { className: 'quiz-opt-t hanzi-font' }, o), isRv && i === rv.correct && html('span', { className: 'quiz-ok-mark' }, '✓')))),
+        html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html(FitText, { text: o, className: 'quiz-opt-t hanzi-font', max: 44 }), isRv && i === rv.correct && html('span', { className: 'quiz-ok-mark' }, '✓')))),
       html('div', { className: 'quiz-host-nav' },
         !isRv ? html('button', { className: 'quiz-big-btn alt', disabled: busy, onClick: () => { revealed.current = st.q_index; call('npcr_quiz_reveal'); } }, 'Mostrar respuesta')
         : html('button', { className: 'quiz-big-btn', onClick: () => setBoard(true) }, '🏆 Ver ranking')));
@@ -2263,10 +2297,10 @@ function QuizPlayerGame({ gameId, onBack }) {
         html('b', null, '¡Respuesta enviada!'), html('span', null, 'Esperá a que se termine el tiempo…')));
     return html('main', { className: wrapCls }, head,
       html('div', { className: 'quiz-p-bar' }, html('i', { style: { width: (cur.time ? ms / (cur.time * 1000) * 100 : 0) + '%' } })),
-      html('div', { className: 'quiz-p-q hanzi-font' }, cur.q),
+      html('div', { className: 'quiz-p-q' }, html(FitText, { text: cur.q, className: 'hanzi-font', max: 44 })),
       cur.img && html('img', { className: 'quiz-p-img', src: cur.img, alt: '' }),
       html('div', { className: 'quiz-opts' + (cur.options.length <= 2 ? ' two' : '') }, cur.options.map((o, i) => html('button', { key: i, className: 'quiz-opt btn', style: { '--c': QUIZ_COLORS[i].bg }, onClick: () => answer(i) },
-        html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html('span', { className: 'quiz-opt-t hanzi-font' }, o)))));
+        html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html(FitText, { text: o, className: 'quiz-opt-t hanzi-font', max: 64 })))));
   }
 
   if (st.status === 'reveal') {

@@ -2359,3 +2359,20 @@ main.quiz-p { position: fixed; inset: 0; z-index: 60; width: auto; max-width: no
   .medal-list.in-table { margin-left: 0; }
 }
 .medal-row-main b, .medal-row-main small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
+/* Cuadrito "🏅 Medallas" del inicio y su ventana */
+.score-chip.medal-chip { cursor: pointer; font-family: inherit; text-align: left; transition: transform .12s, border-color .2s; }
+.score-chip.medal-chip:hover { border-color: #F3D27A; background: #FFFBEF; transform: translateY(-1px); }
+.score-chip.medal-chip:active { transform: translateY(1px); }
+.medal-chip-ico { font-size: .85em; margin-right: 4px; }
+.medal-modal-ov { position: fixed; inset: 0; z-index: 9000; background: rgba(20, 12, 4, .45); display: flex; align-items: center; justify-content: center; padding: 16px; animation: quizIn .2s ease; }
+.medal-modal { position: relative; width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; border-radius: 20px; }
+.medal-modal .medal-card { margin: 0; }
+.medal-modal-x { position: absolute; top: 10px; right: 10px; z-index: 1; width: 32px; height: 32px; border-radius: 50%; border: none; background: #fff; color: var(--ink); font-weight: 900; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.medal-modal .medal-card-head { padding-right: 36px; }
+@media (max-width: 420px) {
+  .score-strip { gap: 6px; }
+  .score-chip { padding: 8px 9px; min-width: 0; }
+  .score-chip .num { font-size: 18px; }
+  .score-chip .lbl { font-size: 9.5px; letter-spacing: .03em; }
+}
+.medal-row.off { opacity: .6; }

@@ -4059,6 +4059,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
           html('div', { className: 'num' }, totalStars + '/' + (regularCount * 3)),
           html('div', { className: 'lbl' }, 'estrellas')
         ),
+        html(MedalChip),
       ),
 
       html(PanelLectura, { playerName }),
@@ -6602,8 +6603,31 @@ function MedalRow({ m, showAula }) {
 // Alumno (Mi aula): sus medallas de todas sus aulas
 function MyMedals() {
   const list = useRpcList('npcr_my_medals');
+  return list ? html(MedalsPanel, { list }) : null;
+}
+
+// Cuadrito "🏅 Medallas" del inicio: total de medallas; al tocarlo se abre el detalle
+function MedalChip() {
+  const list = useRpcList('npcr_my_medals');
   const [open, setOpen] = useState(false);
-  if (!list) return null;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+  if (list === false) return null;   // la base todavía no tiene el medallero
+  return html(React.Fragment, null,
+    html('button', { type: 'button', className: 'score-chip medal-chip', onClick: () => setOpen(true), title: 'Ver mis medallas' },
+      html('div', { className: 'num' }, html('span', { className: 'medal-chip-ico' }, '🏅'), list ? list.length : '…'),
+      html('div', { className: 'lbl' }, 'medallas')),
+    open && html('div', { className: 'medal-modal-ov', onClick: () => setOpen(false) },
+      html('div', { className: 'medal-modal', role: 'dialog', 'aria-modal': true, onClick: e => e.stopPropagation() },
+        html('button', { className: 'medal-modal-x', onClick: () => setOpen(false), 'aria-label': 'Cerrar' }, '✕'),
+        list ? html(MedalsPanel, { list, startOpen: true }) : html('p', { className: 'admin-note' }, 'Cargando…'))));
+}
+
+function MedalsPanel({ list, startOpen }) {
+  const [open, setOpen] = useState(!!startOpen);
   const n = (p) => list.filter(m => m.puesto === p).length;
   return html('div', { className: 'medal-card' },
     html('div', { className: 'medal-card-head' },
@@ -6647,18 +6671,21 @@ function QuizHistory({ classId, refreshKey }) {
     list.length === 0
       ? html('p', { className: 'admin-note', style: { margin: 0 } }, 'Todavía no se jugó ninguna partida en esta aula.')
       : list.map(g => {
-          const isOpen = open === g.id, win = (g.podio || [])[0];
+          const isOpen = open === g.id, rk = g.ranking || [];
+          // La base dice qué medalla le tocó a cada uno (el equipo docente y las cuentas de prueba no compiten)
+          const gold = rk.find(p => p.medalla === 1);
+          const compiten = g.compiten != null ? g.compiten : g.jugadores;
           return html('div', { key: g.id, className: 'bingo-hist' + (isOpen ? ' open' : '') },
             html('button', { className: 'bingo-hist-head', onClick: () => setOpen(isOpen ? null : g.id) },
               html('span', { className: 'bingo-hist-date' }, medalWhen(g.fecha)),
               html('span', { className: 'bingo-hist-meta hanzi-font' }, g.titulo + ' · ' + g.preguntas + ' preguntas · ' + g.jugadores + (g.jugadores === 1 ? ' jugador' : ' jugadores')),
-              html('span', { className: 'bingo-hist-win' }, !win || !(win.puntos > 0) ? 'Sin puntos' : g.jugadores < 2 ? 'Jugó solo: ' + win.nombre : '🥇 ' + win.nombre + ' · ' + win.puntos + ' pts'),
+              html('span', { className: 'bingo-hist-win' }, gold ? '🥇 ' + gold.nombre + ' · ' + gold.puntos + ' pts' : compiten < 2 ? 'Sin medallas' : 'Sin puntos'),
               html('span', { className: 'bingo-hist-arrow' }, isOpen ? '▲' : '▼')),
             isOpen && html('div', { className: 'bingo-hist-body' },
-              g.jugadores < 2 && html('div', { className: 'bingo-sub' }, 'Jugó una sola persona: esta partida no reparte medallas.'),
-              html('div', { className: 'medal-list' }, (g.ranking || []).map((p, k) => html('div', { key: k, className: 'medal-row' },
-                html('span', { className: 'medal-ico' }, g.jugadores >= 2 && k < 3 && p.puntos > 0 ? MEDALS[k] : (k + 1) + '.'),
-                html('span', { className: 'medal-row-main' }, html('b', null, p.nombre)),
+              compiten < 2 && html('div', { className: 'bingo-sub' }, 'Compitieron menos de 2 alumnos: esta partida no reparte medallas.'),
+              html('div', { className: 'medal-list' }, rk.map((p, k) => html('div', { key: k, className: 'medal-row' + (p.compite === false ? ' off' : '') },
+                html('span', { className: 'medal-ico' }, p.medalla ? MEDALS[p.medalla - 1] : (k + 1) + '.'),
+                html('span', { className: 'medal-row-main' }, html('b', null, p.nombre), p.compite === false && html('small', null, 'equipo docente o cuenta de prueba: no compite')),
                 html('span', { className: 'medal-row-pts' }, p.puntos + ' pts'))))));
         }));
 }

@@ -2115,6 +2115,63 @@ function QuizEditor({ edit, setEdit, onSave, onCancel, msg, flash }) {
 }
 
 // Pantalla para proyectar
+// Lista del lǎoshī: conectados, puntos y respuestas por alumno (npcr_quiz_presencia.sql).
+// Si la función todavía no existe en la base, los paneles simplemente no aparecen.
+function useQuizRoster(gameId, active) {
+  const [roster, setRoster] = useState(null);
+  useEffect(() => {
+    if (!gameId || !active) return;
+    let alive = true;
+    const load = () => db.rpc('npcr_quiz_roster', { p_game: gameId }).then(({ data, error }) => { if (alive) setRoster(error ? null : (data || [])); });
+    load(); const t = setInterval(load, 2000);
+    return () => { alive = false; clearInterval(t); };
+  }, [gameId, active]);
+  return roster;
+}
+const quizAgo = (s) => s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : 'hace un rato';
+
+function QuizSidePlayers({ roster }) {
+  const on = roster.filter(p => p.online).length;
+  return html('aside', { className: 'quiz-side' },
+    html('div', { className: 'quiz-side-h' }, '👥 Jugadores', html('span', { className: 'quiz-side-n' }, on + ' de ' + roster.length + ' conectados')),
+    roster.length === 0 ? html('div', { className: 'quiz-side-empty' }, 'Todavía no entró nadie.')
+      : html('div', { className: 'quiz-side-list' }, roster.map(p => html('div', { key: p.k, className: 'quiz-side-row' + (p.online ? '' : ' away') },
+        html('span', { className: 'quiz-dot' + (p.online ? '' : ' off'), title: p.online ? 'Conectado' : 'Desconectado' }),
+        html('span', { className: 'quiz-side-name' }, p.name, !p.online && html('small', null, 'salió ' + quizAgo(p.away || 0))),
+        html('span', { className: 'quiz-side-pts' }, p.score)))));
+}
+
+function QuizSideAnswers({ roster, st }) {
+  const cur = st.current;
+  if (st.status === 'lobby') return html('aside', { className: 'quiz-side' },
+    html('div', { className: 'quiz-side-h' }, '🎮 Cómo se juega'),
+    html('ol', { className: 'quiz-side-how' },
+      html('li', null, 'Entrá desde ', html('b', null, 'Mi aula → ⚡ Quiz en vivo'), '.'),
+      html('li', null, 'Mirá la pregunta en la pantalla y elegí en tu celular el color correcto.'),
+      html('li', null, 'Acertar suma ', html('b', null, '500'), ' y la rapidez hasta ', html('b', null, '500'), ' más.'),
+      html('li', null, 'Cada acierto seguido suma ', html('b', null, '+100'), ' de racha.')));
+  if (st.status === 'end' || !cur) return html('aside', { className: 'quiz-side' },
+    html('div', { className: 'quiz-side-h' }, '🎯 Aciertos'),
+    html('div', { className: 'quiz-side-list' }, roster.map(p => html('div', { key: p.k, className: 'quiz-side-row' },
+      html('span', { className: 'quiz-side-name' }, p.name),
+      html('span', { className: 'quiz-side-pts' }, (p.hits || 0) + ' / ' + st.q_count)))));
+  const open = st.status === 'reveal';
+  const done = roster.filter(p => p.answered).sort((a, b) => a.ms - b.ms), wait = roster.filter(p => !p.answered && p.online);
+  return html('aside', { className: 'quiz-side' },
+    html('div', { className: 'quiz-side-h' }, '📝 Respuestas', html('span', { className: 'quiz-side-n' }, done.length + ' de ' + roster.length)),
+    !open && html('div', { className: 'quiz-side-note' }, 'Qué eligió cada uno se ve al mostrar la respuesta.'),
+    html('div', { className: 'quiz-side-list' },
+      done.map(p => html('div', { key: p.k, className: 'quiz-side-row' + (open ? (p.correct ? ' good' : ' bad') : '') },
+        open && p.choice != null
+          ? html('span', { className: 'quiz-chip', style: { '--c': QUIZ_COLORS[p.choice].bg } }, QUIZ_COLORS[p.choice].shape)
+          : html('span', { className: 'quiz-chip done' }, '✓'),
+        html('span', { className: 'quiz-side-name' }, p.name, html('small', null, (p.ms / 1000).toFixed(1) + ' s')),
+        open && html('span', { className: 'quiz-side-pts' + (p.correct ? '' : ' zero') }, p.correct ? '+' + p.points : '✗'))),
+      wait.map(p => html('div', { key: p.k, className: 'quiz-side-row waiting' },
+        html('span', { className: 'quiz-chip wait' }, open ? '–' : '…'),
+        html('span', { className: 'quiz-side-name' }, p.name, html('small', null, open ? 'sin responder' : 'pensando…'))))));
+}
+
 function QuizHostGame({ gameId, onClose }) {
   const { st, err, refresh, left } = useQuizState(gameId, 1000);
   const [board, setBoard] = useState(false);
@@ -2126,6 +2183,14 @@ function QuizHostGame({ gameId, onClose }) {
   const live = st && st.status === 'question';
   useTicker(live, 200);
   const ms = left();
+  const roster = useQuizRoster(gameId, !!st);
+  // Pantalla grande (como el Bingo): pantalla completa con los paneles incluidos
+  const stageRef = React.useRef(null);
+  const [fs, setFs] = useState(false);
+  useEffect(() => { const on = () => setFs(!!stageRef.current && document.fullscreenElement === stageRef.current); document.addEventListener('fullscreenchange', on); return () => document.removeEventListener('fullscreenchange', on); }, []);
+  const toggleFs = () => { const el = stageRef.current; if (!el) return; if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); };
+  const stage = (inner) => html('div', { ref: stageRef, className: 'quiz-stage' + (roster ? ' with-sides' : '') + (fs ? ' fs' : '') },
+    roster && html(QuizSidePlayers, { roster }), inner, roster && html(QuizSideAnswers, { roster, st }));
   const call = async (fn) => { setBusy(true); const { error } = await db.rpc(fn, { p_game: gameId }); setBusy(false); if (error) appAlert({ icon: '❌', title: 'No se pudo', text: error.message }); refresh(); };
 
   // Sonidos y pasos automáticos
@@ -2163,21 +2228,22 @@ function QuizHostGame({ gameId, onClose }) {
     html('b', { style: { flex: 1, minWidth: 0 } }, '⚡ ' + st.title),
     st.q_index >= 0 && st.status !== 'end' && html('span', { className: 'quiz-pill' }, 'Pregunta ' + (st.q_index + 1) + ' de ' + st.q_count),
     html(SoundToggle, null),
+    document.fullscreenEnabled && html('button', { className: 'mini-btn', onClick: toggleFs }, fs ? '✕ Salir de pantalla grande' : '⛶ Pantalla grande'),
     st.status !== 'end' && html('button', { className: 'mini-btn danger', onClick: async () => (await appConfirm('¿Terminar el quiz ahora?')) && call('npcr_quiz_end') }, '⏹ Terminar'),
     st.status === 'end' && html('button', { className: 'mini-btn', onClick: onClose }, '← Cuestionarios'));
 
-  if (st.status === 'lobby') return html('div', { className: 'quiz-host' }, top,
+  if (st.status === 'lobby') return stage(html('div', { className: 'quiz-host' }, top,
     html('div', { className: 'quiz-lobby' },
       html('div', { className: 'quiz-lobby-title' }, st.title),
       html('div', { className: 'quiz-lobby-how' }, '📱 Entrá desde ', html('b', null, 'Mi aula → ⚡ Quiz en vivo')),
       html('div', { className: 'quiz-lobby-count' }, html('b', null, st.players), st.players === 1 ? ' jugador' : ' jugadores'),
       html('div', { className: 'quiz-names' }, (st.names || []).map((n, i) => html('span', { key: n + i, className: 'quiz-name', style: { '--c': QUIZ_COLORS[i % 4].bg } }, n))),
-      html('button', { className: 'quiz-big-btn', disabled: busy || !st.players, onClick: () => call('npcr_quiz_next') }, st.players ? '▶ Empezar' : 'Esperando jugadores…')));
+      html('button', { className: 'quiz-big-btn', disabled: busy || !st.players, onClick: () => call('npcr_quiz_next') }, st.players ? '▶ Empezar' : 'Esperando jugadores…'))));
 
   if (st.status === 'question' || (st.status === 'reveal' && !board)) {
     const isRv = st.status === 'reveal';
     const max = isRv ? Math.max(1, ...rv.counts) : 1;
-    return html('div', { className: 'quiz-host' }, top,
+    return stage(html('div', { className: 'quiz-host' }, top,
       html('div', { key: 'q' + st.q_index, className: 'quiz-q-card' },
         html('div', { className: 'quiz-q-text' }, html(FitText, { text: cur ? cur.q : '', className: 'hanzi-font', max: 56 })),
         html('div', { className: 'quiz-q-mid' },
@@ -2194,13 +2260,13 @@ function QuizHostGame({ gameId, onClose }) {
         html('span', { className: 'quiz-shape' }, QUIZ_COLORS[i].shape), html(FitText, { text: o, className: 'quiz-opt-t hanzi-font', max: 44 }), isRv && i === rv.correct && html('span', { className: 'quiz-ok-mark' }, '✓')))),
       html('div', { className: 'quiz-host-nav' },
         !isRv ? html('button', { className: 'quiz-big-btn alt', disabled: busy, onClick: () => { revealed.current = st.q_index; call('npcr_quiz_reveal'); } }, 'Mostrar respuesta')
-        : html('button', { className: 'quiz-big-btn', onClick: () => setBoard(true) }, '🏆 Ver ranking')));
+        : html('button', { className: 'quiz-big-btn', onClick: () => setBoard(true) }, '🏆 Ver ranking'))));
   }
 
   if (st.status === 'reveal' && board) {
     const b = (st.board || []).slice(0, 5);
     const last = st.q_index + 1 >= st.q_count;
-    return html('div', { className: 'quiz-host' }, top,
+    return stage(html('div', { className: 'quiz-host' }, top,
       html('div', { className: 'quiz-board-title' }, '🏆 Ranking'),
       html('div', { className: 'quiz-board' }, b.map((p, i) => html('div', { key: p.name, className: 'quiz-board-row', style: { '--i': i } },
         html('span', { className: 'quiz-board-pos' }, i + 1),
@@ -2208,20 +2274,20 @@ function QuizHostGame({ gameId, onClose }) {
         p.gain > 0 && html('span', { className: 'quiz-gain' }, '+' + p.gain),
         html('span', { className: 'quiz-board-score' }, p.score)))),
       html('div', { className: 'quiz-host-nav' },
-        html('button', { className: 'quiz-big-btn', disabled: busy, onClick: () => call('npcr_quiz_next') }, last ? '🏁 Ver podio' : 'Siguiente pregunta ▶')));
+        html('button', { className: 'quiz-big-btn', disabled: busy, onClick: () => call('npcr_quiz_next') }, last ? '🏁 Ver podio' : 'Siguiente pregunta ▶'))));
   }
 
   // Podio final
   const b = st.board || [];
   const pod = [b[1], b[0], b[2]];
-  return html('div', { className: 'quiz-host' }, top, html(QuizConfetti),
+  return stage(html('div', { className: 'quiz-host' }, top, html(QuizConfetti),
     html('div', { className: 'quiz-board-title' }, '🎉 ¡Terminó el quiz!'),
     html('div', { className: 'quiz-podium' }, pod.map((p, i) => p ? html('div', { key: i, className: 'quiz-pod p' + [2, 1, 3][i], style: { '--d': [0.6, 1.2, 0][i] + 's' } },
       html('div', { className: 'quiz-pod-name' }, p.name), html('div', { className: 'quiz-pod-score' }, p.score + ' pts'),
       html('div', { className: 'quiz-pod-block' }, ['🥈', '🥇', '🥉'][i])) : html('div', { key: i }))),
     b.length > 3 && html('div', { className: 'quiz-board small' }, b.slice(3).map((p, i) => html('div', { key: p.name, className: 'quiz-board-row' },
       html('span', { className: 'quiz-board-pos' }, i + 4), html('span', { className: 'quiz-board-name' }, p.name), html('span', { className: 'quiz-board-score' }, p.score)))),
-    html('div', { className: 'quiz-host-nav' }, html('button', { className: 'quiz-big-btn', onClick: onClose }, 'Listo')));
+    html('div', { className: 'quiz-host-nav' }, html('button', { className: 'quiz-big-btn', onClick: onClose }, 'Listo'))));
 }
 
 // ── Alumno: responde desde el celular ──
@@ -2251,6 +2317,15 @@ function QuizPlayer({ classId, onBack }) {
 
 function QuizPlayerGame({ gameId, onBack }) {
   const { st, err, refresh, left } = useQuizState(gameId, 1200);
+  // "Sigo acá" cada 8 s para la lista de conectados del lǎoshī; "me fui" al salir o cerrar
+  useEffect(() => {
+    const ping = (leaving) => db.rpc('npcr_quiz_ping', { p_game: gameId, p_leaving: !!leaving }).then(() => {}, () => {});
+    ping(false);
+    const t = setInterval(() => ping(false), 8000);
+    const bye = () => ping(true);
+    window.addEventListener('pagehide', bye);
+    return () => { clearInterval(t); window.removeEventListener('pagehide', bye); ping(true); };
+  }, [gameId]);
   const [sent, setSent] = useState(null);       // { q, choice }
   const prev = React.useRef(null);
   const lastSec = React.useRef(null);
@@ -2287,7 +2362,7 @@ function QuizPlayerGame({ gameId, onBack }) {
 
   if (st.status === 'lobby') return html('main', { className: wrapCls }, head,
     html('div', { className: 'quiz-wait' }, html('div', { className: 'quiz-wait-icon bounce' }, '🎮'),
-      html('b', null, '¡Estás adentro!'), html('span', null, 'Buscá tu nombre en la pantalla del aula. Ya empieza…')));
+      html('b', null, '¡Estás adentro!'), html('span', null, 'Esperá a que tu lǎoshī inicie la partida.')));
 
   if (st.status === 'question') {
     const cur = st.current;

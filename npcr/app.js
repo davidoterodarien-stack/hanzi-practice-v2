@@ -2050,7 +2050,9 @@ function QuizHost({ classId }) {
           html('button', { className: 'mini-btn strong', disabled: busy, onClick: () => play(s) }, '▶ Jugar en esta aula'),
           (s.created_by === me) && html('button', { className: 'mini-btn', onClick: () => setEdit({ id: s.id, title: s.title, questions: s.questions }) }, '✏️ Editar'),
           html('button', { className: 'mini-btn', onClick: () => setEdit({ title: s.title + ' (copia)', questions: s.questions }) }, '⧉ Duplicar'),
-          (s.created_by === me) && html('button', { className: 'mini-btn danger', onClick: () => remove(s) }, '🗑'))))));
+          (s.created_by === me) && html('button', { className: 'mini-btn danger', onClick: () => remove(s) }, '🗑'))))),
+    html(QuizHistory, { classId }),
+    html(ClassMedals, { classId, juego: 'quiz' }));
 }
 
 function QuizEditor({ edit, setEdit, onSave, onCancel, msg, flash }) {
@@ -3813,6 +3815,7 @@ function ClassHome({ cls, dailyCount, dailyDone, assignments, settings, hardCoun
     html('div', { style: { padding: '0 16px' } },
       html(BingoInvite, { game: bingoGame, onJoin: onBingo }),
       html(QuizInvite, { classId: cls.class_id, enabled: aulaShown(settings, 'quiz-vivo'), onJoin: () => onActivity('quiz-vivo') }),
+      html(MyMedals),
       !aulaHidden(settings, 'entrenamiento') && html('h2', { className: 'section-title' }, 'Hoy'),
       !aulaHidden(settings, 'entrenamiento') && html('button', { className: 'class-training-card' + (dailyDone ? ' done' : ''), onClick: onTraining },
         html(AulaIcon, { name: dailyDone ? 'check' : 'target', tone: 'white', size: 52 }),
@@ -6357,7 +6360,8 @@ function BingoHost({ classId, className, lessons, maxLesson }) {
       html('p', { className: 'admin-note', style: { margin: '6px 0 0' } }, 'Si no lo activás, durante el juego tenés el botón 💡 Pista para mostrarlo unos segundos. También se puede cambiar en plena partida.'),
       html('button', { className: 'primary-btn', style: { width: '100%', marginTop: 14 }, disabled: busy || (mode === 'hanzi' && !pick.length), onClick: create }, busy ? 'Creando…' : 'Crear partida'),
     ),
-    html(BingoHistory, { classId, refreshKey: game ? game.id + game.status : '' }));
+    html(BingoHistory, { classId, refreshKey: game ? game.id + game.status : '' }),
+    html(ClassMedals, { classId, juego: 'bingo', refreshKey: game ? game.id + game.status : '' }));
 
   const winners = game.winners || [];
   return html('div', { ref: boxRef, className: 'bingo-host' },
@@ -6561,6 +6565,103 @@ function BingoInvite({ game, onJoin }) {
     html('span', { className: 'bingo-invite-go' }, 'Unirme →'));
 }
 
+// ═════════════════ 🏅 Medallero (Quiz en vivo y Bingo) + 📜 historial del Quiz ═════════════════
+// Todo se calcula en la base con las partidas ya jugadas (npcr_medallero.sql): los 3 primeros de
+// cada partida con 2 jugadores o más se llevan 🥇🥈🥉. Si la función todavía no existe, no se muestra.
+const MEDAL_GAME = { quiz: '⚡ Quiz', bingo: '🎱 Bingo' };
+const medalDate = (iso) => new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+const medalWhen = (iso) => new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+
+function useRpcList(fn, args, refreshKey) {
+  const [data, setData] = useState(null);
+  const key = JSON.stringify(args || {});
+  useEffect(() => {
+    let alive = true;
+    db.rpc(fn, args || {}).then(({ data: d, error }) => { if (alive) setData(error ? false : (d || [])); });
+    return () => { alive = false; };
+  }, [fn, key, refreshKey]);
+  return data;   // null = cargando · false = no disponible · [] = lista
+}
+
+function MedalCounts({ gold, silver, bronze, big }) {
+  return html('div', { className: 'medal-counts' + (big ? ' big' : '') },
+    [[MEDALS[0], gold, 'oro'], [MEDALS[1], silver, 'plata'], [MEDALS[2], bronze, 'bronce']].map(([m, n, t]) =>
+      html('span', { key: t, className: 'medal-count' + (n ? '' : ' none'), title: n + ' de ' + t }, html('span', { className: 'medal-ico' }, m), html('b', null, n || 0))));
+}
+
+function MedalRow({ m, showAula }) {
+  return html('div', { className: 'medal-row' },
+    html('span', { className: 'medal-ico' }, MEDALS[m.puesto - 1]),
+    html('span', { className: 'medal-row-main' },
+      // Mismo formato para los dos juegos: "⚡ Quiz en vivo · <cuestionario>" y "🎱 Bingo de hanzi"
+      html('b', { className: 'hanzi-font' }, m.juego === 'quiz' ? '⚡ Quiz en vivo · ' + m.titulo : '🎱 ' + m.titulo),
+      html('small', null, medalDate(m.fecha) + (m.jugadores ? ' · ' + m.jugadores + ' jugadores' : '') + (showAula && m.aula ? ' · ' + m.aula : ''))),
+    html('span', { className: 'medal-row-pts' }, m.puntos + ' pts'));
+}
+
+// Alumno (Mi aula): sus medallas de todas sus aulas
+function MyMedals() {
+  const list = useRpcList('npcr_my_medals');
+  const [open, setOpen] = useState(false);
+  if (!list) return null;
+  const n = (p) => list.filter(m => m.puesto === p).length;
+  return html('div', { className: 'medal-card' },
+    html('div', { className: 'medal-card-head' },
+      html('div', { className: 'medal-card-title' }, '🏅 Mis medallas'),
+      html(MedalCounts, { gold: n(1), silver: n(2), bronze: n(3), big: true })),
+    list.length === 0
+      ? html('p', { className: 'medal-empty' }, 'Todavía no ganaste medallas. En el ⚡ Quiz en vivo y el 🎱 Bingo de tu aula, los 3 primeros de cada partida se llevan 🥇🥈🥉.')
+      : html(React.Fragment, null,
+          html('button', { className: 'medal-toggle', onClick: () => setOpen(!open) }, open ? '▲ Ocultar historial' : '▼ Ver historial (' + list.length + ')'),
+          open && html('div', { className: 'medal-list' }, list.map((m, i) => html(MedalRow, { key: i, m, showAula: true })))));
+}
+
+// Equipo docente: medallero del aula para un juego (quiz o bingo)
+function ClassMedals({ classId, juego, refreshKey }) {
+  const list = useRpcList('npcr_class_medals', { p_class: classId }, refreshKey);
+  const [open, setOpen] = useState(null);
+  if (!list) return null;
+  const rows = list.map(r => ({ ...r, g: r[juego + '_oro'], s: r[juego + '_plata'], b: r[juego + '_bronce'], hist: (r.historial || []).filter(h => h.juego === juego) }))
+    .filter(r => r.g + r.s + r.b > 0)
+    .sort((a, b) => b.g - a.g || b.s - a.s || b.b - a.b || String(a.nombre).localeCompare(String(b.nombre)));
+  return html('div', { className: 'report-card' },
+    html('div', { className: 'report-h' }, '🏅 Medallero del aula · ' + MEDAL_GAME[juego]),
+    rows.length === 0
+      ? html('p', { className: 'admin-note', style: { margin: 0 } }, 'Todavía nadie ganó medallas en ' + (juego === 'quiz' ? 'el Quiz en vivo' : 'el Bingo') + '. Se reparten 🥇🥈🥉 a los 3 primeros de cada partida con 2 jugadores o más.')
+      : html('div', { className: 'medal-table' }, rows.map((r, i) => html(React.Fragment, { key: r.nombre + i },
+          html('button', { className: 'medal-trow' + (open === i ? ' open' : ''), onClick: () => setOpen(open === i ? null : i) },
+            html('span', { className: 'medal-pos' }, i + 1),
+            html('span', { className: 'medal-name' }, r.nombre),
+            html(MedalCounts, { gold: r.g, silver: r.s, bronze: r.b }),
+            html('span', { className: 'medal-arrow' }, open === i ? '▲' : '▼')),
+          open === i && html('div', { className: 'medal-list in-table' }, r.hist.map((m, k) => html(MedalRow, { key: k, m })))))));
+}
+
+// Equipo docente: partidas de Quiz jugadas en el aula, con fecha, podio y ranking completo
+function QuizHistory({ classId, refreshKey }) {
+  const list = useRpcList('npcr_quiz_history', { p_class: classId }, refreshKey);
+  const [open, setOpen] = useState(null);
+  if (!list) return null;
+  return html('div', { className: 'report-card' },
+    html('div', { className: 'report-h' }, '📜 Partidas anteriores'),
+    list.length === 0
+      ? html('p', { className: 'admin-note', style: { margin: 0 } }, 'Todavía no se jugó ninguna partida en esta aula.')
+      : list.map(g => {
+          const isOpen = open === g.id, win = (g.podio || [])[0];
+          return html('div', { key: g.id, className: 'bingo-hist' + (isOpen ? ' open' : '') },
+            html('button', { className: 'bingo-hist-head', onClick: () => setOpen(isOpen ? null : g.id) },
+              html('span', { className: 'bingo-hist-date' }, medalWhen(g.fecha)),
+              html('span', { className: 'bingo-hist-meta hanzi-font' }, g.titulo + ' · ' + g.preguntas + ' preguntas · ' + g.jugadores + (g.jugadores === 1 ? ' jugador' : ' jugadores')),
+              html('span', { className: 'bingo-hist-win' }, !win || !(win.puntos > 0) ? 'Sin puntos' : g.jugadores < 2 ? 'Jugó solo: ' + win.nombre : '🥇 ' + win.nombre + ' · ' + win.puntos + ' pts'),
+              html('span', { className: 'bingo-hist-arrow' }, isOpen ? '▲' : '▼')),
+            isOpen && html('div', { className: 'bingo-hist-body' },
+              g.jugadores < 2 && html('div', { className: 'bingo-sub' }, 'Jugó una sola persona: esta partida no reparte medallas.'),
+              html('div', { className: 'medal-list' }, (g.ranking || []).map((p, k) => html('div', { key: k, className: 'medal-row' },
+                html('span', { className: 'medal-ico' }, g.jugadores >= 2 && k < 3 && p.puntos > 0 ? MEDALS[k] : (k + 1) + '.'),
+                html('span', { className: 'medal-row-main' }, html('b', null, p.nombre)),
+                html('span', { className: 'medal-row-pts' }, p.puntos + ' pts'))))));
+        }));
+}
 // ----------------- Quiz -----------------
 const FLAG_RE = /^\p{Emoji_Presentation}/u;
 const FLAG_CODE_RE = /^([\u{1F1E0}-\u{1F1FF}]{2})/u;

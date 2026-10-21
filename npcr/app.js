@@ -2845,6 +2845,11 @@ function App() {
   }, 0);
 
   const needsName = !!(studentId && profile && myClasses !== null && !(myClasses && myClasses.length) && !isStaffUser && !validStudentName(profile.name));
+  // 📝 Encuesta a los alumnos: pendiente hasta que la responden (el equipo docente no la recibe)
+  const [survey] = useSurveyPending(!!studentId && !!profile && !isStaffUser && !needsName);
+  const [surveyOpen, setSurveyOpen] = useState(false);
+  const [surveyDone, setSurveyDone] = useState(false);
+  const surveyPending = survey && !surveyDone ? survey : null;
   const saveName = async (n) => {
     const name = n.trim();
     await db.from('profiles').update({ name }).eq('id', studentId);
@@ -2870,6 +2875,7 @@ function App() {
   if (screen.name === 'home') {
     content = html(Home, {
       vocab, lessons, progress, totalWords, totalStars,
+      topSlot: html(SurveyCard, { survey: surveyPending, onOpen: () => setSurveyOpen(true) }),
       modulesList: appConfig.modules_list,
       maxLesson,
       onSelectLesson: openLesson,
@@ -3301,6 +3307,8 @@ function App() {
 
   return html('div', { className: 'app-shell' }, sidebar, html('div', { className: 'app' }, topbar, content), needsName && html(NameRequired, { onSave: saveName }),
     html(AppDialogs),
+    html(SurveyPopup, { survey: surveyPending, onHome: screen.name === 'home' && !surveyOpen, onOpen: () => setSurveyOpen(true) }),
+    surveyOpen && survey && html(SurveyFlow, { survey, playerName, onClose: () => setSurveyOpen(false), onDone: () => setSurveyDone(true) }),
     guestLock && guestLimited && html(GuestLockModal, { text: guestText, onClose: () => setGuestLock(false), myClasses, onActivateCode: activateStudentCode }),
     !needsName && studentId && html(UserNotices, { studentId, currentName: profile && profile.name, onName: (name) => setProfile(p => ({ ...(p || {}), name })) }));
 }
@@ -4034,7 +4042,7 @@ function NameRequired({ onSave }) {
   );
 }
 
-function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass, bingoGame, onBingo, guestLimited, onGuestLock }) {
+function Home({ topSlot, vocab, lessons, progress, totalWords, totalStars, onSelectLesson, onAdmin, onPrueba, pruebaProgress, onDownload, onRefuerzo, playerName, onChangeName, streak, assignments, myClasses, onActivateCode, codeNotice, onDismissNotice, modulesList, dailyCount, dailyDone, onOpenClass, onTraining, onProgress, maxLesson, classSettings, hardCount, onActivity, staffClasses, onPreviewClass, bingoGame, onBingo, guestLimited, onGuestLock }) {
   // Invitados: la base no les manda las lecciones bloqueadas, pero se muestran con candado (desde los temas)
   const gridIds = guestLimited
     ? [...new Set([...lessons, ...Object.keys(LESSON_THEMES).filter(k => /^\d+(\.\d+)?$/.test(k))])].sort(lessonCompare)
@@ -4046,6 +4054,7 @@ function Home({ vocab, lessons, progress, totalWords, totalStars, onSelectLesson
       html('button', { className: 'change-name-btn', onClick: onChangeName, title: 'Cerrar sesión' }, '🚪'),
     ),
     html('main', null,
+      topSlot,
       html('div', { className: 'score-strip' },
         html('div', { className: 'score-chip' },
           html('div', { className: 'num' }, totalWords),
@@ -6689,6 +6698,257 @@ function QuizHistory({ classId, refreshKey }) {
                 html('span', { className: 'medal-row-pts' }, p.puntos + ' pts'))))));
         }));
 }
+// ═════════════════ 📝 Encuestas a los alumnos (npcr_encuestas.sql) ═════════════════
+// La encuesta activa aparece como ventana al entrar a la app (se cierra con ✕ y vuelve en la
+// próxima entrada) y como tarjeta en el inicio, hasta que el alumno la responde. El equipo docente
+// no la recibe. Título, presentación, preguntas y opciones vienen de la base.
+const SURVEY_FACES = ['😞', '😐', '🙂', '😀', '🤩'];
+const titleCase = (s) => String(s || '').toLowerCase().replace(/(^|\s)(\S)/g, (m, a, b) => a + b.toUpperCase());
+
+// Encuesta pendiente del alumno (null = ninguna)
+function useSurveyPending(enabled) {
+  const [survey, setSurvey] = useState(null);
+  useEffect(() => {
+    if (!enabled) { setSurvey(null); return; }
+    let alive = true;
+    db.rpc('npcr_survey_pending').then(({ data, error }) => { if (alive && !error && data && data.id) setSurvey(data); });
+    return () => { alive = false; };
+  }, [enabled]);
+  return [survey, () => setSurvey(null)];
+}
+
+// Ventana al entrar: unos segundos después de llegar al inicio; ✕ la cierra hasta la próxima entrada
+function SurveyPopup({ survey, onOpen, onHome }) {
+  const [shown, setShown] = useState(false);
+  const [closed, setClosed] = useState(false);
+  useEffect(() => { if (!onHome || closed) return; const t = setTimeout(() => setShown(true), 2500); return () => clearTimeout(t); }, [onHome, closed]);
+  if (!survey || !shown || closed || !onHome) return null;
+  const n = (survey.questions || []).length;
+  return html('div', { className: 'survey-pop-ov' },
+    html('div', { className: 'survey-pop', role: 'dialog', 'aria-modal': true },
+      html('button', { className: 'survey-x', onClick: () => setClosed(true), 'aria-label': 'Cerrar' }, '✕'),
+      html('div', { className: 'survey-pop-ico' }, '📝'),
+      html('div', { className: 'survey-pop-title' }, survey.title),
+      html('p', { className: 'survey-pop-text' }, 'Queremos saber qué te parece la app. Son ' + n + ' preguntas cortas y te lleva menos de 2 minutos.'),
+      html('button', { className: 'primary-btn survey-go', onClick: () => { setClosed(true); onOpen(); } }, 'Responder la encuesta →')));
+}
+
+// Tarjeta del inicio (queda hasta que la responda)
+function SurveyCard({ survey, onOpen }) {
+  if (!survey) return null;
+  return html('button', { type: 'button', className: 'survey-card', onClick: onOpen },
+    html('span', { className: 'survey-card-ico' }, '📝'),
+    html('span', { className: 'survey-card-main' },
+      html('b', null, survey.title),
+      html('small', null, 'Tu opinión nos ayuda a mejorar la app · menos de 2 minutos')),
+    html('span', { className: 'survey-card-go' }, 'Responder →'));
+}
+
+// El recorrido: presentación → una pregunta por pantalla → gracias
+function SurveyFlow({ survey, playerName, onClose, onDone, preview }) {
+  const qs = survey.questions || [];
+  const [step, setStep] = useState(-1);          // -1 = presentación · qs.length = gracias
+  const [ans, setAns] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const first = titleCase(playerName);
+  const q = qs[step];
+  const set = (v) => setAns(a => ({ ...a, [q.id]: v }));
+  const val = q ? ans[q.id] : null;
+  const ready = !q || q.optional || (q.type === 'scale' ? val != null : q.type === 'multi' ? (val || []).length > 0 : String(val || '').trim() !== '');
+  const send = async () => {
+    if (preview) { setStep(qs.length); return; }   // vista previa: no guarda nada
+    setBusy(true); setErr('');
+    const clean = {};
+    qs.forEach(x => { const v = ans[x.id]; if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) clean[x.id] = typeof v === 'string' ? v.trim().slice(0, 2000) : v; });
+    const { error } = await db.rpc('npcr_survey_submit', { p_survey: survey.id, p_answers: clean });
+    setBusy(false);
+    if (error) { setErr('No se pudo enviar (' + error.message + '). Probá de nuevo.'); return; }
+    setStep(qs.length); onDone();
+  };
+  const next = () => (step === qs.length - 1 ? send() : setStep(step + 1));
+
+  let body;
+  if (step === -1) body = html('div', { className: 'survey-intro' },
+    html('div', { className: 'survey-big-ico' }, '👋'),
+    html('h2', null, '¡Hola' + (first ? ', ' + first : '') + '!'),
+    String(survey.intro || '').split(/\n\s*\n/).filter(Boolean).map((p, i) => html('p', { key: i }, p)),
+    html('button', { className: 'primary-btn', onClick: () => setStep(0) }, 'Empezar →'));
+  else if (step >= qs.length) body = html('div', { className: 'survey-intro' },
+    html('div', { className: 'survey-big-ico' }, '🎉'),
+    html('h2', null, '¡Gracias' + (first ? ', ' + first : '') + '!'),
+    html('p', null, 'Tu respuesta ya nos llegó. Nos ayuda muchísimo a seguir mejorando la app. 谢谢！'),
+    html('button', { className: 'primary-btn', onClick: onClose }, 'Volver a la app'));
+  else body = html('div', { className: 'survey-q', key: q.id },
+    html('div', { className: 'survey-progress' }, html('i', { style: { width: ((step + 1) / qs.length * 100) + '%' } })),
+    html('div', { className: 'survey-step' }, 'Pregunta ' + (step + 1) + ' de ' + qs.length + (q.optional ? ' · opcional' : '')),
+    html('h3', null, q.text),
+    q.hint && html('div', { className: 'survey-hint' }, q.hint),
+    q.type === 'scale' && html(React.Fragment, null,
+      html('div', { className: 'survey-scale' }, SURVEY_FACES.map((f, i) => html('button', { key: i, type: 'button',
+        className: 'survey-face' + (val === i + 1 ? ' on' : ''), onClick: () => set(i + 1), 'aria-label': (i + 1) + ' de 5' },
+        html('span', null, f), html('small', null, i + 1)))),
+      q.labels && html('div', { className: 'survey-scale-lbl' }, html('span', null, q.labels[0]), html('span', null, q.labels[1]))),
+    q.type === 'multi' && html('div', { className: 'survey-opts' }, (q.options || []).map(o => {
+      const sel = (val || []).includes(o), full = !sel && (val || []).length >= (q.max || 99);
+      return html('button', { key: o, type: 'button', disabled: full, className: 'survey-opt' + (sel ? ' on' : ''),
+        onClick: () => set(sel ? (val || []).filter(x => x !== o) : [...(val || []), o]) }, (sel ? '✓ ' : '') + o);
+    })),
+    q.type === 'text' && html('textarea', { className: 'survey-text', rows: 5, maxLength: 2000, value: val || '', placeholder: q.placeholder || '', onChange: e => set(e.target.value) }),
+    err && html('div', { className: 'admin-status err', style: { marginTop: 10 } }, err),
+    html('div', { className: 'survey-nav' },
+      html('button', { type: 'button', className: 'survey-back', onClick: () => setStep(step - 1) }, '← Atrás'),
+      html('button', { type: 'button', className: 'primary-btn', disabled: !ready || busy, onClick: next },
+        busy ? 'Enviando…' : step === qs.length - 1 ? 'Enviar ✓' : (q.optional && !String(val || '').trim() ? 'Saltear →' : 'Siguiente →'))));
+
+  return html('div', { className: 'survey-ov' },
+    html('div', { className: 'survey-box', role: 'dialog', 'aria-modal': true },
+      html('button', { className: 'survey-x', onClick: onClose, 'aria-label': 'Cerrar' }, '✕'),
+      preview && html('div', { className: 'survey-preview-tag' }, '👁 Vista previa: así la ven los alumnos. No se guarda nada.'),
+      body));
+}
+
+// ── Superadmin: resultados y edición (Administrar → Encuestas) ──
+function SurveyAdmin() {
+  const [list, setList] = useState(null);
+  const [selId, setSelId] = useState(null);
+  const [res, setRes] = useState(null);
+  const [aula, setAula] = useState('');
+  const [edit, setEdit] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [preview, setPreview] = useState(false);
+  const load = () => db.rpc('npcr_survey_list').then(({ data, error }) => {
+    if (error) { setList([]); setMsg({ type: 'err', text: /function|does not exist/.test(error.message) ? 'Falta correr npcr_encuestas.sql en la base.' : error.message }); return; }
+    setList(data || []); if (!selId && data && data.length) setSelId((data.find(s => s.active) || data[0]).id);
+  });
+  useEffect(() => { load(); }, []);
+  useEffect(() => { if (!selId) return; setRes(null); db.rpc('npcr_survey_results', { p_survey: selId }).then(({ data }) => setRes(data || { responses: [] })); }, [selId]);
+  if (preview && list) { const ps = list.find(x => x.id === selId); if (ps) return html(SurveyFlow, { survey: ps, playerName: 'Marianela', preview: true, onClose: () => setPreview(false), onDone: () => {} }); }
+  if (edit) return html(SurveyEditor, { edit, onCancel: () => setEdit(null), onSaved: (id) => { setEdit(null); setSelId(id); load(); setMsg({ type: 'ok', text: '✅ Encuesta guardada.' }); } });
+  if (!list) return html('p', { className: 'admin-note' }, 'Cargando encuestas…');
+  const s = list.find(x => x.id === selId);
+  const all = (res && res.responses) || [];
+  const aulas = [...new Set(all.map(r => r.class_name || 'Invitados'))].sort();
+  const rows = aula ? all.filter(r => (r.class_name || 'Invitados') === aula) : all;
+  const csv = () => {
+    const qs = s.questions || [];
+    const esc = (v) => '"' + String(v == null ? '' : Array.isArray(v) ? v.join(' | ') : v).replace(/"/g, '""') + '"';
+    const lines = [['Fecha', 'Nombre', 'Aula', ...qs.map(q => q.text)].map(esc).join(',')]
+      .concat(rows.map(r => [new Date(r.created_at).toLocaleString('es-AR'), r.name, r.class_name || 'Invitado', ...qs.map(q => (r.answers || {})[q.id])].map(esc).join(',')));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'encuesta-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+  };
+  return html('div', null,
+    msg && html('div', { className: 'admin-status ' + msg.type, style: { marginBottom: 10 } }, msg.text),
+    html('div', { className: 'report-card' },
+      html('div', { className: 'plan-head' }, html('div', { className: 'report-h', style: { margin: 0, flex: 1 } }, '📝 Encuestas'),
+        html('button', { className: 'primary-btn', style: { margin: 0, width: 'auto', padding: '8px 14px' }, onClick: () => setEdit({ title: '', intro: '', questions: [], active: false }) }, '+ Nueva encuesta')),
+      html('p', { className: 'admin-note', style: { margin: '6px 0 10px' } }, 'La encuesta activa les aparece a los alumnos (con código e invitados) al entrar a la app y en el inicio, hasta que la responden. El equipo docente no la recibe. Solo puede haber una activa.'),
+      list.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no hay encuestas.')
+        : html('div', { className: 'survey-tabs' }, list.map(x => html('button', { key: x.id, className: 'survey-tab' + (x.id === selId ? ' on' : ''), onClick: () => setSelId(x.id) },
+            x.active ? '🟢 ' : '⚪ ', x.title, html('small', null, x.responses + (x.responses === 1 ? ' respuesta' : ' respuestas')))))),
+    s && html('div', { className: 'report-card' },
+      html('div', { className: 'plan-head', style: { flexWrap: 'wrap', gap: 8 } },
+        html('div', { className: 'report-h', style: { margin: 0, flex: 1, minWidth: 200 } }, s.title, s.active ? html('span', { className: 'survey-active' }, 'Activa') : html('span', { className: 'survey-active off' }, 'Apagada: no la ve nadie')),
+        html('button', { className: 'mini-btn', onClick: () => setPreview(true) }, '👁 Vista previa'),
+        html('button', { className: 'mini-btn', onClick: () => setEdit({ ...s }) }, '✏️ Editar'),
+        html('button', { className: 'mini-btn' + (s.active ? '' : ' strong'), onClick: async () => {
+          const ok = await appConfirm(s.active ? '¿Pausar la encuesta? Deja de aparecerles a los alumnos (las respuestas quedan guardadas).' : '¿Activar la encuesta? Les va a empezar a aparecer a todos los alumnos al entrar a la app.');
+          if (!ok) return;
+          const { error } = await db.rpc('npcr_survey_save', { p_id: s.id, p_title: s.title, p_intro: s.intro, p_questions: s.questions, p_active: !s.active });
+          if (error) { setMsg({ type: 'err', text: error.message }); return; }
+          setMsg({ type: 'ok', text: s.active ? '⏸ Encuesta pausada.' : '▶ Encuesta activada: ya les aparece a los alumnos.' }); load();
+        } }, s.active ? '⏸ Pausar' : '▶ Activar'),
+        rows.length > 0 && html('button', { className: 'mini-btn', onClick: csv }, '⬇ Descargar planilla')),
+      !res ? html('p', { className: 'admin-note' }, 'Cargando respuestas…') : html(React.Fragment, null,
+        html('div', { className: 'survey-kpis' },
+          html('div', { className: 'survey-kpi' }, html('b', null, all.length), html('span', null, 'respuestas')),
+          html('div', { className: 'survey-kpi' }, html('b', null, all.filter(r => !r.is_guest).length + ' / ' + (res.students || 0)), html('span', null, 'alumnos con código')),
+          html('div', { className: 'survey-kpi' }, html('b', null, all.filter(r => r.is_guest).length), html('span', null, 'invitados'))),
+        aulas.length > 1 && html('div', { className: 'survey-filter' }, html('span', null, 'Aula:'),
+          html('select', { value: aula, onChange: e => setAula(e.target.value) }, html('option', { value: '' }, 'Todas'), aulas.map(a => html('option', { key: a, value: a }, a)))),
+        rows.length === 0 ? html('p', { className: 'admin-note' }, 'Todavía no respondió nadie.')
+          : (s.questions || []).map(q => html(SurveyQuestionResult, { key: q.id, q, rows })))));
+}
+
+function SurveyQuestionResult({ q, rows }) {
+  const vals = rows.map(r => ({ v: (r.answers || {})[q.id], r })).filter(x => x.v != null && x.v !== '' && !(Array.isArray(x.v) && !x.v.length));
+  let body;
+  if (q.type === 'scale') {
+    const nums = vals.map(x => Number(x.v)).filter(n => n >= 1 && n <= 5);
+    const avg = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+    const max = Math.max(1, ...[1, 2, 3, 4, 5].map(k => nums.filter(n => n === k).length));
+    body = html('div', { className: 'survey-res-scale' },
+      html('div', { className: 'survey-avg' }, html('b', null, avg ? avg.toFixed(1) : '–'), html('span', null, ' / 5 ' + (avg ? SURVEY_FACES[Math.round(avg) - 1] : ''))),
+      html('div', { className: 'survey-bars' }, [5, 4, 3, 2, 1].map(k => { const c = nums.filter(n => n === k).length;
+        return html('div', { key: k, className: 'survey-bar-row' }, html('span', null, SURVEY_FACES[k - 1] + ' ' + k), html('div', { className: 'survey-bar' }, html('i', { style: { width: (c / max * 100) + '%' } })), html('b', null, c)); })));
+  } else if (q.type === 'multi') {
+    const count = {}; vals.forEach(x => (x.v || []).forEach(o => { count[o] = (count[o] || 0) + 1; }));
+    const items = Object.entries(count).sort((a, b) => b[1] - a[1]); const max = Math.max(1, ...items.map(i => i[1]));
+    body = items.length ? html('div', { className: 'survey-bars' }, items.map(([o, c]) => html('div', { key: o, className: 'survey-bar-row wide' },
+      html('span', null, o), html('div', { className: 'survey-bar' }, html('i', { style: { width: (c / max * 100) + '%' } })), html('b', null, c)))) : html('p', { className: 'admin-note' }, 'Sin respuestas.');
+  } else {
+    body = vals.length ? html('div', { className: 'survey-comments' }, vals.map((x, i) => html('div', { key: i, className: 'survey-comment' },
+      html('p', null, String(x.v)), html('small', null, x.r.name + ' · ' + (x.r.class_name || 'Invitado') + ' · ' + new Date(x.r.created_at).toLocaleDateString('es-AR'))))) : html('p', { className: 'admin-note' }, 'Nadie escribió todavía.');
+  }
+  return html('div', { className: 'survey-res' }, html('div', { className: 'survey-res-q' }, q.text, html('small', null, ' · ' + vals.length + (vals.length === 1 ? ' respuesta' : ' respuestas'))), body);
+}
+
+function SurveyEditor({ edit, onCancel, onSaved }) {
+  const [e, setE] = useState(() => ({ ...edit, questions: (edit.questions || []).map(q => ({ ...q, optionsText: (q.options || []).join('\n') })) }));
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const setQ = (i, patch) => setE(x => ({ ...x, questions: x.questions.map((q, k) => k === i ? { ...q, ...patch } : q) }));
+  const move = (i, d) => setE(x => { const a = [...x.questions]; const j = i + d; if (j < 0 || j >= a.length) return x; [a[i], a[j]] = [a[j], a[i]]; return { ...x, questions: a }; });
+  const save = async () => {
+    setErr('');
+    const questions = e.questions.map((q, i) => {
+      const out = { id: q.id || ('p' + (i + 1) + '_' + Math.random().toString(36).slice(2, 6)), type: q.type || 'scale', text: String(q.text || '').trim() };
+      if (q.optional) out.optional = true;
+      if (q.hint) out.hint = q.hint;
+      if (q.type === 'multi') { out.options = String(q.optionsText || '').split('\n').map(s => s.trim()).filter(Boolean); out.max = Number(q.max) || 3; }
+      if (q.type === 'scale') out.labels = q.labels && q.labels.length === 2 ? q.labels : ['Nada', 'Mucho'];
+      if (q.type === 'text' && q.placeholder) out.placeholder = q.placeholder;
+      return out;
+    });
+    if (questions.some(q => !q.text)) { setErr('Hay una pregunta sin texto.'); return; }
+    if (questions.some(q => q.type === 'multi' && q.options.length < 2)) { setErr('Las preguntas de opciones necesitan al menos 2 opciones (una por renglón).'); return; }
+    setBusy(true);
+    const { data, error } = await db.rpc('npcr_survey_save', { p_id: e.id || null, p_title: e.title, p_intro: e.intro, p_questions: questions, p_active: !!e.active });
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onSaved(data);
+  };
+  const inp = { width: '100%', boxSizing: 'border-box' };
+  return html('div', { className: 'report-card' },
+    html('div', { className: 'report-h' }, e.id ? '✏️ Editar encuesta' : '+ Nueva encuesta'),
+    html('label', { className: 'survey-field' }, 'Título', html('input', { className: 'admin-input', style: inp, value: e.title, onChange: ev => setE({ ...e, title: ev.target.value }) })),
+    html('label', { className: 'survey-field' }, 'Presentación (se muestra antes de las preguntas; un renglón vacío separa párrafos)',
+      html('textarea', { className: 'admin-input', rows: 7, style: inp, value: e.intro, onChange: ev => setE({ ...e, intro: ev.target.value }) })),
+    html('label', { className: 'survey-check' }, html('input', { type: 'checkbox', checked: !!e.active, onChange: ev => setE({ ...e, active: ev.target.checked }) }), ' Activa (les aparece a los alumnos; desactiva la que estaba activa)'),
+    html('div', { className: 'report-h', style: { marginTop: 14 } }, 'Preguntas'),
+    e.questions.map((q, i) => html('div', { key: i, className: 'survey-edit-q' },
+      html('div', { className: 'survey-edit-head' },
+        html('b', null, (i + 1) + '.'),
+        html('select', { value: q.type || 'scale', onChange: ev => setQ(i, { type: ev.target.value }) },
+          html('option', { value: 'scale' }, 'Escala 1 a 5 (caritas)'), html('option', { value: 'multi' }, 'Opciones (elegir varias)'), html('option', { value: 'text' }, 'Texto libre')),
+        html('label', { className: 'survey-check' }, html('input', { type: 'checkbox', checked: !!q.optional, onChange: ev => setQ(i, { optional: ev.target.checked }) }), ' Opcional'),
+        html('span', { style: { flex: 1 } }),
+        html('button', { className: 'mini-btn', onClick: () => move(i, -1), disabled: i === 0 }, '↑'),
+        html('button', { className: 'mini-btn', onClick: () => move(i, 1), disabled: i === e.questions.length - 1 }, '↓'),
+        html('button', { className: 'mini-btn danger', onClick: () => setE(x => ({ ...x, questions: x.questions.filter((_, k) => k !== i) })) }, '🗑')),
+      html('input', { className: 'admin-input', style: inp, placeholder: 'Pregunta', value: q.text || '', onChange: ev => setQ(i, { text: ev.target.value }) }),
+      q.type === 'multi' && html(React.Fragment, null,
+        html('textarea', { className: 'admin-input', rows: 5, style: { ...inp, marginTop: 6 }, placeholder: 'Opciones, una por renglón', value: q.optionsText || '', onChange: ev => setQ(i, { optionsText: ev.target.value }) }),
+        html('label', { className: 'survey-field inline' }, 'Pueden elegir hasta ', html('input', { type: 'number', min: 1, max: 20, className: 'admin-input', style: { width: 70 }, value: q.max || 3, onChange: ev => setQ(i, { max: ev.target.value }) })),
+        html('input', { className: 'admin-input', style: { ...inp, marginTop: 6 }, placeholder: 'Ayuda (ej. Elegí hasta 3)', value: q.hint || '', onChange: ev => setQ(i, { hint: ev.target.value }) })),
+      q.type === 'text' && html('input', { className: 'admin-input', style: { ...inp, marginTop: 6 }, placeholder: 'Texto de ayuda dentro del cuadro', value: q.placeholder || '', onChange: ev => setQ(i, { placeholder: ev.target.value }) }))),
+    html('button', { className: 'mini-btn', style: { marginTop: 8 }, onClick: () => setE(x => ({ ...x, questions: [...x.questions, { type: 'scale', text: '' }] })) }, '+ Agregar pregunta'),
+    err && html('div', { className: 'admin-status err', style: { marginTop: 10 } }, err),
+    html('div', { style: { display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' } },
+      html('button', { className: 'primary-btn', style: { width: 'auto', margin: 0 }, disabled: busy, onClick: save }, busy ? 'Guardando…' : 'Guardar'),
+      html('button', { className: 'mini-btn', onClick: onCancel }, 'Cancelar')));
+}
 // ----------------- Quiz -----------------
 const FLAG_RE = /^\p{Emoji_Presentation}/u;
 const FLAG_CODE_RE = /^([\u{1F1E0}-\u{1F1FF}]{2})/u;
@@ -8665,6 +8925,7 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
     isAdmin && { id: 'alumnos', icon: 'chart', tone: 'green', title: 'Alumnos', sub: 'Registro y estadísticas' },
     isAdmin && { id: 'ingresos', icon: 'login', tone: 'gold', title: 'Ingresos', sub: 'Accesos a la consola' },
     isAdmin && { id: 'contenido', icon: 'book', tone: 'purple', title: 'Contenido', sub: 'Lecciones y módulos' },
+    isSuper && { id: 'encuestas', icon: 'clipboard', tone: 'purple', title: 'Encuestas', sub: 'Opinión de los alumnos' },
     isSuper && { id: 'papelera', icon: 'trash', tone: 'red', title: 'Papelera', sub: 'E historial de cambios' },
     isAdmin && { id: 'config', icon: 'gear', tone: 'blue', title: 'Configuración', sub: 'Textos y módulos de la app' },
   ].filter(Boolean);
@@ -9123,6 +9384,9 @@ function AdminPanel({ vocab, onBack, onVocabUpdate, onReports, appConfig, onAppC
 
             // ── Papelera e historial de cambios (solo superadmin) ──
             isSuper && showTab('papelera') && html(ContentTrash, null),
+
+            // ── Encuestas a los alumnos: resultados y edición (solo superadmin) ──
+            isSuper && showTab('encuestas') && html(SurveyAdmin, null),
 
             // ── Contenido: lecciones, módulos especiales y módulos de práctica ──
             isAdmin && showTab('contenido') && html(React.Fragment, null,

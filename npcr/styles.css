@@ -2376,3 +2376,86 @@ main.quiz-p { position: fixed; inset: 0; z-index: 60; width: auto; max-width: no
   .score-chip .lbl { font-size: 9.5px; letter-spacing: .03em; }
 }
 .medal-row.off { opacity: .6; }
+
+/* 📝 Encuesta a los alumnos */
+.survey-card { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; font-family: inherit; cursor: pointer; margin: 4px 0 14px;
+  background: linear-gradient(120deg, #EAF6FF, #F3ECFF); border: 2px solid #C9B6F2; border-radius: 16px; padding: 12px 14px; box-shadow: 0 3px 0 #C9B6F2; color: var(--ink); animation: surveyGlow 2.4s ease-in-out infinite; }
+@keyframes surveyGlow { 50% { box-shadow: 0 3px 0 #C9B6F2, 0 0 0 4px rgba(150, 110, 230, .15); } }
+.survey-card:active { transform: translateY(2px); }
+.survey-card-ico { font-size: 30px; flex-shrink: 0; }
+.survey-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.survey-card-main b { font-size: 15px; font-weight: 900; }
+.survey-card-main small { font-size: 12px; font-weight: 600; color: var(--ink-mid); }
+.survey-card-go { background: #7C4DDB; color: #fff; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 6px 12px; white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 400px) { .survey-card-go { display: none; } }
+
+.survey-pop-ov, .survey-ov { position: fixed; inset: 0; z-index: 9300; background: rgba(25, 12, 50, .5); display: flex; align-items: center; justify-content: center; padding: 16px; animation: quizIn .25s ease; }
+.survey-pop, .survey-box { position: relative; background: #fff; border-radius: 22px; width: min(440px, 100%); box-shadow: 0 18px 50px rgba(30, 10, 70, .3); }
+.survey-pop { padding: 26px 22px 22px; text-align: center; animation: bpPop .35s cubic-bezier(.2, 1.4, .4, 1); }
+.survey-pop-ico { font-size: 54px; line-height: 1; }
+.survey-pop-title { font-size: 21px; font-weight: 900; margin: 10px 0 6px; color: #3B1E80; }
+.survey-pop-text { margin: 0 0 16px; color: var(--ink-mid); font-weight: 600; line-height: 1.45; }
+.survey-go { width: 100%; margin: 0; background: #7C4DDB; box-shadow: 0 4px 0 #5A31B0; }
+.survey-x { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 50%; border: none; background: #F1ECFA; color: #3B1E80; font-weight: 900; font-size: 15px; cursor: pointer; z-index: 2; }
+.survey-box { width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px 20px 20px; }
+.survey-intro { text-align: center; }
+.survey-intro h2 { margin: 6px 0 10px; color: #3B1E80; font-size: 24px; }
+.survey-intro p { text-align: left; color: var(--ink-mid); line-height: 1.55; font-weight: 600; margin: 0 0 12px; }
+.survey-intro .primary-btn { margin-top: 8px; background: #7C4DDB; box-shadow: 0 4px 0 #5A31B0; }
+.survey-big-ico { font-size: 52px; line-height: 1; }
+.survey-progress { height: 8px; border-radius: 999px; background: #EEE8FA; overflow: hidden; margin: 4px 36px 10px 0; }
+.survey-progress i { display: block; height: 100%; background: linear-gradient(90deg, #9B6CF0, #7C4DDB); transition: width .3s; }
+.survey-step { font-size: 12px; font-weight: 800; color: #7C4DDB; text-transform: uppercase; letter-spacing: .05em; }
+.survey-q h3 { margin: 6px 0 4px; font-size: 20px; line-height: 1.3; color: var(--ink); }
+.survey-q { animation: quizIn .25s ease; }
+.survey-hint { font-size: 13px; color: var(--ink-soft); font-weight: 700; margin-bottom: 4px; }
+.survey-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+.survey-face { border: 2px solid var(--paper-deep); background: #fff; border-radius: 14px; padding: 10px 0 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-family: inherit; transition: transform .12s, border-color .2s, background .2s; }
+.survey-face span { font-size: clamp(26px, 8vw, 36px); line-height: 1; }
+.survey-face small { font-weight: 800; color: var(--ink-soft); }
+.survey-face.on { border-color: #7C4DDB; background: #F3ECFF; transform: scale(1.06); }
+.survey-scale-lbl { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-top: 6px; }
+.survey-opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.survey-opt { border: 2px solid var(--paper-deep); background: #fff; border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; color: var(--ink); }
+.survey-opt.on { border-color: #7C4DDB; background: #7C4DDB; color: #fff; }
+.survey-opt:disabled { opacity: .4; cursor: default; }
+.survey-text { width: 100%; box-sizing: border-box; margin-top: 12px; border: 2px solid var(--paper-deep); border-radius: 14px; padding: 12px; font-family: inherit; font-size: 15px; resize: vertical; }
+.survey-text:focus { outline: none; border-color: #7C4DDB; }
+.survey-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; }
+.survey-nav .primary-btn { width: auto; margin: 0; padding: 12px 22px; background: #7C4DDB; box-shadow: 0 4px 0 #5A31B0; }
+.survey-back { background: none; border: none; color: var(--ink-soft); font-weight: 800; cursor: pointer; font-family: inherit; font-size: 14px; }
+
+/* Resultados (superadmin) */
+.survey-tabs { display: flex; flex-direction: column; gap: 6px; }
+.survey-tab { display: flex; align-items: center; gap: 6px; text-align: left; background: #fff; border: 2px solid var(--paper-deep); border-radius: 12px; padding: 9px 12px; cursor: pointer; font-family: inherit; font-weight: 800; color: var(--ink); }
+.survey-tab small { margin-left: auto; font-weight: 700; color: var(--ink-soft); }
+.survey-tab.on { border-color: #7C4DDB; background: #F7F2FF; }
+.survey-active { margin-left: 8px; font-size: 11px; background: #E6F6DC; color: #3E7A16; border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
+.survey-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 10px 0; }
+.survey-kpi { background: #F7F2FF; border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; }
+.survey-kpi b { font-size: 24px; color: #3B1E80; }
+.survey-kpi span { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.survey-filter { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; font-weight: 700; font-size: 14px; }
+.survey-filter select { max-width: 100%; padding: 6px 8px; border-radius: 10px; border: 2px solid var(--paper-deep); font-family: inherit; }
+.survey-res { border-top: 1px solid var(--paper-deep); padding: 14px 0 6px; }
+.survey-res-q { font-weight: 900; margin-bottom: 8px; }
+.survey-res-q small { font-weight: 600; color: var(--ink-soft); }
+.survey-res-scale { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.survey-avg b { font-size: 34px; color: #3B1E80; }
+.survey-avg span { font-weight: 800; color: var(--ink-soft); }
+.survey-bars { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 5px; }
+.survey-bar-row { display: grid; grid-template-columns: 52px 1fr 30px; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.survey-bar-row.wide { grid-template-columns: minmax(110px, 190px) 1fr 30px; }
+.survey-bar { height: 12px; background: #EEE8FA; border-radius: 999px; overflow: hidden; }
+.survey-bar i { display: block; height: 100%; background: linear-gradient(90deg, #9B6CF0, #7C4DDB); border-radius: 999px; }
+.survey-comments { display: flex; flex-direction: column; gap: 8px; }
+.survey-comment { background: #FAFAFC; border: 1px solid var(--paper-deep); border-radius: 12px; padding: 10px 12px; }
+.survey-comment p { margin: 0 0 4px; white-space: pre-wrap; line-height: 1.45; }
+.survey-comment small { color: var(--ink-soft); font-weight: 700; }
+.survey-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 800; color: var(--ink-mid); margin-bottom: 10px; }
+.survey-field.inline { flex-direction: row; align-items: center; margin: 6px 0 0; }
+.survey-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.survey-edit-q { border: 2px solid var(--paper-deep); border-radius: 14px; padding: 10px; margin-bottom: 8px; background: #FCFBFF; }
+.survey-edit-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.survey-active.off { background: #F1F1F4; color: var(--ink-soft); }
+.survey-preview-tag { background: #FFF6D6; border: 1px solid #F3D27A; color: #7A5300; font-size: 12px; font-weight: 800; border-radius: 10px; padding: 6px 10px; margin: 0 40px 12px 0; }

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>EstudioChino</title>
+</head>
+<body style="margin:0;font-family:system-ui,-apple-system,sans-serif;background:#faf7f2;color:#333;text-align:center;padding:64px 16px">
+<p style="font-size:18px">Nos mudamos a <a href="https://estudiochino.com/app/" style="color:#c1432b">estudiochino.com</a></p>
+<p style="font-size:14px;color:#777">Te llevamos en un instante…</p>
+<script>
+(function () {
+  var destino = 'https://estudiochino.com/app/';
+  try {
+    var s = JSON.parse(localStorage.getItem('sb-pwqwlfrlaxnybnkdauvk-auth-token') || 'null');
+    if (s && s.access_token && s.refresh_token) {
+      destino += '#traspaso=' + btoa(JSON.stringify({ a: s.access_token, r: s.refresh_token }))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+  } catch (e) {}
+  location.replace(destino);
+})();
+</script>
+</body>
+</html>
